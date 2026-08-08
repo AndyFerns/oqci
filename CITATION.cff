@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+title: "Open Quantum Compiler Infrastructure"
+message: "If you use OQCI in academic or research work, please cite this project."
+type: software
+
+authors:
+  - name: Andrew Fernandes
+
+repository-code: "https://github.com/AndyFerns/oqci"
+license: Apache-2.0
+
+version: 0.1.0
+date-released: 2026-08-08
