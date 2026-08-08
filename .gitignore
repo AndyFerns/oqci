@@ -27,3 +27,8 @@ docs/
 # Test outputs
 test_outputs/
 
+
+
+# Added by cargo
+
+/target

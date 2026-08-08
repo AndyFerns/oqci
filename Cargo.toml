@@ -1,0 +1,11 @@
+[package]
+name = "oqci"
+description = "The Open Quantum Compiler Infrastructure"
+version = "0.1.0"
+readme = "README.md"
+edition = "2024"
+
+license = "Apache-2.0"
+repository = "https://github.com/AndyFerns/oqci"
+
+[dependencies]
