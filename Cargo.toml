@@ -8,4 +8,14 @@ edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/AndyFerns/oqci"
 
+[lib]
+name = "oqci"
+path = "src/lib.rs"
+
+[[bin]]
+name = "oqci"
+path = "src/main.rs"
+
 [dependencies]
+thiserror = "2"
+petgraph = "0.6"

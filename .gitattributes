@@ -1,0 +1,25 @@
+# Normalize line endings so cross-platform edits (and the Windows .bat helper
+# scripts, which emit CRLF) never produce noisy whole-file diffs. Git stores
+# text as LF; working trees get the platform-appropriate endings on checkout.
+
+# Default: treat everything as text and store with LF.
+* text=auto eol=lf
+
+# Shell scripts MUST stay LF or they break on Unix.
+*.sh text eol=lf
+
+# Windows batch files should keep CRLF.
+*.bat text eol=crlf
+
+# Explicit text types (belt-and-suspenders for the common source files).
+*.rs   text eol=lf
+*.toml text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.css  text eol=lf
+VERSION text eol=lf
+
+# Binary assets — never touch these.
+*.png   binary
+*.woff2 binary
+*.ico   binary
