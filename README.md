@@ -1,10 +1,10 @@
 <div align="center">
 
-# oqci - Open Quantum Computing Infrastructure
+# ⚛ oqci 💻
+
+Open Quantum Compiler Infrastructure
 
 </div>
-
----
 
 ## About
 
