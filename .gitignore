@@ -1,34 +1,30 @@
 # Rust
-target/
-Cargo. Lock
-*. pdb
+/target/
+*.pdb
 
 # Python
 .venv/
-__ pycache
-*. pyc
-*. egg-info/
-*. wheel
+__pycache__/
+*.pyc
+*.egg-info/
+*.whl
+
+# Packaging / test
 .pytest_cache/
+test_outputs/
 
 # IDE
 .vscode/
 .idea/
-*. swp
-*. swo
+*.swp
+*.swo
 
 # OS
 .DS_Store
 .env
 
-# Documentation
-docs/
+# NOTE: docs/ is a tracked deliverable (IR spec, MLIR dialect, ADRs) and must
+# NOT be ignored. Cargo.lock is intentionally committed for the binary crate.
 
-# Test outputs
-test_outputs/
-
-
-
-# Added by cargo
-
-/target
+# Rendered mdBook site (generated from tracked Markdown under docs/).
+docs/book/
