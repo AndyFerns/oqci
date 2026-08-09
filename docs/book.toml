@@ -1,0 +1,47 @@
+# mdBook configuration for the OQCI documentation site.
+#
+# Source of truth is the tracked Markdown under `docs/` — this file only wraps
+# it into a static site. Rendered output goes to `docs/book/` (gitignored).
+
+[book]
+title       = "OQCI — Open Quantum Compiler Infrastructure"
+description = "Documentation for OQCI: IR specification, MLIR dialect, QIR lowering, and architecture decisions."
+authors     = ["OQCI contributors"]
+language    = "en"
+src         = "."
+
+[build]
+build-dir       = "book"
+create-missing  = false   # never invent new .md files on our behalf
+
+[output.html]
+default-theme          = "rust"
+preferred-dark-theme   = "ayu"
+smart-punctuation      = true
+mathjax-support        = true
+git-repository-url     = "https://github.com/AndyFerns/oqci"
+git-repository-icon    = "fab-github"
+edit-url-template      = "https://github.com/AndyFerns/oqci/edit/master/docs/{path}"
+additional-css         = ["theme/custom.css"]
+site-url               = "/oqci/"
+# no-section-label prevents mdBook from injecting numeric prefixes like `1.2.`
+# into chapter titles, which read as clutter in a reference document.
+no-section-label       = true
+
+[output.html.fold]
+enable = true
+level  = 1
+
+[output.html.search]
+enable                = true
+limit-results         = 30
+teaser-word-count     = 30
+use-boolean-and       = true
+boost-title           = 2
+boost-hierarchy       = 2
+boost-paragraph       = 1
+expand                = true
+heading-split-level   = 3
+
+[output.html.print]
+enable = true
