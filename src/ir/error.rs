@@ -75,6 +75,27 @@ pub enum IrError {
         gate: String,
     },
 
+    /// A [`crate::ir::Param::Symbol`] was given an empty name.
+    #[error("gate `{gate}` has an empty parameter symbol name")]
+    EmptyParameterSymbol {
+        /// Gate mnemonic.
+        gate: String,
+    },
+
+    /// A symbolic parameter reached a stage that requires a concrete value —
+    /// either [`crate::ir::bind_parameters`] was called without a binding for
+    /// it, or the circuit was lowered before binding.
+    ///
+    /// Per Stage F, parameter binding is an explicit compiler step: lowering
+    /// never invents a value for an unbound symbol.
+    #[error("gate `{gate}` uses unbound parameter `{symbol}`; bind it before lowering")]
+    UnboundParameter {
+        /// Gate mnemonic.
+        gate: String,
+        /// The unbound symbol's name.
+        symbol: String,
+    },
+
     /// The dependency graph produced during conversion contained a cycle.
     ///
     /// This indicates an internal invariant violation (QC-IR is a linear

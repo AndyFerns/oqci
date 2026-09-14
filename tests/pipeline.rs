@@ -4,7 +4,11 @@
 //! measurement — end to end, plus one malformed circuit per validation rule to
 //! exercise every error path through the public API.
 
-use oqci::ir::{Angle, CircuitBuilder, GateKind, IrError, QubitId, emit_qir, qc_to_qco};
+use std::collections::HashMap;
+
+use oqci::ir::{
+    CircuitBuilder, GateKind, IrError, Param, QubitId, bind_parameters, emit_qir, qc_to_qco,
+};
 
 /// Runs a builder through the whole pipeline and returns the emitted QIR.
 fn pipeline(build: impl FnOnce(&mut CircuitBuilder)) -> String {
@@ -16,6 +20,61 @@ fn pipeline(build: impl FnOnce(&mut CircuitBuilder)) -> String {
 }
 
 // --- Required corpus: full pipeline -----------------------------------------
+
+#[test]
+fn parameterized_circuit_binds_then_lowers() {
+    // A VQE-shaped ansatz: symbolic rotations that only become concrete at the
+    // explicit binding step (Stage F).
+    let mut b = CircuitBuilder::new("ansatz");
+    let q0 = b.alloc_qubit();
+    let q1 = b.alloc_qubit();
+    b.ry(Param::symbol("theta"), q0)
+        .cx(q0, q1)
+        .rz(Param::symbol("phi"), q1);
+    let symbolic = b.build().expect("symbolic circuits are valid QC-IR");
+    assert_eq!(
+        symbolic.parameters(),
+        vec!["phi".to_string(), "theta".to_string()]
+    );
+
+    // Lowering before binding is refused rather than guessing a value.
+    let symbolic_dag = qc_to_qco(&symbolic).unwrap();
+    assert!(matches!(
+        emit_qir(&symbolic_dag),
+        Err(IrError::UnboundParameter { .. })
+    ));
+
+    // Binding produces exactly the circuit we would have built concretely.
+    let bindings = HashMap::from([("theta".to_string(), 0.25), ("phi".to_string(), 0.5)]);
+    let bound = bind_parameters(&symbolic, &bindings).unwrap();
+    assert!(bound.is_concrete());
+
+    let bound_qir = emit_qir(&qc_to_qco(&bound).unwrap()).unwrap();
+    let expected = {
+        let mut b = CircuitBuilder::new("ansatz");
+        let q0 = b.alloc_qubit();
+        let q1 = b.alloc_qubit();
+        b.ry(0.25, q0).cx(q0, q1).rz(0.5, q1);
+        emit_qir(&qc_to_qco(&b.build().unwrap()).unwrap()).unwrap()
+    };
+    assert_eq!(bound_qir, expected);
+}
+
+#[test]
+fn missing_binding_is_reported() {
+    let mut b = CircuitBuilder::new("ansatz");
+    let q0 = b.alloc_qubit();
+    b.rx(Param::symbol("theta"), q0);
+    let circuit = b.build().unwrap();
+
+    assert_eq!(
+        bind_parameters(&circuit, &HashMap::new()),
+        Err(IrError::UnboundParameter {
+            gate: "rx".into(),
+            symbol: "theta".into()
+        })
+    );
+}
 
 #[test]
 fn identity_empty_circuit() {
@@ -138,7 +197,7 @@ fn opaque_gate_flows_through_pipeline() {
         b.gate(
             GateKind::Opaque {
                 name: "iswap".into(),
-                params: vec![Angle::new(0.5)],
+                params: vec![Param::concrete(0.5)],
             },
             [q0, q1],
         );
@@ -220,6 +279,6 @@ fn err_empty_opaque_operands() {
 fn err_non_finite_angle() {
     let mut b = CircuitBuilder::new("bad");
     let q0 = b.alloc_qubit();
-    b.rz(Angle::new(f64::INFINITY), q0);
+    b.rz(Param::concrete(f64::INFINITY), q0);
     assert!(matches!(b.build(), Err(IrError::NonFiniteAngle { .. })));
 }

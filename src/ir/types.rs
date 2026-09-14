@@ -9,6 +9,8 @@
 
 use std::fmt;
 
+use crate::ir::param::Param;
+
 /// A reference to a qubit in a [`crate::ir::Circuit`].
 ///
 /// Newtype-wrapped (rather than a bare `u32`) so that qubit references map
@@ -133,22 +135,22 @@ pub enum GateKind {
     T,
     /// Adjoint of `T`.
     Tdg,
-    /// Rotation about X by the given angle.
-    Rx(Angle),
-    /// Rotation about Y by the given angle.
-    Ry(Angle),
-    /// Rotation about Z by the given angle.
-    Rz(Angle),
+    /// Rotation about X by the given parameter.
+    Rx(Param),
+    /// Rotation about Y by the given parameter.
+    Ry(Param),
+    /// Rotation about Z by the given parameter.
+    Rz(Param),
     /// Phase / `R1` gate `P(λ) = diag(1, e^{iλ})`.
-    P(Angle),
+    P(Param),
     /// General single-qubit unitary `U(θ, φ, λ)` (Euler / OpenQASM `U`).
     U {
         /// Polar angle θ.
-        theta: Angle,
+        theta: Param,
         /// First azimuthal angle φ.
-        phi: Angle,
+        phi: Param,
         /// Second azimuthal angle λ.
-        lambda: Angle,
+        lambda: Param,
     },
     /// Controlled-X (CNOT): operands `[control, target]`.
     Cx,
@@ -169,8 +171,8 @@ pub enum GateKind {
     Opaque {
         /// Gate mnemonic (must be non-empty; validated).
         name: String,
-        /// Angle parameters, lowered to MLIR attributes.
-        params: Vec<Angle>,
+        /// Gate parameters, lowered to MLIR attributes.
+        params: Vec<Param>,
     },
 }
 
@@ -228,18 +230,67 @@ impl GateKind {
         }
     }
 
-    /// Returns this gate's angle parameters in canonical order.
+    /// Returns this gate's parameters in canonical order.
     ///
     /// The order is significant and forms the lowering contract to MLIR
-    /// attributes / QIR intrinsic arguments.
+    /// attributes / QIR intrinsic arguments. Parameters may be symbolic; see
+    /// [`Param`] and [`crate::ir::bind_parameters`].
     #[must_use]
-    pub fn params(&self) -> Vec<Angle> {
+    pub fn params(&self) -> Vec<Param> {
         match self {
-            GateKind::Rx(a) | GateKind::Ry(a) | GateKind::Rz(a) | GateKind::P(a) => vec![*a],
-            GateKind::U { theta, phi, lambda } => vec![*theta, *phi, *lambda],
+            GateKind::Rx(p) | GateKind::Ry(p) | GateKind::Rz(p) | GateKind::P(p) => {
+                vec![p.clone()]
+            }
+            GateKind::U { theta, phi, lambda } => {
+                vec![theta.clone(), phi.clone(), lambda.clone()]
+            }
             GateKind::Opaque { params, .. } => params.clone(),
             _ => Vec::new(),
         }
+    }
+
+    /// Returns the names of every symbolic parameter this gate uses, in
+    /// canonical parameter order. Empty for fully-concrete gates.
+    #[must_use]
+    pub fn symbols(&self) -> Vec<String> {
+        self.params()
+            .into_iter()
+            .filter_map(|p| p.as_symbol().map(str::to_string))
+            .collect()
+    }
+
+    /// Returns a copy of this gate with every symbolic parameter replaced by
+    /// the value `resolve` returns for its name.
+    ///
+    /// # Errors
+    ///
+    /// Propagates whatever error `resolve` returns for an unresolvable symbol.
+    pub fn substitute<E>(
+        &self,
+        resolve: &mut impl FnMut(&str) -> Result<Angle, E>,
+    ) -> Result<GateKind, E> {
+        let mut sub = |p: &Param| -> Result<Param, E> {
+            match p {
+                Param::Concrete(_) => Ok(p.clone()),
+                Param::Symbol(name) => resolve(name).map(Param::Concrete),
+            }
+        };
+        Ok(match self {
+            GateKind::Rx(p) => GateKind::Rx(sub(p)?),
+            GateKind::Ry(p) => GateKind::Ry(sub(p)?),
+            GateKind::Rz(p) => GateKind::Rz(sub(p)?),
+            GateKind::P(p) => GateKind::P(sub(p)?),
+            GateKind::U { theta, phi, lambda } => GateKind::U {
+                theta: sub(theta)?,
+                phi: sub(phi)?,
+                lambda: sub(lambda)?,
+            },
+            GateKind::Opaque { name, params } => GateKind::Opaque {
+                name: name.clone(),
+                params: params.iter().map(&mut sub).collect::<Result<_, E>>()?,
+            },
+            other => other.clone(),
+        })
     }
 
     /// Whether this gate is a unitary (reversible) operation. Every
@@ -260,7 +311,7 @@ impl fmt::Display for GateKind {
         } else {
             let joined = params
                 .iter()
-                .map(|a| a.radians().to_string())
+                .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ");
             write!(f, "{}({joined})", self.mnemonic())

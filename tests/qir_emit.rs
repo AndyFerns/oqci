@@ -3,7 +3,7 @@
 
 use std::f64::consts::PI;
 
-use oqci::ir::{Angle, CircuitBuilder, GateKind, emit_qir, qc_to_qco};
+use oqci::ir::{CircuitBuilder, GateKind, Param, emit_qir, qc_to_qco};
 
 /// Build a circuit, run the full pipeline, and return the emitted QIR text.
 fn qir_of(build: impl FnOnce(&mut CircuitBuilder)) -> String {
@@ -23,12 +23,12 @@ fn extended_intrinsics_declared_for_nonstandard_gates() {
         let q1 = b.alloc_qubit();
         let q2 = b.alloc_qubit();
         b.gate(GateKind::I, [q0]);
-        b.gate(GateKind::P(Angle::new(0.5)), [q0]);
+        b.gate(GateKind::P(Param::concrete(0.5)), [q0]);
         b.gate(
             GateKind::U {
-                theta: Angle::new(0.1),
-                phi: Angle::new(0.2),
-                lambda: Angle::new(0.3),
+                theta: Param::concrete(0.1),
+                phi: Param::concrete(0.2),
+                lambda: Param::concrete(0.3),
             },
             [q0],
         );
@@ -62,8 +62,8 @@ fn extended_intrinsics_declared_for_nonstandard_gates() {
 fn angles_emitted_as_hex_double_not_decimal() {
     let qir = qir_of(|b| {
         let q0 = b.alloc_qubit();
-        b.rz(Angle::new(PI), q0);
-        b.gate(GateKind::P(Angle::new(0.5)), [q0]);
+        b.rz(Param::concrete(PI), q0);
+        b.gate(GateKind::P(Param::concrete(0.5)), [q0]);
     });
 
     assert!(qir.contains(&format!("double 0x{:016X}", PI.to_bits())));

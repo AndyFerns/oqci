@@ -2,7 +2,7 @@
 //! all known variants guards against silent gaps (subject to the external-crate
 //! `#[non_exhaustive]` wildcard requirement).
 
-use oqci::ir::{Angle, CircuitBuilder, ClbitId, GateKind, IrError, QubitId};
+use oqci::ir::{CircuitBuilder, ClbitId, GateKind, IrError, Param, QubitId};
 
 /// Collect one value of each of the eight `IrError` variants: seven via
 /// `build()` and `CyclicGraph` constructed directly (enum-level
@@ -60,7 +60,7 @@ fn one_of_each() -> Vec<IrError> {
     let non_finite = {
         let mut b = CircuitBuilder::new("e");
         let q0 = b.alloc_qubit();
-        b.rx(Angle::new(f64::NAN), q0);
+        b.rx(Param::concrete(f64::NAN), q0);
         b.build().expect_err("non finite")
     };
 
