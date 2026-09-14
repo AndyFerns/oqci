@@ -1,0 +1,9 @@
+# Development/test dependencies for the PyO3 boundary.
+#
+# The Qiskit pin records the version the adapter's duck-typing was verified
+# against (see docs/qiskit_adapter.md). Raising it is fine, but re-run
+# python/tests afterwards: the extraction relies on `QuantumCircuit.data`,
+# `.operation.name/.params`, and `find_bit(...).index` keeping their shape.
+qiskit>=2.0,<3.0
+maturin>=1.7,<2.0
+pytest>=8.0

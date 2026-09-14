@@ -2,7 +2,10 @@
 # OQCI full-pipeline build script (Linux / macOS / Git Bash).
 #
 # Runs every check the project cares about, in order:
-#   fmt-check | clippy | test | rustdoc | mdbook
+#   fmt-check | clippy | test | rustdoc | py-build | py-test | mdbook
+#
+# The py-* stages are optional and skip when maturin/pytest are absent; the
+# Rust stages already cover every translation decision without Python.
 #
 # All stages route through cargo/mdbook, which auto-discover modules and
 # chapters — this script does not enumerate them, so adding a new module,
@@ -149,6 +152,17 @@ if [ "$DOCS_ONLY" -eq 0 ]; then
     run_stage "test"         0 cargo test --all-targets --all-features           || true
     run_stage "doctest"      0 cargo test --doc --all-features                   || true
     run_stage "rustdoc"      0 env RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --all-features || true
+
+    # Python bindings (optional). The Rust checks above already cover the
+    # whole Qiskit adapter core — these stages only exercise the thin PyO3
+    # boundary, so a machine without maturin/qiskit skips them rather than
+    # failing. See docs/qiskit_adapter.md.
+    #
+    # Every Python test is `importorskip`-gated on qiskit + the built
+    # extension, so pytest's exit 5 ("no tests collected") means the optional
+    # dependencies are absent — a skip, not a failure. Any other code is real.
+    run_stage "py-build"     1 maturin develop --manifest-path python/Cargo.toml || true
+    run_stage "py-test"      1 bash -c 'pytest python/tests -q; rc=$?; [ "$rc" -eq 5 ] && exit 0; exit "$rc"' || true
 fi
 
 if [ "$FAST" -eq 0 ]; then
