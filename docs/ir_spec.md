@@ -22,7 +22,8 @@ typed MLIR SSA values / attributes in Phase 2 (see §7 and `mlir_dialect.md`).
 |------|------|---------|----------------|
 | Qubit reference | `QubitId(u32)` | index into a circuit's qubit register | `0 ≤ id < num_qubits` |
 | Classical-bit reference | `ClbitId(u32)` | index into the classical register | `0 ≤ id < num_clbits` |
-| Angle / parameter | `Angle(f64)` | rotation angle in **radians** | any finite `f64` |
+| Angle | `Angle(f64)` | a concrete rotation angle in **radians** | any finite `f64` |
+| Gate parameter | `Param` | `Concrete(Angle)` or `Symbol(String)` | see §1.1 |
 | Gate identity + params | `GateKind` | closed enum + `Opaque` escape hatch | see §2 |
 
 **Design rationale — newtypes over primitives.** A bare `u32` for a qubit and a
@@ -38,6 +39,36 @@ given; the IR never reduces modulo `2π`. This preserves frontend intent and
 keeps conversion a pure structural operation. Finiteness (`NaN`/`inf` rejection)
 is enforced at validation time (§3.3), not at construction, so that builder
 chaining stays infallible.
+
+### 1.1 Parameters: `Param`
+
+Stage F requires QC-IR to express **static circuit topology with symbolic *or*
+numeric rotation parameters**, so that variational (VQE-style) ansatzes are
+representable without admitting dynamic control flow. Every gate parameter is
+therefore a `Param` (`src/ir/param.rs`):
+
+```text
+Param ::= Concrete(Angle)   // a known radian value
+        | Symbol(String)    // a named parameter, bound later
+```
+
+Three rules make this safe rather than merely expressive:
+
+1. **A symbolic circuit is a valid circuit.** `CircuitBuilder::build` accepts
+   `Param::Symbol`. Only the symbol's *name* is validated (non-empty, I8).
+2. **Binding is explicit.** `bind_parameters(&circuit, &bindings)` (§3.5) is
+   the only way a symbol becomes a value. Nothing binds implicitly.
+3. **Lowering refuses to guess.** `emit_qir` reports `UnboundParameter` for any
+   symbol still present, because QIR requires a concrete `double` and inventing
+   one would silently change the program.
+
+`Param` is deliberately a symbol, **not** a symbolic *expression*: there is no
+`2*theta` representation. A frontend that encounters one reports it rather than
+folding it away. Expression-valued parameters would need their own design (an
+algebra passes must preserve, per Stage F §6) and are not part of this scope.
+
+`Angle` remains the concrete type, and `Angle`/`f64` both convert into `Param`,
+so concrete call sites read unchanged: `b.rz(PI / 2.0, q0)`.
 
 ## 2. Gates: the `GateKind` enum
 
@@ -56,7 +87,7 @@ Registered gates and their fixed qubit arity:
 | Hadamard | `H` | — | 1 | |
 | Phase / adj | `S`, `Sdg` | — | 1 | `S = diag(1, i)` |
 | π/8 / adj | `T`, `Tdg` | — | 1 | |
-| Rotations | `Rx(θ)`, `Ry(θ)`, `Rz(θ)` | 1 | 1 | radians |
+| Rotations | `Rx(θ)`, `Ry(θ)`, `Rz(θ)` | 1 | 1 | each a `Param` (§1.1) |
 | Phase gate | `P(λ)` | 1 | 1 | `diag(1, e^{iλ})` |
 | General 1q | `U{θ,φ,λ}` | 3 | 1 | Euler / OpenQASM `U` |
 | CNOT / CY / CZ | `Cx`, `Cy`, `Cz` | — | 2 | operands `[control, target]` |
@@ -120,10 +151,40 @@ Each rule maps to exactly one error variant and one test.
 | I4 | no qubit appears twice within one gate | `DuplicateQubit` |
 | I5 | an `Opaque` gate has a non-empty name | `EmptyOpaqueName` |
 | I6 | an `Opaque` gate acts on ≥1 qubit | `EmptyOpaqueOperands` |
-| I7 | every angle parameter is finite | `NonFiniteAngle` |
+| I7 | every **concrete** parameter is finite | `NonFiniteAngle` |
+| I8 | every **symbolic** parameter has a non-empty name | `EmptyParameterSymbol` |
 
-A `Circuit` value is a *witness* that all seven hold; downstream stages
+A `Circuit` value is a *witness* that all eight hold; downstream stages
 (conversion, lowering) therefore never re-validate and never panic.
+
+Note what is deliberately **not** an invariant: a circuit may carry unbound
+symbolic parameters. That is a well-formed parameterized circuit (§1.1), not an
+error — the requirement for concrete values belongs to lowering, not to
+construction.
+
+### 3.5 Parameter binding
+
+```rust
+pub fn bind_parameters(
+    circuit: &Circuit,
+    bindings: &HashMap<String, f64>,
+) -> Result<Circuit, IrError>
+```
+
+`bind_parameters` (`src/ir/bind.rs`) replaces every `Param::Symbol` with its
+bound value and re-validates the result, so a binding supplying `NaN` is
+rejected exactly as a literal `NaN` would be (I7). Structure is untouched:
+same instructions, same order, same register sizes — only parameter values
+change, which is precisely the Stage F static-topology guarantee.
+
+- A symbol with no binding → `UnboundParameter`.
+- A binding for a symbol the circuit does not use is ignored.
+- `Circuit::parameters()` lists the free symbols; `Circuit::is_concrete()`
+  reports whether the circuit is ready to lower.
+
+Binding is an explicit compiler step, never implicit: Stage F §8 requires that
+a backend never receive an ambiguous symbolic value where its execution API
+needs a concrete one.
 
 ### 3.4 Operational semantics
 

@@ -23,7 +23,8 @@
 //! full operational semantics.
 
 use crate::ir::error::IrError;
-use crate::ir::types::{Angle, ClbitId, GateKind, QubitId};
+use crate::ir::param::Param;
+use crate::ir::types::{ClbitId, GateKind, QubitId};
 
 /// A single QC-IR instruction.
 ///
@@ -164,6 +165,33 @@ impl Circuit {
     pub fn is_empty(&self) -> bool {
         self.instructions.is_empty()
     }
+
+    /// The names of every free symbolic parameter in the circuit, sorted and
+    /// deduplicated. Empty for a fully-concrete circuit.
+    ///
+    /// This is the set [`crate::ir::bind_parameters`] requires bindings for.
+    #[must_use]
+    pub fn parameters(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .instructions
+            .iter()
+            .filter_map(|inst| match inst {
+                Instruction::Gate { kind, .. } => Some(kind.symbols()),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+
+    /// `true` if the circuit contains no free symbolic parameters, i.e. it is
+    /// ready to lower.
+    #[must_use]
+    pub fn is_concrete(&self) -> bool {
+        self.parameters().is_empty()
+    }
 }
 
 /// Builder for [`Circuit`], mirroring MLIR's `OpBuilder`.
@@ -272,17 +300,20 @@ impl CircuitBuilder {
     pub fn z(&mut self, q: QubitId) -> &mut Self {
         self.gate(GateKind::Z, [q])
     }
-    /// Appends an `Rx(theta)` on `q`.
-    pub fn rx(&mut self, theta: Angle, q: QubitId) -> &mut Self {
-        self.gate(GateKind::Rx(theta), [q])
+    /// Appends an `Rx(theta)` on `q`. `theta` may be a concrete
+    /// [`crate::ir::Angle`]/`f64` or a symbolic [`Param`].
+    pub fn rx(&mut self, theta: impl Into<Param>, q: QubitId) -> &mut Self {
+        self.gate(GateKind::Rx(theta.into()), [q])
     }
-    /// Appends an `Ry(theta)` on `q`.
-    pub fn ry(&mut self, theta: Angle, q: QubitId) -> &mut Self {
-        self.gate(GateKind::Ry(theta), [q])
+    /// Appends an `Ry(theta)` on `q`. `theta` may be a concrete
+    /// [`crate::ir::Angle`]/`f64` or a symbolic [`Param`].
+    pub fn ry(&mut self, theta: impl Into<Param>, q: QubitId) -> &mut Self {
+        self.gate(GateKind::Ry(theta.into()), [q])
     }
-    /// Appends an `Rz(theta)` on `q`.
-    pub fn rz(&mut self, theta: Angle, q: QubitId) -> &mut Self {
-        self.gate(GateKind::Rz(theta), [q])
+    /// Appends an `Rz(theta)` on `q`. `theta` may be a concrete
+    /// [`crate::ir::Angle`]/`f64` or a symbolic [`Param`].
+    pub fn rz(&mut self, theta: impl Into<Param>, q: QubitId) -> &mut Self {
+        self.gate(GateKind::Rz(theta.into()), [q])
     }
 
     // --- Named multi-qubit gate helpers --------------------------------------
@@ -310,8 +341,13 @@ impl CircuitBuilder {
     ///
     /// Returns the first [`IrError`] encountered while checking (in instruction
     /// order): qubit/clbit references in range, correct gate arity, no repeated
-    /// operand within a gate, non-empty opaque names/operands, and finite
-    /// angles. See `docs/ir_spec.md` for the invariant list.
+    /// operand within a gate, non-empty opaque names/operands, finite concrete
+    /// angles, and non-empty symbolic parameter names. See `docs/ir_spec.md`
+    /// for the invariant list.
+    ///
+    /// Unbound symbolic parameters are **accepted** here: a parameterized
+    /// circuit is valid QC-IR, and binding is an explicit later step
+    /// ([`crate::ir::bind_parameters`]).
     pub fn build(&self) -> Result<Circuit, IrError> {
         for inst in &self.instructions {
             self.validate_instruction(inst)?;
@@ -338,9 +374,19 @@ impl CircuitBuilder {
     fn validate_gate(&self, kind: &GateKind, qubits: &[QubitId]) -> Result<(), IrError> {
         let mnemonic = kind.mnemonic().to_string();
 
-        // Angle finiteness.
-        if kind.params().iter().any(|a| !a.is_finite()) {
-            return Err(IrError::NonFiniteAngle { gate: mnemonic });
+        // Parameter well-formedness: concrete angles must be finite, symbolic
+        // parameters must be named. A symbolic parameter is *not* an error
+        // here — binding it is a separate, explicit step (Stage F).
+        for p in kind.params() {
+            match p {
+                Param::Concrete(a) if !a.is_finite() => {
+                    return Err(IrError::NonFiniteAngle { gate: mnemonic });
+                }
+                Param::Symbol(name) if name.is_empty() => {
+                    return Err(IrError::EmptyParameterSymbol { gate: mnemonic });
+                }
+                _ => {}
+            }
         }
 
         // Opaque-specific rules.
@@ -541,10 +587,55 @@ mod tests {
     fn non_finite_angle_is_rejected() {
         let mut b = CircuitBuilder::new("bad");
         let q0 = b.alloc_qubit();
-        b.rx(Angle::new(f64::NAN), q0);
+        b.rx(f64::NAN, q0);
         assert_eq!(
             b.build(),
             Err(IrError::NonFiniteAngle { gate: "rx".into() })
+        );
+    }
+
+    #[test]
+    fn symbolic_parameter_builds_and_is_reported() {
+        let mut b = CircuitBuilder::new("ansatz");
+        let q0 = b.alloc_qubit();
+        b.rz(Param::symbol("theta"), q0).rx(0.5, q0);
+        let circuit = b.build().unwrap();
+        assert_eq!(circuit.parameters(), vec!["theta".to_string()]);
+        assert!(!circuit.is_concrete());
+    }
+
+    #[test]
+    fn concrete_circuit_reports_no_parameters() {
+        let mut b = CircuitBuilder::new("c");
+        let q0 = b.alloc_qubit();
+        b.rz(0.5, q0);
+        let circuit = b.build().unwrap();
+        assert!(circuit.parameters().is_empty());
+        assert!(circuit.is_concrete());
+    }
+
+    #[test]
+    fn empty_parameter_symbol_is_rejected() {
+        let mut b = CircuitBuilder::new("bad");
+        let q0 = b.alloc_qubit();
+        b.rz(Param::symbol(""), q0);
+        assert_eq!(
+            b.build(),
+            Err(IrError::EmptyParameterSymbol { gate: "rz".into() })
+        );
+    }
+
+    #[test]
+    fn parameters_are_sorted_and_deduplicated() {
+        let mut b = CircuitBuilder::new("c");
+        let q0 = b.alloc_qubit();
+        b.rz(Param::symbol("theta"), q0)
+            .rx(Param::symbol("alpha"), q0)
+            .ry(Param::symbol("theta"), q0);
+        let circuit = b.build().unwrap();
+        assert_eq!(
+            circuit.parameters(),
+            vec!["alpha".to_string(), "theta".to_string()]
         );
     }
 

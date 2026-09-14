@@ -3,7 +3,10 @@ setlocal enabledelayedexpansion
 rem OQCI full-pipeline build script (Windows / cmd.exe).
 rem
 rem Runs every check the project cares about, in order:
-rem   fmt-check ^| clippy ^| test ^| doctest ^| rustdoc ^| mdbook
+rem   fmt-check ^| clippy ^| test ^| doctest ^| rustdoc ^| py-build ^| py-test ^| mdbook
+rem
+rem The py-* stages are optional and skip when maturin/pytest are absent; the
+rem Rust stages already cover every translation decision without Python.
 rem
 rem All stages route through cargo/mdbook, which auto-discover modules and
 rem chapters -- this script does not enumerate them, so adding a new module,
@@ -109,6 +112,15 @@ set "SAVED_RUSTDOCFLAGS=%RUSTDOCFLAGS%"
 set "RUSTDOCFLAGS=-D warnings"
 call :run_stage "rustdoc"   0 cargo cargo doc --no-deps --all-features
 set "RUSTDOCFLAGS=%SAVED_RUSTDOCFLAGS%"
+
+rem Python bindings (optional). The Rust stages above already cover the whole
+rem Qiskit adapter core; these only exercise the thin PyO3 boundary, so a
+rem machine without maturin/pytest skips them. See docs/qiskit_adapter.md.
+rem Every Python test is importorskip-gated on qiskit + the built extension, so
+rem pytest exit 5 ("no tests collected") means those optional dependencies are
+rem absent -- a skip, not a failure.
+call :run_stage "py-build"  1 maturin maturin develop --manifest-path python/Cargo.toml
+call :run_stage "py-test"   1 pytest cmd /c "pytest python/tests -q & if errorlevel 5 if not errorlevel 6 exit /b 0"
 
 :docs_stage
 if "%FAST%"=="0" call :run_stage "mdbook" 1 mdbook mdbook build docs

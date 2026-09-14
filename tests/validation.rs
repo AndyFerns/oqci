@@ -2,7 +2,7 @@
 //! (a boundary case and a clearly-invalid case), plus positive boundary
 //! controls. Complements the single-negative unit tests in `src/ir/qc.rs`.
 
-use oqci::ir::{Angle, CircuitBuilder, ClbitId, GateKind, IrError, QubitId};
+use oqci::ir::{CircuitBuilder, ClbitId, GateKind, IrError, Param, QubitId};
 
 /// I1 boundary: a qubit index exactly equal to the register size is rejected.
 #[test]
@@ -128,7 +128,7 @@ fn opaque_empty_name_multi_qubit_with_params() {
     b.gate(
         GateKind::Opaque {
             name: String::new(),
-            params: vec![Angle::new(0.5)],
+            params: vec![Param::concrete(0.5)],
         },
         [q0, q1],
     );
@@ -158,7 +158,7 @@ fn opaque_no_operands_with_params() {
     b.gate(
         GateKind::Opaque {
             name: "iswap".into(),
-            params: vec![Angle::new(0.1)],
+            params: vec![Param::concrete(0.1)],
         },
         [],
     );
@@ -171,7 +171,7 @@ fn opaque_no_operands_with_params() {
 fn angle_nan_rejected() {
     let mut b = CircuitBuilder::new("i7-a");
     let q0 = b.alloc_qubit();
-    b.rx(Angle::new(f64::NAN), q0);
+    b.rx(Param::concrete(f64::NAN), q0);
     let err = b.build().expect_err("NaN angle must be rejected");
     assert!(matches!(err, IrError::NonFiniteAngle { .. }));
 }
@@ -181,7 +181,7 @@ fn angle_nan_rejected() {
 fn angle_positive_infinity_rejected() {
     let mut b = CircuitBuilder::new("i7-b");
     let q0 = b.alloc_qubit();
-    b.rz(Angle::new(f64::INFINITY), q0);
+    b.rz(Param::concrete(f64::INFINITY), q0);
     let err = b.build().expect_err("inf angle must be rejected");
     assert!(matches!(err, IrError::NonFiniteAngle { .. }));
 }
@@ -193,9 +193,9 @@ fn angle_u_gate_negative_infinity_rejected() {
     let q0 = b.alloc_qubit();
     b.gate(
         GateKind::U {
-            theta: Angle::new(f64::NEG_INFINITY),
-            phi: Angle::new(0.0),
-            lambda: Angle::new(0.0),
+            theta: Param::concrete(f64::NEG_INFINITY),
+            phi: Param::concrete(0.0),
+            lambda: Param::concrete(0.0),
         },
         [q0],
     );

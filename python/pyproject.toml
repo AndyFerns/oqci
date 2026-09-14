@@ -1,0 +1,21 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "oqci"
+description = "Python bindings for the Open Quantum Compiler Infrastructure"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+qiskit = ["qiskit>=1.0"]
+
+[tool.maturin]
+module-name = "oqci_native"
+manifest-path = "Cargo.toml"

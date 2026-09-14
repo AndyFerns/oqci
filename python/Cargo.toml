@@ -1,0 +1,16 @@
+[package]
+name = "oqci-python"
+description = "Python bindings for the Open Quantum Compiler Infrastructure"
+version = "0.1.0"
+edition = "2024"
+
+license = "Apache-2.0"
+repository = "https://github.com/AndyFerns/oqci"
+
+[lib]
+name = "oqci_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+oqci = { path = ".." }
+pyo3 = { version = "0.24", features = ["extension-module"] }

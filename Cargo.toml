@@ -8,6 +8,9 @@ edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/AndyFerns/oqci"
 
+[workspace]
+members = [".", "python"]
+
 [lib]
 name = "oqci"
 path = "src/lib.rs"
