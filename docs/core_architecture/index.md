@@ -78,21 +78,26 @@ An implementation agent must not silently override a locked decision because ano
 
 At the verified `master` state:
 
-- the repository is at version `0.0.1`;
-- the implemented core is the Phase 0 IR foundation;
+- the repository is at version `0.1.0`;
+- the implemented core is the Phase 0 IR foundation plus the frontend layer;
 - QC-IR exists;
 - QCO-IR exists;
 - deterministic QC-IR → QCO-IR conversion exists;
 - QCO-IR → textual LLVM-compatible QIR emission exists;
 - validation/error infrastructure exists;
 - test coverage exists for the current IR/pipeline;
-- `src/` currently contains the IR subsystem plus root library/demo entry points;
-- `frontend`, optimization-pass, execution-backend, and full analysis subsystems are not yet implemented;
-- `python/src/lib.rs` is currently a placeholder for later bindings;
+- symbolic/numeric gate parameters (`Param`) and explicit parameter binding exist, satisfying the Stage F IR requirement;
+- an OpenQASM 3 frontend exists over a documented subset (`docs/openqasm_frontend.md`);
+- a Qiskit adapter exists, split into a pure-Rust translation core and a PyO3 boundary (`docs/qiskit_adapter.md`);
+- `src/` contains the IR and frontend subsystems plus root library/demo entry points;
+- optimization-pass, execution-backend, compiler-orchestration, and full analysis subsystems are **not** yet implemented;
+- `python/` is a real PyO3 crate covering the frontend → QIR path only; the compiler/pass/backend/analysis APIs of §17 do not exist yet;
 - `benchmarks/` is not yet a populated benchmark suite;
 - `mlir_compat.rs` exists as the future MLIR boundary but the full MLIR integration is not implemented.
 
-The repository's own changelog explicitly defines `0.0.1` as the Phase 0 IR core and states that frontends, backend execution, and optimization passes are deliberately absent.
+The repository's changelog defines `0.0.1` as the Phase 0 IR core, and the
+unreleased `0.1.0` entry as the frontend layer plus the Stage F parameter
+work. Optimization passes and backend execution remain deliberately absent.
 
 ## How to Use These Documents
 

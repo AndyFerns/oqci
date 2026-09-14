@@ -12,7 +12,92 @@ and may change without a major bump (per SemVer §4).
 
 ## [Unreleased]
 
-_Nothing yet._
+The **frontend layer**: OpenQASM 3 and Qiskit ingestion, plus the Stage F
+parameter work they both depend on. QIR emission remains the output boundary —
+there are still **no optimization passes**, **no pass manager**, and **no
+backend execution**.
+
+### Added
+
+#### Symbolic gate parameters (`src/ir/param.rs`, `src/ir/bind.rs`)
+
+Stage F (`docs/core_architecture/stage-f-static-parameterized-circuit-scope.md`)
+requires QC-IR to express static circuits with **symbolic or numeric**
+rotation parameters, so VQE-style ansatzes are representable without admitting
+dynamic control flow.
+
+- `Param`: a gate parameter that is either `Concrete(Angle)` or
+  `Symbol(String)`. `GateKind`'s parameter-bearing variants (`Rx`, `Ry`, `Rz`,
+  `P`, `U`, `Opaque`) now carry `Param`. `Angle` remains the concrete type and
+  converts into `Param`, so existing concrete call sites are unchanged.
+- A circuit with unbound symbols is **valid** QC-IR; only its symbol *names*
+  are validated (new invariant I8, `IrError::EmptyParameterSymbol`).
+- `bind_parameters(&circuit, &bindings)`: the explicit symbolic → concrete
+  step Stage F §8 requires. Structure is preserved exactly; the result is
+  re-validated, so a `NaN` binding is rejected like a literal one.
+- `emit_qir` now reports `IrError::UnboundParameter` rather than lowering a
+  circuit whose angles are not yet known — it never invents a value.
+- `Circuit::parameters()` / `Circuit::is_concrete()`.
+
+#### Frontend contract (`src/frontend/`)
+
+- `FrontendError`: one error type for every frontend, distinguishing syntax
+  (with line/column), semantic, unsupported-construct, parameter-arity, and
+  propagated `IrError` failures.
+- `map_gate`: a **single** source-name → `GateKind` table shared by both
+  frontends, so they agree on what `rz` or `u2` means by construction.
+  Unrecognised names become `GateKind::Opaque`; the enum is never grown to
+  accommodate a source language.
+
+#### OpenQASM 3 frontend (`src/frontend/openqasm/`)
+
+- `parse_openqasm3` / `parse_openqasm3_named`, built from a hand-written
+  lexer, recursive-descent parser, and a translator resolving OpenQASM's
+  named/indexed registers onto QC-IR's flat space. No new dependencies.
+- Supported subset documented precisely in `docs/openqasm_frontend.md`:
+  declarations, `input` parameters, gate calls with broadcast, both `measure`
+  spellings, `reset`, comments, and constant-folded angle arithmetic.
+- Out-of-subset constructs — `if`/`for`/`while`, `def`/`gate` blocks,
+  `output`, `barrier`, OpenQASM 2 `qreg`/`creg`, compound symbolic
+  expressions — are **refused by name**, never skipped.
+
+#### Qiskit adapter (`src/frontend/qiskit/`, `python/`)
+
+- `QiskitCircuitIr`: a vendor-neutral handoff struct, keeping Qiskit types out
+  of QC-IR entirely.
+- `translate`: all adapter logic — gate mapping, operand order, measurement
+  destinations, parameters — in pure Rust, tested with no Python present.
+- A thin PyO3 boundary (`oqci-python`, module `oqci_native`) exposing
+  `qiskit_to_qir`, `qiskit_parameters` and `qasm3_to_qir`, verified against
+  **Qiskit 2.5.2** via `python/tests/test_adapter.py`. The repo is now a Cargo
+  workspace so this crate builds alongside the core.
+- Documented limitations: compound `ParameterExpression`s and Qiskit control
+  flow are refused; `barrier`/`delay` are dropped (recorded, not silent).
+
+#### Tests
+
+- 181 Rust tests (106 unit + 75 integration, including the new
+  `tests/openqasm_pipeline.rs` and `tests/qiskit_adapter.rs`), 7 doctests, and
+  15 Python tests against real Qiskit circuits.
+- The frontends are pinned by **equivalence**: a parsed Bell state, GHZ-3 and
+  folded-angle rotation must emit byte-identical QIR to the hand-built
+  circuit, and both frontends must agree on the same program. That is what
+  makes them a mapping onto the existing IR rather than a second definition
+  of it.
+
+#### Documentation
+
+- `docs/gate_mapping.md`, `docs/openqasm_frontend.md`,
+  `docs/qiskit_adapter.md`, `python/README.md`; `docs/ir_spec.md` extended
+  with `Param`, invariant I8, and parameter binding.
+
+### Changed
+
+- `GateKind`'s parameter-bearing variants take `Param` instead of `Angle`, and
+  `GateKind::params()` returns `Vec<Param>`. Call sites constructing these
+  variants directly need `Param::concrete(x)` in place of `Angle::new(x)`;
+  `CircuitBuilder::rx/ry/rz` accept both.
+- `VERSION` reconciled with `Cargo.toml` at `0.1.0` (they had drifted).
 
 ## [0.0.1] - 2026-08-09
 
