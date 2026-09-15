@@ -12,12 +12,77 @@ and may change without a major bump (per SemVer §4).
 
 ## [Unreleased]
 
-The **frontend layer**: OpenQASM 3 and Qiskit ingestion, plus the Stage F
-parameter work they both depend on. QIR emission remains the output boundary —
-there are still **no optimization passes**, **no pass manager**, and **no
-backend execution**.
+The **frontend layer** (OpenQASM 3 and Qiskit ingestion plus the Stage F
+parameter work they depend on), the **pass manager and target-independent
+optimization passes**, and the **`oqci` CLI** for inspecting every stage.
+QIR emission remains the output boundary — there is still **no target model**
+and **no backend execution**.
 
 ### Added
+
+#### Pass manager and optimization passes (`src/pass/`)
+
+- `Pass` / `PassManager`: explicit registration and ordering, enable/disable
+  selection for ablation runs, deterministic execution, per-pass metadata,
+  and error propagation naming the offending pass
+  (`final-deliverables-spec.md` §7).
+- Passes are `Circuit → Circuit` and replay their result through
+  `CircuitBuilder`, so **a pass cannot emit a circuit that violates a QC-IR
+  invariant** — it fails loudly instead.
+- `canonicalize`: removes `I` gates and exact-zero rotations. Nothing that
+  would require asserting a global-phase-sensitive identity.
+- `gate-cancellation`: removes adjacent inverse pairs, where "adjacent" is a
+  QCO-IR question (`H q0; H q1; H q0` cancels; `X q0; measure q0; X q0` does
+  not). `U` and `Opaque` are deliberately never cancelled.
+- `rotation-merge`: `Rz(a); Rz(b) → Rz(a+b)` for `Rx`/`Ry`/`Rz`/`P`, only
+  when both parameters are concrete. This is the whole of OQCI's gate
+  fusion; arbitrary unitary synthesis is not implemented and is not claimed.
+- `schedule`: reports ASAP layering, depth and parallel width. Analysis
+  only — it never reorders.
+- Default pipeline `canonicalize → gate-cancellation → rotation-merge →
+  canonicalize → schedule`, with the ordering rationale documented.
+
+#### Analysis (`src/analysis/`)
+
+- `analyze` → `ResourceReport`: gate counts, measurement/reset counts,
+  depth, parallel width (§13.1–13.3). Target-native counts and routing
+  overhead are absent rather than reported as zero — they need a target
+  profile.
+- `diff_circuits` → `CircuitDiff`: LCS alignment of two instruction lists,
+  computed by comparing circuits rather than trusting a pass's own account.
+- `QcoCircuit::layers` / `depth` / `max_parallel_width`.
+- This module is the single source of truth for measurement: the pass
+  manager's bookkeeping and the CLI's output call the same functions, so
+  they cannot disagree.
+
+#### Pass-correctness harness (`tests/pass_equivalence.rs`)
+
+- `proptest`-generated circuits run through each pass, asserting the state
+  vector is unchanged up to global phase.
+- Semantics come from an independent dense-matrix simulator
+  (`tests/support/statevector.rs`; test-only, `num-complex` and `proptest`
+  are dev-dependencies), so a mis-signed rewrite cannot hide behind a
+  matching mistake in the check.
+- Verified to actually fail when a rule is broken — inverting the sign in
+  rotation-merge's addition fails four tests including the randomized one.
+
+#### The `oqci` CLI (`src/cli/`)
+
+- `compile`, `optimize`, `analyze`, `watch`, `passes`. `watch` re-runs the
+  pipeline on every save, watching the directory (so editor save-and-rename
+  works) and staying alive through parse errors.
+- `--diff` renders a before/after instruction diff; `--disable ID` runs an
+  ablation; `--bind NAME=VALUE` supplies symbolic parameters.
+- `--json` emits a `PipelineReport` — the schema a future dashboard
+  consumes. IR types stay serde-free; the schema is CLI-layer view types.
+- Per §19 the CLI duplicates no compiler logic: `src/cli/pipeline.rs` is the
+  only module that calls the compiler, and every metric it prints came from
+  `analysis`.
+- `examples/{bell,ghz3,parameterized}.qasm` as runnable starting points.
+- `src/main.rs` is now a thin entry point; the old hardcoded Bell demo is
+  replaced by `oqci compile examples/bell.qasm`.
+
+### Added — frontends (earlier in this cycle)
 
 #### Symbolic gate parameters (`src/ir/param.rs`, `src/ir/bind.rs`)
 
@@ -76,9 +141,8 @@ dynamic control flow.
 
 #### Tests
 
-- 181 Rust tests (106 unit + 75 integration, including the new
-  `tests/openqasm_pipeline.rs` and `tests/qiskit_adapter.rs`), 7 doctests, and
-  15 Python tests against real Qiskit circuits.
+- 330 Rust tests (218 unit + 112 integration across `tests/*.rs`), 10
+  doctests, and 15 Python tests against real Qiskit circuits.
 - The frontends are pinned by **equivalence**: a parsed Bell state, GHZ-3 and
   folded-angle rotation must emit byte-identical QIR to the hand-built
   circuit, and both frontends must agree on the same program. That is what
@@ -98,6 +162,10 @@ dynamic control flow.
   variants directly need `Param::concrete(x)` in place of `Angle::new(x)`;
   `CircuitBuilder::rx/ry/rz` accept both.
 - `VERSION` reconciled with `Cargo.toml` at `0.1.0` (they had drifted).
+- New dependencies: `clap`, `notify`, `serde`, `serde_json` for the CLI;
+  `proptest` and `num-complex` as dev-dependencies for the equivalence
+  harness only.
+- The QIR module header no longer claims "Phase 0", which stopped being true.
 
 ## [0.0.1] - 2026-08-09
 
