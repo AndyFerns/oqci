@@ -37,5 +37,8 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod analysis;
+pub mod cli;
 pub mod frontend;
 pub mod ir;
+pub mod pass;
