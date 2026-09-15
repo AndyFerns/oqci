@@ -89,15 +89,20 @@ At the verified `master` state:
 - symbolic/numeric gate parameters (`Param`) and explicit parameter binding exist, satisfying the Stage F IR requirement;
 - an OpenQASM 3 frontend exists over a documented subset (`docs/openqasm_frontend.md`);
 - a Qiskit adapter exists, split into a pure-Rust translation core and a PyO3 boundary (`docs/qiskit_adapter.md`);
-- `src/` contains the IR and frontend subsystems plus root library/demo entry points;
-- optimization-pass, execution-backend, compiler-orchestration, and full analysis subsystems are **not** yet implemented;
+- a pass manager and four target-independent passes exist — canonicalization, gate cancellation, rotation merging, and scheduling-as-analysis (`docs/pass_manager.md`);
+- pass correctness is verified by property-based state-vector equivalence testing (`tests/pass_equivalence.rs`);
+- an analysis module provides gate counts, depth and circuit diffing (`src/analysis/`);
+- an `oqci` CLI exposes every pipeline stage, including a live `watch` mode and a JSON schema (`docs/cli.md`);
+- `src/` contains the IR, frontend, pass, analysis and CLI subsystems;
+- **target model, qubit mapping, routing, basis decomposition, execution-backend and compiler-orchestration subsystems are not yet implemented** — mapping/routing/decomposition are blocked on the Stage D target profile;
 - `python/` is a real PyO3 crate covering the frontend → QIR path only; the compiler/pass/backend/analysis APIs of §17 do not exist yet;
 - `benchmarks/` is not yet a populated benchmark suite;
 - `mlir_compat.rs` exists as the future MLIR boundary but the full MLIR integration is not implemented.
 
 The repository's changelog defines `0.0.1` as the Phase 0 IR core, and the
-unreleased `0.1.0` entry as the frontend layer plus the Stage F parameter
-work. Optimization passes and backend execution remain deliberately absent.
+unreleased `0.1.0` entry as the frontend layer, the Stage F parameter work,
+the pass manager with its target-independent passes, and the CLI. Target
+modelling and backend execution remain deliberately absent.
 
 ## How to Use These Documents
 
