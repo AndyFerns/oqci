@@ -1,10 +1,10 @@
 # OQCI Source-of-Truth Documentation Index
 
 Status: Active planning baseline  
-Last verified against repository: 2026-09-04  
+Last verified against repository: 2026-09-16  
 Repository: `https://github.com/AndyFerns/oqci`  
 Branch reviewed: `master`  
-Current repository version: `0.0.1`
+Current repository version: `0.2.0`
 
 ## Purpose
 
@@ -78,7 +78,7 @@ An implementation agent must not silently override a locked decision because ano
 
 At the verified `master` state:
 
-- the repository is at version `0.1.0`;
+- the repository is at version `0.2.0`;
 - the implemented core is the Phase 0 IR foundation plus the frontend layer;
 - QC-IR exists;
 - QCO-IR exists;
@@ -99,10 +99,10 @@ At the verified `master` state:
 - `benchmarks/` is not yet a populated benchmark suite;
 - `mlir_compat.rs` exists as the future MLIR boundary but the full MLIR integration is not implemented.
 
-The repository's changelog defines `0.0.1` as the Phase 0 IR core, and the
-unreleased `0.1.0` entry as the frontend layer, the Stage F parameter work,
-the pass manager with its target-independent passes, and the CLI. Target
-modelling and backend execution remain deliberately absent.
+The repository's changelog defines `0.0.1` as the Phase 0 IR core, and
+`0.2.0` as the frontend layer, the Stage F parameter work, the pass manager
+with its target-independent passes, and the CLI. Target modelling and
+backend execution remain deliberately absent.
 
 ## How to Use These Documents
 
