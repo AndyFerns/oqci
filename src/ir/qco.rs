@@ -275,6 +275,79 @@ impl QcoCircuit {
         ops.into_iter().map(|(_, inst)| inst.clone()).collect()
     }
 
+    /// Groups operations into **as-soon-as-possible (ASAP) scheduling layers**.
+    ///
+    /// An operation's layer is `1 + max(layer of its predecessors)`, counting
+    /// boundary input nodes as layer 0. Operations sharing a layer are provably
+    /// independent: no path in the dependency graph connects them, so they
+    /// could execute simultaneously. The returned `Vec` is indexed by layer
+    /// (layer 0 first), each inner `Vec` holding program indices in ascending
+    /// order.
+    ///
+    /// This is an **analysis**: it reports the parallelism the graph already
+    /// implies and never reorders anything. Both [`crate::analysis`] and the
+    /// scheduling pass consume it, so depth is computed in exactly one place.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`IrError::CyclicGraph`] if the graph contains a cycle (which
+    /// cannot arise from valid QC-IR).
+    pub fn layers(&self) -> Result<Vec<Vec<usize>>, IrError> {
+        let order = self.stable_toposort()?;
+        let mut layer_of: HashMap<NodeIndex, usize> = HashMap::new();
+        let mut layers: Vec<Vec<usize>> = Vec::new();
+
+        for node in order {
+            let deepest_predecessor = self
+                .graph
+                .neighbors_directed(node, Direction::Incoming)
+                .map(|p| layer_of.get(&p).copied().unwrap_or(0))
+                .max()
+                .unwrap_or(0);
+
+            match self.graph[node].kind {
+                NodeKind::Op { index, .. } => {
+                    let layer = deepest_predecessor + 1;
+                    layer_of.insert(node, layer);
+                    if layers.len() < layer {
+                        layers.resize(layer, Vec::new());
+                    }
+                    layers[layer - 1].push(index);
+                }
+                // Boundaries sit at layer 0 and never occupy a scheduling slot.
+                NodeKind::Input(_) | NodeKind::Output(_) => {
+                    layer_of.insert(node, deepest_predecessor);
+                }
+            }
+        }
+
+        for layer in &mut layers {
+            layer.sort_unstable();
+        }
+        Ok(layers)
+    }
+
+    /// The circuit's **depth**: the number of ASAP scheduling layers, i.e. the
+    /// length of the longest dependency chain. `0` for a circuit with no
+    /// operations.
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`IrError::CyclicGraph`] from [`QcoCircuit::layers`].
+    pub fn depth(&self) -> Result<usize, IrError> {
+        Ok(self.layers()?.len())
+    }
+
+    /// The widest scheduling layer — the most operations that could run at
+    /// once. `0` for a circuit with no operations.
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`IrError::CyclicGraph`] from [`QcoCircuit::layers`].
+    pub fn max_parallel_width(&self) -> Result<usize, IrError> {
+        Ok(self.layers()?.iter().map(Vec::len).max().unwrap_or(0))
+    }
+
     /// Deterministic Kahn topological sort over all nodes (boundaries included).
     ///
     /// Ties are broken by a key that orders boundary inputs first, then ops by
@@ -366,6 +439,70 @@ mod tests {
             })
             .collect();
         assert_eq!(topo, vec![GateKind::X, GateKind::Y, GateKind::Z]);
+    }
+
+    #[test]
+    fn layers_expose_parallelism() {
+        use crate::ir::qc::CircuitBuilder;
+
+        // Two independent single-qubit gates share one layer.
+        let mut b = CircuitBuilder::new("parallel");
+        let q0 = b.alloc_qubit();
+        let q1 = b.alloc_qubit();
+        b.h(q0).h(q1);
+        let dag = qc_to_qco(&b.build().unwrap()).unwrap();
+        assert_eq!(dag.layers().unwrap(), vec![vec![0, 1]]);
+        assert_eq!(dag.depth().unwrap(), 1);
+        assert_eq!(dag.max_parallel_width().unwrap(), 2);
+    }
+
+    #[test]
+    fn a_dependency_chain_is_one_op_per_layer() {
+        use crate::ir::qc::CircuitBuilder;
+
+        let mut b = CircuitBuilder::new("chain");
+        let q0 = b.alloc_qubit();
+        b.x(q0).y(q0).z(q0);
+        let dag = qc_to_qco(&b.build().unwrap()).unwrap();
+        assert_eq!(dag.layers().unwrap(), vec![vec![0], vec![1], vec![2]]);
+        assert_eq!(dag.depth().unwrap(), 3);
+        assert_eq!(dag.max_parallel_width().unwrap(), 1);
+    }
+
+    #[test]
+    fn bell_has_depth_two() {
+        use crate::ir::qc::CircuitBuilder;
+
+        let mut b = CircuitBuilder::new("bell");
+        let q0 = b.alloc_qubit();
+        let q1 = b.alloc_qubit();
+        b.h(q0).cx(q0, q1);
+        let dag = qc_to_qco(&b.build().unwrap()).unwrap();
+        assert_eq!(dag.depth().unwrap(), 2);
+    }
+
+    #[test]
+    fn empty_circuit_has_zero_depth() {
+        use crate::ir::qc::CircuitBuilder;
+
+        let dag = qc_to_qco(&CircuitBuilder::new("empty").build().unwrap()).unwrap();
+        assert!(dag.layers().unwrap().is_empty());
+        assert_eq!(dag.depth().unwrap(), 0);
+        assert_eq!(dag.max_parallel_width().unwrap(), 0);
+    }
+
+    #[test]
+    fn measurement_barrier_deepens_the_schedule() {
+        use crate::ir::qc::CircuitBuilder;
+
+        // X ; measure ; X on one qubit — the trailing X cannot share a layer
+        // with anything before the collapse.
+        let mut b = CircuitBuilder::new("mid");
+        let q0 = b.alloc_qubit();
+        let c0 = b.alloc_clbit();
+        b.x(q0).measure(q0, c0).x(q0);
+        let dag = qc_to_qco(&b.build().unwrap()).unwrap();
+        assert_eq!(dag.depth().unwrap(), 3);
     }
 
     #[test]

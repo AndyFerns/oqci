@@ -16,6 +16,14 @@
 - [OpenQASM 3 Frontend](openqasm_frontend.md)
 - [Qiskit Adapter](qiskit_adapter.md)
 
+# Optimization
+
+- [Pass Manager](pass_manager.md)
+
+# Tooling
+
+- [Command Line](cli.md)
+
 # Architecture Decisions
 
 - [No Frontend in Phase 0](architecture_decision_no_frontend.md)
