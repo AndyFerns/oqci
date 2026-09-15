@@ -56,7 +56,7 @@ cwd:       /path/to/oqci
 ============================================================
 
 --- [clippy] exit=101 ---
-   Compiling oqci v0.1.0 (…)
+   Compiling oqci v0.2.0 (…)
 error: something specific here
 …
 

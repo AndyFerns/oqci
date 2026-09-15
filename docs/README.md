@@ -59,9 +59,9 @@ program, or `oqci watch <file>` to keep seeing them as you edit — see
 | OpenQASM 3 frontend (lexer/parser/AST/translate) | `src/frontend/openqasm/` |
 | Qiskit adapter core (no Python) | `src/frontend/qiskit/mod.rs` |
 | Qiskit PyO3 boundary | `python/src/lib.rs` |
-| End-to-end + error-path tests | `tests/pipeline.rs`, `tests/openqasm_pipeline.rs`, `tests/qiskit_adapter.rs` |
+| End-to-end + error-path tests | `tests/*.rs` — see [`../tests/README.md`](../tests/README.md) |
 
-## Verifying Phase 0
+## Verifying the build
 
 ```bash
 cargo build
@@ -69,6 +69,10 @@ cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 cargo test
 ```
+
+Or run [`../scripts/build.sh`](../scripts/build.sh) /
+[`build.bat`](../scripts/build.bat) for the full check suite, including the
+optional Python and mdBook stages.
 
 ## Reading order
 
