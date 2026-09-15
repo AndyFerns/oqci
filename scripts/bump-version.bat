@@ -4,8 +4,9 @@ rem OQCI version bumper (Windows / cmd.exe).
 rem
 rem The repo-root VERSION file is the single source of truth for the project
 rem version (semantic versioning, MAJOR.MINOR.PATCH). Run this whenever you cut
-rem a change worth versioning; it bumps VERSION and keeps Cargo.toml's package
-rem version in sync so the two can never drift.
+rem a change worth versioning; it bumps VERSION and keeps every workspace
+rem member's Cargo.toml [package] version -- root and python\ -- in sync so
+rem none of them can drift.
 rem
 rem When to bump what (semantic versioning):
 rem   major  - breaking change to a public API or IR contract (0.x: still allowed)
@@ -30,6 +31,7 @@ pushd "%SCRIPT_DIR%.." >nul
 set "ROOT=%CD%"
 set "VERSION_FILE=%ROOT%\VERSION"
 set "CARGO_FILE=%ROOT%\Cargo.toml"
+set "PYTHON_CARGO_FILE=%ROOT%\python\Cargo.toml"
 
 if "%~1"=="" (
     echo error: missing argument 1^>^&2
@@ -96,39 +98,50 @@ rem --- write VERSION ----------------------------------------------------------
 > "%VERSION_FILE%" echo !NEW!
 if errorlevel 1 (echo error: could not write %VERSION_FILE% 1^>^&2 & popd ^>nul & exit /b 3)
 
-rem --- sync Cargo.toml [package] version --------------------------------------
+rem --- sync every Cargo.toml [package] version ---------------------------------
 rem Only the package version line changes; dependency version strings like
-rem `thiserror = "2"` are left alone because they do not start with `version `.
-if exist "%CARGO_FILE%" (
-    set "TMP_CARGO=%TEMP%\oqci-cargo-%RANDOM%.toml"
-    set "REPLACED=0"
-    > "!TMP_CARGO!" (
-        for /f "usebackq delims=" %%L in (`findstr /n "^" "%CARGO_FILE%"`) do (
-            set "raw=%%L"
-            rem strip the leading "<n>:" that findstr /n adds, keeping colons in content
-            set "content="
-            for /f "tokens=1* delims=:" %%m in ("!raw!") do set "content=%%n"
-            set "trimmed=!content: =!"
-            rem decide whether this is the (first) package version line
-            set "isver=0"
-            if "!REPLACED!"=="0" if "!trimmed:~0,8!"=="version=" set "isver=1"
-            if "!isver!"=="1" (
-                echo version = "!NEW!"
-                set "REPLACED=1"
-            ) else (
-                echo(!content!
-            )
-        )
-    )
-    move /y "!TMP_CARGO!" "%CARGO_FILE%" >nul
-    if errorlevel 1 (echo error: could not update %CARGO_FILE% 1^>^&2 & popd ^>nul & exit /b 3)
+rem `thiserror = "2"` (or a sibling's own `oqci = { path = "..", version = ".." }`
+rem pin) are left alone because they do not start with `version `.
+set "UPDATED=VERSION, Cargo.toml"
+call :sync_cargo "%CARGO_FILE%"
+if errorlevel 1 (echo error: could not update %CARGO_FILE% 1^>^&2 & popd ^>nul & exit /b 3)
+if exist "%PYTHON_CARGO_FILE%" (
+    call :sync_cargo "%PYTHON_CARGO_FILE%"
+    if errorlevel 1 (echo error: could not update %PYTHON_CARGO_FILE% 1^>^&2 & popd ^>nul & exit /b 3)
+    set "UPDATED=!UPDATED!, python\Cargo.toml"
 )
 
 echo version: %CURRENT% -^> !NEW!
-echo updated: VERSION, Cargo.toml
+echo updated: !UPDATED!
 echo next (optional): git commit -am "chore: bump version to !NEW!" ^&^& git tag v!NEW!
 popd >nul
 exit /b 0
+
+:sync_cargo
+rem %~1 = path to a Cargo.toml to rewrite in place. Uses !NEW! from the caller.
+if not exist "%~1" exit /b 0
+set "TMP_CARGO=%TEMP%\oqci-cargo-%RANDOM%.toml"
+set "REPLACED=0"
+> "!TMP_CARGO!" (
+    for /f "usebackq delims=" %%L in (`findstr /n "^" "%~1"`) do (
+        set "raw=%%L"
+        rem strip the leading "<n>:" that findstr /n adds, keeping colons in content
+        set "content="
+        for /f "tokens=1* delims=:" %%m in ("!raw!") do set "content=%%n"
+        set "trimmed=!content: =!"
+        rem decide whether this is the (first) package version line
+        set "isver=0"
+        if "!REPLACED!"=="0" if "!trimmed:~0,8!"=="version=" set "isver=1"
+        if "!isver!"=="1" (
+            echo version = "!NEW!"
+            set "REPLACED=1"
+        ) else (
+            echo(!content!
+        )
+    )
+)
+move /y "!TMP_CARGO!" "%~1" >nul
+exit /b %errorlevel%
 
 rem ------------------------------------------------------------------ helpers
 

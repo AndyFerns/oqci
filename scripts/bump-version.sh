@@ -3,8 +3,9 @@
 #
 # The repo-root `VERSION` file is the single source of truth for the project
 # version (semantic versioning, MAJOR.MINOR.PATCH). Run this whenever you cut a
-# change worth versioning; it bumps `VERSION` and keeps `Cargo.toml`'s package
-# version in sync so the two can never drift.
+# change worth versioning; it bumps `VERSION` and keeps every workspace
+# member's `Cargo.toml` [package] version — root and `python/` — in sync so
+# none of them can drift.
 #
 # When to bump what (semantic versioning):
 #   major  — breaking change to a public API or IR contract (0.x: still allowed)
@@ -29,6 +30,7 @@ set -uo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION_FILE="$ROOT/VERSION"
 CARGO_FILE="$ROOT/Cargo.toml"
+PYTHON_CARGO_FILE="$ROOT/python/Cargo.toml"
 
 die() { echo "error: $*" >&2; exit "${2:-3}"; }
 
@@ -74,13 +76,17 @@ case "$1" in
         ;;
 esac
 
-# --- write VERSION, then sync Cargo.toml [package] version --------------------
+# --- write VERSION, then sync every Cargo.toml [package] version --------------
 
 printf '%s\n' "$new" > "$VERSION_FILE" || die "could not write $VERSION_FILE"
 
-if [ -f "$CARGO_FILE" ]; then
-    # Replace `version = "..."` only inside the [package] table, so dependency
-    # version strings are never touched. Portable awk (no in-place needed).
+# Replaces `version = "..."` only inside the [package] table, so dependency
+# version strings (including a `path = "../"` sibling's own pin) are never
+# touched. Portable awk (no in-place needed).
+sync_cargo_version() {
+    local file="$1"
+    [ -f "$file" ] || return 0
+    local tmp
     tmp="$(mktemp)"
     awk -v newver="$new" '
         /^\[/ { in_pkg = ($0 == "[package]") }
@@ -88,9 +94,16 @@ if [ -f "$CARGO_FILE" ]; then
             sub(/version[[:space:]]*=[[:space:]]*"[^"]*"/, "version = \"" newver "\"")
         }
         { print }
-    ' "$CARGO_FILE" > "$tmp" && mv "$tmp" "$CARGO_FILE" || die "could not update $CARGO_FILE"
+    ' "$file" > "$tmp" && mv "$tmp" "$file" || die "could not update $file"
+}
+
+updated="VERSION, Cargo.toml"
+sync_cargo_version "$CARGO_FILE"
+if [ -f "$PYTHON_CARGO_FILE" ]; then
+    sync_cargo_version "$PYTHON_CARGO_FILE"
+    updated="$updated, python/Cargo.toml"
 fi
 
 echo "version: $current -> $new"
-echo "updated: VERSION, Cargo.toml"
+echo "updated: $updated"
 echo "next (optional): git commit -am \"chore: bump version to $new\" && git tag v$new"

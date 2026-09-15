@@ -12,6 +12,10 @@ and may change without a major bump (per SemVer §4).
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.2.0] - 2026-09-16
+
 The **frontend layer** (OpenQASM 3 and Qiskit ingestion plus the Stage F
 parameter work they depend on), the **pass manager and target-independent
 optimization passes**, and the **`oqci` CLI** for inspecting every stage.
@@ -167,6 +171,18 @@ dynamic control flow.
   harness only.
 - The QIR module header no longer claims "Phase 0", which stopped being true.
 
+### Not included (planned for later phases)
+
+- Target/basis profiles, qubit mapping, routing, and basis decomposition
+  (`final-deliverables-spec.md` §8.6–8.8, §11) — blocked on the Stage D
+  target model, which does not exist yet.
+- Compiler orchestration layer, backend execution (simulators, hardware),
+  and cost models — Phase 3+.
+- General gate fusion beyond additive-parameter merging; a fixed-point pass
+  scheduler; pass plugins.
+- A Python compiler/analysis/backend API — the current bindings cover only
+  the frontend → QC-IR → QIR path (`python/README.md`).
+
 ## [0.0.1] - 2026-08-09
 
 First substantive drop: the **Phase 0 IR core**. This establishes the
@@ -282,5 +298,6 @@ the first usable milestone; Phase 1 will bump the minor.
 - Backend execution (simulators, hardware) — beyond the QIR emission boundary.
 - Python bindings — only empty PyO3 placeholders exist under `python/`.
 
-[Unreleased]: https://github.com/AndyFerns/oqci/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/AndyFerns/oqci/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/AndyFerns/oqci/compare/v0.0.1...v0.2.0
 [0.0.1]: https://github.com/AndyFerns/oqci/releases/tag/v0.0.1
