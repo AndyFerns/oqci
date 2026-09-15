@@ -1,0 +1,14 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+#
+# Provenance: these two seeds were found by deliberately inverting the sign in
+# rotation-merge's angle addition, to confirm the equivalence harness actually
+# catches a broken rewrite rather than passing vacuously. The bug was reverted
+# immediately; the seeds are kept because they are minimal circuits that
+# exercise the merge rule, so they stay worth re-running.
+cc 7194ea001f790d37366aa65fc3b4a85912b748101d0d750040654cabe6db073d # shrinks to circuit = Circuit { name: "generated", num_qubits: 1, num_clbits: 0, instructions: [Gate { kind: Rx(Concrete(Angle(0.0))), qubits: [QubitId(0)] }, Gate { kind: Rx(Concrete(Angle(0.25))), qubits: [QubitId(0)] }] }
+cc ac8495983f53cf11d67d6958c2e0d4db81bf1c923e66d6ab76a43e95e263f632 # shrinks to circuit = Circuit { name: "generated", num_qubits: 3, num_clbits: 0, instructions: [Gate { kind: Ry(Concrete(Angle(0.25))), qubits: [QubitId(1)] }, Gate { kind: Ry(Concrete(Angle(0.25))), qubits: [QubitId(1)] }] }
