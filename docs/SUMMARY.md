@@ -20,6 +20,10 @@
 
 - [Pass Manager](pass_manager.md)
 
+# Targets
+
+- [Target Model](target_model.md)
+
 # Tooling
 
 - [Command Line](cli.md)
@@ -28,3 +32,4 @@
 
 - [No Frontend in Phase 0](architecture_decision_no_frontend.md)
 - [MLIR Integration Path (Phase 2)](architecture_decision_mlir_phase2.md)
+- [Adding SX / SXdg to the Gate Set](architecture_decision_sx_basis_gate.md)

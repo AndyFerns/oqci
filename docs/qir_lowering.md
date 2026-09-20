@@ -59,6 +59,8 @@ parameters (as `double`) first, then qubit operands. `quantum.measure` and
 | `Sdg` | `__quantum__qis__s__adj` | q | standard |
 | `T` | `__quantum__qis__t__body` | q | standard |
 | `Tdg` | `__quantum__qis__t__adj` | q | standard |
+| `SX` | `__quantum__qis__sx__body` | q | **extended** |
+| `SXdg` | `__quantum__qis__sxdg__body` | q | **extended** |
 | `Rx(θ)` | `__quantum__qis__rx__body` | θ, q | standard |
 | `Ry(θ)` | `__quantum__qis__ry__body` | θ, q | standard |
 | `Rz(θ)` | `__quantum__qis__rz__body` | θ, q | standard |
@@ -86,7 +88,7 @@ change to this lowering's structure.
 ### 3.1 Extended intrinsics
 
 Gates with no member of the QIR *standard* instruction set (`id`, `p`, `u`,
-`cy`, `swap`, `ccx`, and every `Opaque`) are emitted as declared
+`cy`, `swap`, `ccx`, `sx`, `sxdg`, and every `Opaque`) are emitted as declared
 `__quantum__qis__*` externs. The emitted module is **valid LLVM IR** (every
 callee is declared) and structurally valid QIR; a runtime that does not provide
 these intrinsics would need a **decomposition pass** (Phase 3) to rewrite them

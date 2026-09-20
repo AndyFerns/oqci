@@ -87,6 +87,7 @@ Registered gates and their fixed qubit arity:
 | Hadamard | `H` | — | 1 | |
 | Phase / adj | `S`, `Sdg` | — | 1 | `S = diag(1, i)` |
 | π/8 / adj | `T`, `Tdg` | — | 1 | |
+| √X / adj | `SX`, `SXdg` | — | 1 | `SX·SX = X`; **`SX` is not self-inverse** |
 | Rotations | `Rx(θ)`, `Ry(θ)`, `Rz(θ)` | 1 | 1 | each a `Param` (§1.1) |
 | Phase gate | `P(λ)` | 1 | 1 | `diag(1, e^{iλ})` |
 | General 1q | `U{θ,φ,λ}` | 3 | 1 | Euler / OpenQASM `U` |
@@ -94,6 +95,13 @@ Registered gates and their fixed qubit arity:
 | Swap | `Swap` | — | 2 | operands `[a, b]` |
 | Toffoli | `Ccx` | — | 3 | operands `[c0, c1, target]` |
 | Escape hatch | `Opaque{name, params}` | n | *variable* | any ≥1 distinct qubits |
+
+**`SX`/`SXdg`.** `SX = ½·[[1+i, 1−i], [1−i, 1+i]]` is the principal square root
+of `X`, and `SXdg` is its adjoint: `SX·SXdg = SXdg·SX = I` exactly. They are
+registered rather than rewritten to `Rx(±π/2)` because the two differ by a
+global phase this IR does not track. Their addition is the one recorded
+amendment to the closed-gate-set rule; the rationale is in
+[`architecture_decision_sx_basis_gate.md`](architecture_decision_sx_basis_gate.md).
 
 **Operand-order convention.** For controlled gates the leading operands are
 controls and the final operand is the target. `Instruction::control()` and

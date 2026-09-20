@@ -115,7 +115,7 @@ compiler pass's call.
 | Gates | Rule |
 |---|---|
 | `X Y Z H Cx Cy Cz Swap Ccx` | self-inverse |
-| `S`↔`Sdg`, `T`↔`Tdg` | mutual inverses |
+| `S`↔`Sdg`, `T`↔`Tdg`, `SX`↔`SXdg` | mutual inverses |
 | `Rx Ry Rz P` | inverse iff both parameters concrete and exactly negating |
 | `U`, `Opaque`, `I` | **never cancelled** |
 
@@ -130,6 +130,14 @@ Why the exclusions:
   demonstrates it across random angles.
 - **`Opaque`** — OQCI does not know what the gate does, so it cannot know
   that doing it twice does nothing.
+- **`SX` is *not* self-inverse.** It appears only in the mutual-inverse row,
+  never in the self-inverse row. `SX` is the principal square root of `X`, so
+  `SX; SX` is `X` — a real operation, not the identity. Cancelling an adjacent
+  `SX; SX` pair would therefore drop an `X` and silently change the circuit.
+  Only `SX; SXdg` and `SXdg; SX` cancel. The same holds for `SXdg; SXdg`, which
+  is `Xdg = X`. `tests/support/statevector.rs::sx_is_not_self_inverse` pins this
+  down on a state where the difference is observable. See
+  [`architecture_decision_sx_basis_gate.md`](architecture_decision_sx_basis_gate.md).
 - **Rotations** cancel only on exact negation. `θ` and `2π − θ` describe the
   same rotation but are not recognised, and no epsilon is applied.
 
@@ -175,9 +183,11 @@ reordering pass would be choosing between schedules on no evidence.
   trusting a pass's own account of itself. `O(n·m)`, which is fine at the
   sizes this project targets.
 
-Target-native gate counts and routing overhead are also named in §13 but need
-a target profile that does not exist yet. They are **absent** rather than
-reported as zero.
+Target-native gate counts and routing overhead are also named in §13. Those
+are target-relative, so they live with the target model rather than here:
+see [`target_model.md`](target_model.md), where `Cost` reports native vs.
+non-native operation counts against a specific profile. `ResourceReport`
+itself stays target-independent.
 
 ## Correctness verification
 
@@ -199,14 +209,25 @@ nothing.
 
 Per `final-deliverables-spec.md`'s Critical Rule — a feature is not
 implemented merely because a module or diagram names it — the following from
-§8 are **absent**, pending the target model (Stage D):
+§8 are **absent**:
 
 | Spec | Status |
 |---|---|
-| §8.6 Qubit mapping | not implemented — needs a target topology |
-| §8.7 Routing / SWAP insertion | not implemented — needs connectivity data |
-| §8.8 Basis decomposition | not implemented — needs a basis profile |
+| §8.6 Qubit mapping | not implemented |
+| §8.7 Routing / SWAP insertion | not implemented |
+| §8.8 Basis decomposition | not implemented |
 | §8.3 general gate fusion | only additive-parameter fusion, as described above |
+
+The first three are no longer blocked on a missing target model — topology,
+basis sets and constraints now exist in [`target_model.md`](target_model.md).
+What is missing is the passes that *consume* them.
+
+**No pass is target-aware.** `Pass::run` takes only a `&Circuit`: there is no
+target or cost context on the trait, so Stage E §8's "a pass may consult
+target cost information where appropriate" is not yet satisfied. Nothing in
+this module reads a `BasisProfile`, and every pass here is target-independent
+by construction. That changes when mapping and routing arrive, since those
+are the first passes that genuinely need the data.
 
 Also absent: a fixed-point pass scheduler (the pipeline order is fixed and
 finite), pass plugins (§18.2), and any target-aware scheduling.

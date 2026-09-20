@@ -30,7 +30,9 @@ program, or `oqci watch <file>` to keep seeing them as you edit — see
 | [`openqasm_frontend.md`](openqasm_frontend.md) | **The OpenQASM 3 supported subset**, precisely: what is accepted, what is refused and why, broadcast rules, and diagnostics. |
 | [`qiskit_adapter.md`](qiskit_adapter.md) | **The Qiskit adapter.** The vendor-neutral `QiskitCircuitIr` handoff, the PyO3 boundary, the verified Qiskit version, and known limitations. |
 | [`pass_manager.md`](pass_manager.md) | **The pass manager and optimization passes.** The `Pass` contract, the default pipeline and why it is ordered that way, each pass's exact rewrite rules and exclusions, and how correctness is verified. |
+| [`target_model.md`](target_model.md) | **Basis profiles, topology and cost.** How a backend describes what it accepts and what it finds expensive, how a circuit is checked against it, and what target-aware work is still absent. |
 | [`cli.md`](cli.md) | **The `oqci` command line.** Inspecting every pipeline stage, pass-by-pass reports, before/after diffs, watch mode, and the JSON schema. |
+| [`architecture_decision_sx_basis_gate.md`](architecture_decision_sx_basis_gate.md) | **ADR.** Why `SX`/`SXdg` were added to the closed gate set, and what that does and does not license. |
 | [`mlir_dialect.md`](mlir_dialect.md) | **The `quantum` MLIR dialect spec.** Types, ops, attribute-vs-operand rules, the complete op↔Rust correspondence table, the Phase 2 integration path, and the implied TableGen skeleton. |
 | [`qir_lowering.md`](qir_lowering.md) | **Lowering rules.** Target QIR format, the op → QIR intrinsic mapping table, angle/qubit encoding, and the two documented conformance caveats (extended intrinsics, mid-circuit measurement). |
 | [`architecture_decision_no_frontend.md`](architecture_decision_no_frontend.md) | **ADR.** Why no frontend is built before the IR is stable, and how to resist adding one early. |
@@ -53,6 +55,7 @@ program, or `oqci watch <file>` to keep seeing them as you edit — see
 | Optimization passes | `src/pass/{canonicalize,cancellation,rotation_merge,schedule}.rs` |
 | Shared peephole adjacency | `src/pass/adjacency.rs` |
 | Metrics and diffing | `src/analysis/` |
+| Target profiles, topology, legality, cost | `src/target/` |
 | CLI inspector | `src/cli/` |
 | Frontend contract (`FrontendError`) | `src/frontend/error.rs` |
 | Shared gate-name table | `src/frontend/gate_map.rs` |

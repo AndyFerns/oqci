@@ -93,8 +93,10 @@ At the verified `master` state:
 - pass correctness is verified by property-based state-vector equivalence testing (`tests/pass_equivalence.rs`);
 - an analysis module provides gate counts, depth and circuit diffing (`src/analysis/`);
 - an `oqci` CLI exposes every pipeline stage, including a live `watch` mode and a JSON schema (`docs/cli.md`);
-- `src/` contains the IR, frontend, pass, analysis and CLI subsystems;
-- **target model, qubit mapping, routing, basis decomposition, execution-backend and compiler-orchestration subsystems are not yet implemented** — mapping/routing/decomposition are blocked on the Stage D target profile;
+- a target model exists — basis profiles, directed topology, circuit-vs-target legality checking, and a backend-supplied cost model (`docs/target_model.md`), satisfying Stage D exit criteria 1, 2, 4, 6 and 8;
+- `SX`/`SXdg` were added to the registered gate set under an explicit architecture decision (`docs/architecture_decision_sx_basis_gate.md`), the first amendment to the Stage A §4 closed-enum invariant;
+- `src/` contains the IR, frontend, pass, analysis, target and CLI subsystems;
+- **qubit mapping, routing, basis decomposition, execution-backend and compiler-orchestration subsystems are not yet implemented** — the target data they need now exists, but the passes that consume it do not (Stage D exit criteria 3, 5, 7 and Stage E exit criterion 3 remain open);
 - `python/` is a real PyO3 crate covering the frontend → QIR path only; the compiler/pass/backend/analysis APIs of §17 do not exist yet;
 - `benchmarks/` is not yet a populated benchmark suite;
 - `mlir_compat.rs` exists as the future MLIR boundary but the full MLIR integration is not implemented.

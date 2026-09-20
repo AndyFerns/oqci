@@ -74,7 +74,7 @@ are SSA operands and, under value semantics, are also results.
 
 | Slot | Contents | Rust source |
 |------|----------|-------------|
-| attr `gate` | gate mnemonic, e.g. `"h"`, `"cx"`, `"rz"`, `"iswap"` | `GateKind::mnemonic()` |
+| attr `gate` | gate mnemonic, e.g. `"h"`, `"cx"`, `"rz"`, `"sx"`, `"sxdg"` | `GateKind::mnemonic()` |
 | attr `params` | `array<f64>`, canonical param order | `GateKind::params()` |
 | operands | `variadic<!quantum.qubit>`, control(s) then target | `Instruction::qubits` |
 | results | one `!quantum.qubit` per operand (value semantics) | threaded in QCO-IR |
@@ -126,6 +126,14 @@ listed here because the Rust IR materialises them as nodes.
 | `QubitId` | `!quantum.qubit` value | — | — | — |
 | `ClbitId` | `!quantum.result` value | — | — | — |
 | `Angle` | `FloatAttr` (`f64`) | (is an attribute) | — | — |
+
+The table is complete at the *op* level and stays complete as `GateKind` grows:
+every registered gate is the same `quantum.gate` op distinguished by its `gate`
+mnemonic attribute, not a separate op. So `GateKind::SX` and `GateKind::SXdg`
+(`ir_spec.md` §2) add two registered mnemonics — `quantum.gate "sx"` and
+`quantum.gate "sxdg"`, one `!quantum.qubit` operand, one result, empty `params`
+— and no new rows. Their verifier obligation is the generic one: arity 1, zero
+parameters.
 
 ## 6. Structural (regional) form
 

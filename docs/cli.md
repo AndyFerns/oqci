@@ -33,11 +33,12 @@ drift apart.
 ## Commands
 
 ```text
-oqci compile  <input.qasm> [--emit STAGES] [--bind NAME=VALUE] [--json]
-oqci optimize <input.qasm> [--emit STAGES] [--passes IDS] [--disable IDS] [--diff] [--bind …] [--json]
-oqci analyze  <input.qasm> [--optimized] [--bind …] [--json]
+oqci compile  <input.qasm> [--emit STAGES] [--bind NAME=VALUE] [--target ID] [--json]
+oqci optimize <input.qasm> [--emit STAGES] [--passes IDS] [--disable IDS] [--diff] [--bind …] [--target ID] [--json]
+oqci analyze  <input.qasm> [--optimized] [--bind …] [--target ID] [--json]
 oqci watch    <input.qasm> [--mode compile|optimize] [...same flags] [--json]
 oqci passes
+oqci targets
 ```
 
 Input is OpenQASM 3 (see [`openqasm_frontend.md`](openqasm_frontend.md)). The
@@ -146,6 +147,47 @@ Re-runs on every save and re-renders. Two details make it usable:
 Lists the default pipeline in execution order — the ids `--passes` and
 `--disable` accept.
 
+### targets
+
+Lists the built-in target profiles — the ids `--target` accepts. Both are
+synthetic; neither describes real hardware. See
+[`target_model.md`](target_model.md).
+
+### `--target ID`
+
+Checks the circuit against a backend profile and costs it. On `optimize` the
+**optimized** circuit is checked, since that is what would actually be
+submitted.
+
+```console
+$ oqci compile examples/bell.qasm --target linear-nisq --emit qc-ir
+-- target -- linear-nisq@1 on generic-nisq (5 qubits, 8 directed coupling(s))
+  legality: 1 violation(s) — will not run as written
+    [0] `h` is not in the target's basis set
+  cost (nisq-weighted@1):
+    operations        4
+    …
+    non-native ops    1
+    scalar score      22
+      from: depth_weight=1, gate_count_weight=1, non_native_weight=5, swap_weight=30, two_qubit_weight=10
+```
+
+Three things about that output are deliberate:
+
+- **Every violation is listed, not just the first** — someone fixing a
+  circuit wants the whole list.
+- **The scalar never appears without its weights.** A cost number with
+  undisclosed coefficients is not evidence (Stage E §6), so the
+  configuration that produced it is printed alongside, and carried in
+  `--json`.
+- **"Will not run as written"** is the precise claim. There is no layout step
+  yet, so logical qubit *n* is checked against physical qubit *n*. A
+  connectivity violation means this circuit needs routing, not that the
+  target can never run it.
+
+An unknown id is rejected with the list of valid ones rather than silently
+checking against nothing.
+
 ## Parameterized circuits
 
 A circuit with unbound parameters is a normal state, not an error. `compile`
@@ -200,6 +242,10 @@ Notes on the schema:
   `{"kind":"symbol","name":"theta"}`, so a consumer can distinguish a bound
   angle from a free one without parsing display text.
 - `unavailable` on a stage explains why it produced nothing.
+- `target` is present only when `--target` was given. It carries the profile's
+  `id@version`, the legality verdict with every `violations` entry tagged by
+  `kind`, the full `cost` breakdown, and `cost_model_configuration` — the
+  weights behind `cost.scalar_score`.
 
 The IR types themselves stay serde-free: these are view types built in
 `src/cli/snapshot.rs`. The IR's shape is a compiler contract governed by

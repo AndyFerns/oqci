@@ -12,7 +12,75 @@ and may change without a major bump (per SemVer §4).
 
 ## [Unreleased]
 
-_Nothing yet._
+The **target model**: how a backend describes what it accepts and what it
+finds expensive. Target *description* only — mapping, routing, basis
+decomposition and execution remain absent, and are the next roadmap step.
+
+### Added
+
+#### `SX` / `SXdg` in the registered gate set
+
+- Two new `GateKind` variants, under an explicit architecture decision
+  ([`docs/architecture_decision_sx_basis_gate.md`](docs/architecture_decision_sx_basis_gate.md)),
+  since Stage A §4 locks the enum as closed "until an explicit architecture
+  decision changes this". `sx` is a native one-qubit operation on IBM-style
+  hardware, and routing it through `Opaque` would have left exactly the
+  circuits the target research depends on unoptimizable and unverifiable.
+- `SX`↔`SXdg` join the cancellation pass's mutual-inverse table. `SX` is
+  **not** self-inverse (`SX; SX` is `X`), and a test guards that.
+- Both frontends resolve `sx`/`sxdg` through the shared gate table; both
+  lower to declared extended QIR intrinsics; both are covered by the
+  state-vector equivalence harness.
+
+#### Target model (`src/target/`)
+
+- `BasisProfile` — the formal target description, covering every field
+  `final-deliverables-spec.md` §11 requires. Built through a validating
+  builder and `Serialize`, so a profile used in an experiment can be
+  snapshotted (Stage D §8).
+- `Topology` — physical qubits and **directed** couplings. Stage D §7
+  forbids assuming an undirected edge means both orderings are native, so
+  symmetric links declare both directions explicitly.
+- `check` — validates a circuit against a profile, reporting *every*
+  violation rather than the first, and repairing nothing (Stage D §4 keeps
+  description, lowering and routing separate).
+- `Cost` / `CostModel` — structured cost that never collapses to a scalar
+  (Stage E §7). `WeightedCostModel`'s weights are explicit configuration
+  reported through `configuration()`, not literals buried in optimizer code
+  (Stage E §6). `estimated_duration`/`estimated_error` stay `None` rather
+  than becoming fabricated zeros.
+- `builtin` — `ideal-simulator` and `linear-nisq`, both **synthetic**.
+  Neither describes real hardware; §9.2 forbids hard-coding a device into the
+  compiler core, and a profile asserting uninvented error rates would be a
+  fabricated record.
+
+#### CLI
+
+- `oqci targets` lists the built-in profiles.
+- `--target ID` on `compile`, `optimize` and `analyze` appends a legality
+  report and a cost breakdown; on `optimize` the *optimized* circuit is
+  checked, since that is what would be submitted. `--json` carries all of it.
+- A scalar score is never printed without the weights that produced it.
+
+### Changed
+
+- `BasisProfile::supports_operation` answers for `"measure"`/`"reset"` from
+  `MeasurementSupport` rather than the basis set, so a profile cannot
+  contradict itself and have legality and cost disagree.
+- `src/ir/qir.rs`'s doc comment now lists `sx`/`sxdg` among the extended
+  intrinsics.
+
+### Not included (deferred to the next roadmap step)
+
+- Qubit mapping (§8.6), routing/SWAP insertion (§8.7) and basis decomposition
+  (§8.8). The data they need now exists; the passes that consume it do not.
+- Executable decomposition-rule data. Profiles record rule *identifiers*; the
+  Stage D §5 model (source op, target sequence, parameter transformation,
+  operand mapping, exactness) lands with the pass that executes it.
+- Target context on the `Pass` trait, so Stage E §8 is not yet satisfied.
+- Per-operation cost and error/noise metadata in profiles (Stage D §2), which
+  has no legitimate value to hold until a real backend supplies it.
+- Backend execution and result retrieval (§9, §10).
 
 ## [0.2.0] - 2026-09-16
 

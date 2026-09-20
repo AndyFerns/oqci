@@ -24,6 +24,8 @@ Matching is **case-insensitive**: OpenQASM spells the built-in controlled-X as
 | `sdg` | `Sdg` | 0 | 1 |
 | `t` | `T` | 0 | 1 |
 | `tdg` | `Tdg` | 0 | 1 |
+| `sx` | `SX` | 0 | 1 |
+| `sxdg` | `SXdg` | 0 | 1 |
 | `rx` | `Rx(θ)` | 1 | 1 |
 | `ry` | `Ry(θ)` | 1 | 1 |
 | `rz` | `Rz(θ)` | 1 | 1 |
@@ -36,12 +38,19 @@ Matching is **case-insensitive**: OpenQASM spells the built-in controlled-X as
 | `swap` | `Swap` | 0 | 2 |
 | `ccx`, `toffoli` | `Ccx` | 0 | 3 |
 
-Two mappings deserve their justification recorded:
+Three mappings deserve their justification recorded:
 
 - **`u1(λ) → P(λ)`.** The legacy `u1` gate is `diag(1, e^{iλ})`, which is
   exactly the phase gate. They are the same operator, not an approximation.
 - **`u2(φ, λ) → U(π/2, φ, λ)`.** This is `u2`'s definition, so the frontend
   supplies the fixed θ rather than inventing a separate variant.
+- **`sx`/`sxdg` → `SX`/`SXdg`.** These names previously matched nothing in the
+  table and fell through to the `Opaque` escape hatch below. They now resolve to
+  registered variants, so they are optimizable and simulable like any other
+  registered gate. The IR change and its rationale are recorded in
+  [`architecture_decision_sx_basis_gate.md`](architecture_decision_sx_basis_gate.md);
+  both frontends pick the change up automatically, since Qiskit already spells
+  them `sx`/`sxdg`.
 
 Qubit-operand counts in the last column are *informational*: arity is enforced
 by QC-IR validation ([`IrError::GateArityMismatch`]), not by this table.
