@@ -15,11 +15,14 @@
 //! it *is* the report type, and mirroring it would create exactly the kind of
 //! drift this module exists to avoid.
 
+use std::collections::BTreeMap;
+
 use serde::Serialize;
 
 use crate::analysis::{CircuitDiff, ResourceReport};
 use crate::ir::{Circuit, GateKind, Instruction, Param, QcoCircuit, Wire};
 use crate::pass::PassRecord;
+use crate::target::{BasisProfile, Cost, CostModel, Violation, check};
 
 /// A full run of the compiler over one input.
 #[derive(Debug, Clone, Serialize)]
@@ -41,6 +44,36 @@ pub struct PipelineReport {
     /// Whole-pipeline before/after diff, when requested.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub diff: Option<Vec<DiffEntryView>>,
+    /// Target legality and cost, when `--target` named a profile.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target: Option<TargetReportView>,
+}
+
+/// How a circuit fares against a specific backend target.
+#[derive(Debug, Clone, Serialize)]
+pub struct TargetReportView {
+    /// The profile's `id@version` — the form that belongs in result
+    /// provenance (Stage D §8).
+    pub profile: String,
+    /// The backend the profile describes.
+    pub backend_id: String,
+    /// Physical qubits available.
+    pub qubit_count: u32,
+    /// Directed couplings declared.
+    pub edge_count: usize,
+    /// The target's native operation set.
+    pub supported_operations: Vec<String>,
+    /// Whether the circuit runs on this target as written.
+    pub legal: bool,
+    /// Every violation found, not just the first.
+    pub violations: Vec<Violation>,
+    /// The cost model that produced `cost`, as `id@version`.
+    pub cost_model: String,
+    /// The cost model's configuration — weights included, so a scalar score is
+    /// never an unexplained figure (Stage E §6).
+    pub cost_model_configuration: BTreeMap<String, String>,
+    /// The structured cost breakdown.
+    pub cost: Cost,
 }
 
 /// One stage's output.
@@ -300,6 +333,37 @@ impl PassRecordView {
     }
 }
 
+/// Checks a circuit against a target and evaluates its cost.
+///
+/// Both halves come from `crate::target` — nothing is judged or scored here.
+///
+/// # Errors
+///
+/// Propagates [`crate::ir::IrError`] from the cost model's analysis.
+pub fn target_report(
+    circuit: &Circuit,
+    profile: &BasisProfile,
+    cost_model: &dyn CostModel,
+) -> Result<TargetReportView, crate::ir::IrError> {
+    let report = check(circuit, profile);
+    Ok(TargetReportView {
+        profile: profile.qualified_id(),
+        backend_id: profile.backend_id().to_string(),
+        qubit_count: profile.qubit_count(),
+        edge_count: profile.topology().edge_count(),
+        supported_operations: profile
+            .supported_operations()
+            .into_iter()
+            .map(ToString::to_string)
+            .collect(),
+        legal: report.is_legal(),
+        violations: report.violations,
+        cost_model: format!("{}@{}", cost_model.id(), cost_model.version()),
+        cost_model_configuration: cost_model.configuration(),
+        cost: cost_model.evaluate(circuit, profile)?,
+    })
+}
+
 /// Builds a view of a circuit diff.
 pub fn diff_view(diff: &CircuitDiff) -> Vec<DiffEntryView> {
     diff.entries
@@ -406,6 +470,7 @@ mod tests {
             stages: vec![],
             passes: None,
             diff: None,
+            target: None,
         };
         let json = serde_json::to_string(&report).unwrap();
         assert!(json.contains("\"frontend\":\"openqasm3\""));

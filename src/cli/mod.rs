@@ -37,6 +37,7 @@ use clap::{Parser, Subcommand};
 use crate::frontend::FrontendError;
 use crate::ir::IrError;
 use crate::pass::{PassError, PassManager, PassSelection};
+use crate::target::{BasisProfile, builtin};
 use pipeline::Stage;
 
 /// Anything that can stop a CLI command.
@@ -92,6 +93,8 @@ enum Command {
     Watch(WatchArgs),
     /// List the registered optimization passes.
     Passes,
+    /// List the built-in target profiles.
+    Targets,
 }
 
 /// Options shared by every command that reads a program.
@@ -105,6 +108,9 @@ struct InputArgs {
     /// Emit machine-readable JSON instead of text.
     #[arg(long)]
     json: bool,
+    /// Check the circuit against a target profile (see `oqci targets`).
+    #[arg(long, value_name = "ID")]
+    target: Option<String>,
 }
 
 #[derive(Debug, clap::Args)]
@@ -190,6 +196,7 @@ fn dispatch(cli: Cli) -> Result<(), CliError> {
                 &input.source,
                 &input.bindings,
                 &input.emit,
+                input.target.as_ref(),
             )?;
             emit_report(&report, args.input.json, false)
         }
@@ -203,6 +210,7 @@ fn dispatch(cli: Cli) -> Result<(), CliError> {
                 &selection,
                 &input.emit,
                 args.diff,
+                input.target.as_ref(),
             )?;
             emit_report(&report, args.input.json, false)
         }
@@ -216,6 +224,7 @@ fn dispatch(cli: Cli) -> Result<(), CliError> {
                     &PassSelection::All,
                     &[Stage::QcIr],
                     false,
+                    input.target.as_ref(),
                 )?
             } else {
                 pipeline::run_compile(
@@ -223,6 +232,7 @@ fn dispatch(cli: Cli) -> Result<(), CliError> {
                     &input.source,
                     &input.bindings,
                     &[Stage::QcIr],
+                    input.target.as_ref(),
                 )?
             };
             emit_report(&report, args.input.json, true)
@@ -230,6 +240,10 @@ fn dispatch(cli: Cli) -> Result<(), CliError> {
         Command::Watch(args) => run_watch(&args),
         Command::Passes => {
             list_passes();
+            Ok(())
+        }
+        Command::Targets => {
+            list_targets();
             Ok(())
         }
     }
@@ -240,6 +254,7 @@ struct Prepared {
     source: String,
     bindings: HashMap<String, f64>,
     emit: Vec<Stage>,
+    target: Option<BasisProfile>,
 }
 
 /// Reads the source and normalizes the shared options.
@@ -252,6 +267,25 @@ fn prepare(input: &InputArgs, emit: &[Stage]) -> Result<Prepared, CliError> {
         } else {
             emit.to_vec()
         },
+        target: resolve_target(input.target.as_deref())?,
+    })
+}
+
+/// Looks up a built-in profile, rejecting an unknown id rather than silently
+/// checking against nothing.
+fn resolve_target(id: Option<&str>) -> Result<Option<BasisProfile>, CliError> {
+    let Some(id) = id else {
+        return Ok(None);
+    };
+    builtin::by_id(id).map(Some).ok_or_else(|| {
+        let available: Vec<String> = builtin::all()
+            .iter()
+            .map(|profile| profile.id().to_string())
+            .collect();
+        CliError::Usage(format!(
+            "unknown target `{id}`; available: {}",
+            available.join(", ")
+        ))
     })
 }
 
@@ -334,15 +368,24 @@ fn run_watch(args: &WatchArgs) -> Result<(), CliError> {
         args.emit.clone()
     };
     let (mode, diff, as_json) = (args.mode, args.diff, args.input.json);
+    let target = resolve_target(args.input.target.as_deref())?;
 
     watch::watch(&path.clone(), move || {
         // Re-read every time: the file is the input, and it just changed.
         let source = read(&path)?;
         let report = match mode {
-            Mode::Compile => pipeline::run_compile(&path, &source, &bindings, &emit)?,
-            Mode::Optimize => {
-                pipeline::run_optimize(&path, &source, &bindings, &selection, &emit, diff)?
+            Mode::Compile => {
+                pipeline::run_compile(&path, &source, &bindings, &emit, target.as_ref())?
             }
+            Mode::Optimize => pipeline::run_optimize(
+                &path,
+                &source,
+                &bindings,
+                &selection,
+                &emit,
+                diff,
+                target.as_ref(),
+            )?,
         };
         if as_json {
             render::json(&report)
@@ -361,6 +404,29 @@ fn list_passes() {
     println!(
         "\nuse --passes ID,... to run only some, or --disable ID,... to ablate one.\n\
          `canonicalize` appears twice: it also cleans up after rotation merging."
+    );
+}
+
+fn list_targets() {
+    println!("built-in target profiles:\n");
+    for profile in builtin::all() {
+        println!("  {}", profile.qualified_id());
+        println!("    backend       {}", profile.backend_id());
+        println!(
+            "    qubits        {} ({} directed coupling(s))",
+            profile.qubit_count(),
+            profile.topology().edge_count()
+        );
+        println!(
+            "    basis         {}",
+            profile.supported_operations().join(", ")
+        );
+        println!("    cost model    {}", profile.cost_model_id());
+        println!();
+    }
+    println!(
+        "use --target ID on `compile`, `optimize` or `analyze` to check a circuit\n\
+         against one. Both profiles are synthetic: neither describes real hardware."
     );
 }
 

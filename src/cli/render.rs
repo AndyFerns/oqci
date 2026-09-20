@@ -13,6 +13,7 @@ use std::fmt::Write as _;
 
 use crate::cli::CliError;
 use crate::cli::snapshot::{PipelineReport, StageSnapshot};
+use crate::target::Violation;
 
 /// Serializes a report as pretty-printed JSON.
 ///
@@ -68,6 +69,8 @@ pub fn human(report: &PipelineReport) -> String {
         render_stage(&mut out, stage);
     }
 
+    render_target(&mut out, report);
+
     if let Some(diff) = &report.diff {
         out.push_str("\n-- diff --\n");
         if diff.iter().all(|e| e.marker == " ") {
@@ -80,6 +83,94 @@ pub fn human(report: &PipelineReport) -> String {
     }
 
     out
+}
+
+/// Renders the target section, shared by every renderer that can show one.
+///
+/// Lives in one place so a command cannot accept `--target` and then quietly
+/// fail to display the answer.
+fn render_target(out: &mut String, report: &PipelineReport) {
+    if let Some(target) = &report.target {
+        let _ = write!(
+            out,
+            "\n-- target -- {} on {} ({} qubits, {} directed coupling(s))\n",
+            target.profile, target.backend_id, target.qubit_count, target.edge_count
+        );
+
+        if target.legal {
+            let _ = writeln!(out, "  legality: OK — runs on this target as written");
+        } else {
+            let _ = writeln!(
+                out,
+                "  legality: {} violation(s) — will not run as written",
+                target.violations.len()
+            );
+            for violation in &target.violations {
+                let _ = writeln!(out, "    {}", describe_violation(violation));
+            }
+        }
+
+        let cost = &target.cost;
+        let _ = writeln!(out, "  cost ({}):", target.cost_model);
+        let _ = writeln!(out, "    operations        {}", cost.total_gate_count);
+        let _ = writeln!(out, "    one-qubit         {}", cost.one_qubit_count);
+        let _ = writeln!(out, "    multi-qubit       {}", cost.two_qubit_count);
+        let _ = writeln!(out, "    depth             {}", cost.depth);
+        let _ = writeln!(out, "    swaps             {}", cost.swap_count);
+        let _ = writeln!(out, "    native ops        {}", cost.native_gate_count);
+        let _ = writeln!(out, "    non-native ops    {}", cost.non_native_gate_count);
+        // Stage E §7: the scalar is shown alongside the components it came
+        // from, never instead of them, and never without its weights.
+        if let Some(score) = cost.scalar_score {
+            let _ = writeln!(out, "    scalar score      {score}");
+            let weights: Vec<String> = target
+                .cost_model_configuration
+                .iter()
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect();
+            let _ = writeln!(out, "      from: {}", weights.join(", "));
+        }
+    }
+}
+
+/// One line per violation, naming the instruction it belongs to.
+fn describe_violation(violation: &Violation) -> String {
+    match violation {
+        Violation::UnsupportedOperation { index, mnemonic } => {
+            format!("[{index}] `{mnemonic}` is not in the target's basis set")
+        }
+        Violation::QubitOutOfRange {
+            index,
+            qubit,
+            qubit_count,
+        } => format!("[{index}] uses {qubit}, but the device has {qubit_count} qubit(s)"),
+        Violation::ConnectivityViolation {
+            index,
+            control,
+            target,
+        } => format!("[{index}] no coupling {control} -> {target} on this device"),
+        Violation::ParameterOutOfRange {
+            index,
+            mnemonic,
+            value,
+            min,
+            max,
+        } => format!("[{index}] `{mnemonic}` parameter {value} outside [{min}, {max}]"),
+        Violation::UnboundParameter {
+            index,
+            mnemonic,
+            symbol,
+        } => format!(
+            "[{index}] `{mnemonic}` parameter `{symbol}` is unbound, so its domain cannot be checked"
+        ),
+        Violation::MeasurementUnsupported { index } => {
+            format!("[{index}] this device cannot measure")
+        }
+        Violation::MidCircuitMeasurementUnsupported { index, qubit } => format!(
+            "[{index}] {qubit} is used after being measured, and this device measures only at the end"
+        ),
+        Violation::ResetUnsupported { index } => format!("[{index}] this device cannot reset"),
+    }
 }
 
 fn render_stage(out: &mut String, stage: &StageSnapshot) {
@@ -185,6 +276,8 @@ pub fn resource_report(report: &PipelineReport) -> String {
         );
     }
 
+    render_target(&mut out, report);
+
     out
 }
 
@@ -206,7 +299,14 @@ mod tests {
     "#;
 
     fn compiled() -> PipelineReport {
-        run_compile(Path::new("bell.qasm"), BELL, &HashMap::new(), &Stage::all()).unwrap()
+        run_compile(
+            Path::new("bell.qasm"),
+            BELL,
+            &HashMap::new(),
+            &Stage::all(),
+            None,
+        )
+        .unwrap()
     }
 
     #[test]
@@ -245,6 +345,7 @@ mod tests {
             &PassSelection::all_except(["rotation-merge"]),
             &[Stage::QcIr],
             true,
+            None,
         )
         .unwrap();
 
@@ -265,6 +366,7 @@ mod tests {
             &PassSelection::All,
             &[],
             true,
+            None,
         )
         .unwrap();
         assert!(human(&report).contains("(no change)"));
@@ -277,6 +379,7 @@ mod tests {
             "input float[64] theta; qubit[1] q; rz(theta) q[0];",
             &HashMap::new(),
             &Stage::all(),
+            None,
         )
         .unwrap();
 
@@ -304,6 +407,7 @@ mod tests {
             &PassSelection::All,
             &[Stage::QcIr],
             false,
+            None,
         )
         .unwrap();
 
@@ -318,6 +422,7 @@ mod tests {
             "qubit[1] q; bit[1] c; x q[0]; measure q[0] -> c[0]; x q[0];",
             &HashMap::new(),
             &[Stage::QcoIr],
+            None,
         )
         .unwrap();
         assert!(human(&report).contains("control barriers:"));
@@ -330,6 +435,7 @@ mod tests {
             "OPENQASM 3.0;",
             &HashMap::new(),
             &Stage::all(),
+            None,
         )
         .unwrap();
         assert!(human(&report).contains("(empty circuit)"));

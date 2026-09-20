@@ -25,10 +25,12 @@ use crate::analysis::{analyze, diff_circuits};
 use crate::cli::CliError;
 use crate::cli::snapshot::{
     PassRecordView, PipelineReport, StageSnapshot, diff_view, graph_of, instructions_of,
+    target_report,
 };
 use crate::frontend::parse_openqasm3_named;
 use crate::ir::{Circuit, bind_parameters, emit_qir, qc_to_qco};
 use crate::pass::{PassManager, PassSelection};
+use crate::target::{BasisProfile, cost};
 
 /// Which stages to include in a report.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -91,11 +93,34 @@ pub fn run_compile(
     source: &str,
     bindings: &HashMap<String, f64>,
     emit: &[Stage],
+    target: Option<&BasisProfile>,
 ) -> Result<PipelineReport, CliError> {
     let circuit = parse(path, source, bindings)?;
     let mut report = new_report(path, &circuit);
     report.stages = stages_for(&circuit, emit)?;
+    report.target = target_for(&circuit, target)?;
     Ok(report)
+}
+
+/// Evaluates a circuit against a target profile, when one was selected.
+///
+/// The cost model is the one the profile names — Stage E's rule that the
+/// *target* defines what is expensive, not the tool doing the reporting.
+fn target_for(
+    circuit: &Circuit,
+    target: Option<&BasisProfile>,
+) -> Result<Option<crate::cli::snapshot::TargetReportView>, CliError> {
+    let Some(profile) = target else {
+        return Ok(None);
+    };
+    let cost_model = cost::resolve(profile.cost_model_id()).ok_or_else(|| {
+        CliError::Usage(format!(
+            "target `{}` references unknown cost model `{}`",
+            profile.id(),
+            profile.cost_model_id()
+        ))
+    })?;
+    Ok(Some(target_report(circuit, profile, &cost_model)?))
 }
 
 /// Runs frontend → QC-IR → pass pipeline → QCO-IR → QIR.
@@ -110,12 +135,16 @@ pub fn run_optimize(
     selection: &PassSelection,
     emit: &[Stage],
     want_diff: bool,
+    target: Option<&BasisProfile>,
 ) -> Result<PipelineReport, CliError> {
     let original = parse(path, source, bindings)?;
     let result = PassManager::default_pipeline().run(&original, selection)?;
 
     let mut report = new_report(path, &result.circuit);
     report.passes = Some(result.records.iter().map(PassRecordView::new).collect());
+    // The optimized circuit is what would actually be submitted, so that is
+    // what gets checked against the target.
+    report.target = target_for(&result.circuit, target)?;
 
     // The pre-optimization circuit, so a reader can see what it started from.
     if emit.contains(&Stage::QcIr) {
@@ -155,6 +184,7 @@ fn new_report(path: &Path, circuit: &Circuit) -> PipelineReport {
         stages: Vec::new(),
         passes: None,
         diff: None,
+        target: None,
     }
 }
 
@@ -233,7 +263,7 @@ mod tests {
 
     #[test]
     fn compile_reports_every_stage() {
-        let report = run_compile(path(), BELL, &HashMap::new(), &Stage::all()).unwrap();
+        let report = run_compile(path(), BELL, &HashMap::new(), &Stage::all(), None).unwrap();
 
         let labels: Vec<&str> = report.stages.iter().map(|s| s.stage.as_str()).collect();
         assert_eq!(labels, vec!["qc-ir", "qco-ir", "qir"]);
@@ -243,7 +273,7 @@ mod tests {
 
     #[test]
     fn emit_selection_is_respected() {
-        let report = run_compile(path(), BELL, &HashMap::new(), &[Stage::Qir]).unwrap();
+        let report = run_compile(path(), BELL, &HashMap::new(), &[Stage::Qir], None).unwrap();
         assert_eq!(report.stages.len(), 1);
         assert!(report.stages[0].qir.is_some());
     }
@@ -258,6 +288,7 @@ mod tests {
             &PassSelection::All,
             &Stage::all(),
             true,
+            None,
         )
         .unwrap();
 
@@ -279,8 +310,14 @@ mod tests {
     #[test]
     fn unbound_parameters_report_rather_than_fail() {
         let source = "input float[64] theta; qubit[1] q; rz(theta) q[0];";
-        let report =
-            run_compile(Path::new("a.qasm"), source, &HashMap::new(), &Stage::all()).unwrap();
+        let report = run_compile(
+            Path::new("a.qasm"),
+            source,
+            &HashMap::new(),
+            &Stage::all(),
+            None,
+        )
+        .unwrap();
 
         assert_eq!(report.unbound_parameters, vec!["theta".to_string()]);
         let qir = report.stages.iter().find(|s| s.stage == "qir").unwrap();
@@ -292,7 +329,8 @@ mod tests {
     fn bindings_make_a_parameterized_circuit_emittable() {
         let source = "input float[64] theta; qubit[1] q; rz(theta) q[0];";
         let bindings = HashMap::from([("theta".to_string(), 0.5)]);
-        let report = run_compile(Path::new("a.qasm"), source, &bindings, &Stage::all()).unwrap();
+        let report =
+            run_compile(Path::new("a.qasm"), source, &bindings, &Stage::all(), None).unwrap();
 
         assert!(report.unbound_parameters.is_empty());
         let qir = report.stages.iter().find(|s| s.stage == "qir").unwrap();
@@ -306,8 +344,14 @@ mod tests {
 
     #[test]
     fn a_frontend_error_surfaces() {
-        let error =
-            run_compile(path(), "qubit[1] q; h q[0]", &HashMap::new(), &Stage::all()).unwrap_err();
+        let error = run_compile(
+            path(),
+            "qubit[1] q; h q[0]",
+            &HashMap::new(),
+            &Stage::all(),
+            None,
+        )
+        .unwrap_err();
         assert!(matches!(error, CliError::Frontend(_)));
     }
 
@@ -321,6 +365,7 @@ mod tests {
             &PassSelection::all_except(["gate-cancellation"]),
             &[Stage::QcIr],
             false,
+            None,
         )
         .unwrap();
 

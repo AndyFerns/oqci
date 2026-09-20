@@ -42,3 +42,4 @@ pub mod cli;
 pub mod frontend;
 pub mod ir;
 pub mod pass;
+pub mod target;
