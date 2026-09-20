@@ -135,6 +135,14 @@ pub enum GateKind {
     T,
     /// Adjoint of `T`.
     Tdg,
+    /// `√X`, the principal square root of Pauli-X: `SX·SX = X` exactly.
+    ///
+    /// Registered rather than expressed as `Rx(π/2)` because the two differ by
+    /// a global phase and `sx` is a native hardware operation in its own right
+    /// — see `docs/architecture_decision_sx_basis_gate.md`.
+    SX,
+    /// Adjoint of [`GateKind::SX`]. `SX·SXdg = I` exactly.
+    SXdg,
     /// Rotation about X by the given parameter.
     Rx(Param),
     /// Rotation about Y by the given parameter.
@@ -191,6 +199,8 @@ impl GateKind {
             | GateKind::Sdg
             | GateKind::T
             | GateKind::Tdg
+            | GateKind::SX
+            | GateKind::SXdg
             | GateKind::Rx(_)
             | GateKind::Ry(_)
             | GateKind::Rz(_)
@@ -216,6 +226,8 @@ impl GateKind {
             GateKind::Sdg => "sdg",
             GateKind::T => "t",
             GateKind::Tdg => "tdg",
+            GateKind::SX => "sx",
+            GateKind::SXdg => "sxdg",
             GateKind::Rx(_) => "rx",
             GateKind::Ry(_) => "ry",
             GateKind::Rz(_) => "rz",

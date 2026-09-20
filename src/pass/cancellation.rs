@@ -131,7 +131,7 @@ fn find_cancellable(circuit: &Circuit) -> Result<HashSet<usize>, crate::ir::IrEr
 
 /// Whether applying `a` then `b` is provably the identity.
 fn are_inverse(a: &GateKind, b: &GateKind) -> bool {
-    use GateKind::{Ccx, Cx, Cy, Cz, H, P, Rx, Ry, Rz, S, Sdg, Swap, T, Tdg, X, Y, Z};
+    use GateKind::{Ccx, Cx, Cy, Cz, H, P, Rx, Ry, Rz, S, SX, SXdg, Sdg, Swap, T, Tdg, X, Y, Z};
     match (a, b) {
         // Involutions: applying twice is the identity.
         (X, X)
@@ -143,8 +143,9 @@ fn are_inverse(a: &GateKind, b: &GateKind) -> bool {
         | (Cz, Cz)
         | (Swap, Swap)
         | (Ccx, Ccx) => true,
-        // Adjoint pairs.
-        (S, Sdg) | (Sdg, S) | (T, Tdg) | (Tdg, T) => true,
+        // Adjoint pairs. `SX` is deliberately absent from the involutions
+        // above: `SX; SX` is `X`, not the identity.
+        (S, Sdg) | (Sdg, S) | (T, Tdg) | (Tdg, T) | (SX, SXdg) | (SXdg, SX) => true,
         // Same-axis rotations whose angles exactly negate.
         (Rx(p), Rx(q)) | (Ry(p), Ry(q)) | (Rz(p), Rz(q)) | (P(p), P(q)) => negate_exactly(p, q),
         // `U`, `Opaque` and `I` are deliberately absent — see the module docs.

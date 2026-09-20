@@ -17,7 +17,8 @@
 //! Two honesty caveats, both documented in `docs/qir_lowering.md`:
 //!
 //! - **Extended intrinsics.** Gates outside the QIR standard instruction set
-//!   (`p`, `u`, `cy`, `swap`, `ccx`, `id`, and any [`crate::ir::GateKind::Opaque`])
+//!   (`p`, `u`, `cy`, `swap`, `ccx`, `id`, `sx`, `sxdg`, and any
+//!   [`crate::ir::GateKind::Opaque`])
 //!   are emitted as declared `__quantum__qis__*` externs. They parse as valid
 //!   LLVM IR; a future decomposition pass (Phase 3) can lower them to the
 //!   standard set.

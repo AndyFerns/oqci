@@ -56,6 +56,8 @@ pub fn map_gate(name: &str, params: Vec<Param>) -> Result<GateKind, FrontendErro
         "sdg" => Some(GateKind::Sdg),
         "t" => Some(GateKind::T),
         "tdg" => Some(GateKind::Tdg),
+        "sx" => Some(GateKind::SX),
+        "sxdg" => Some(GateKind::SXdg),
         "cx" | "cnot" => Some(GateKind::Cx),
         "cy" => Some(GateKind::Cy),
         "cz" => Some(GateKind::Cz),
