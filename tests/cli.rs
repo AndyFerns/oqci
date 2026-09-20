@@ -225,7 +225,131 @@ fn passes_lists_the_default_pipeline_in_order() {
     assert!(text.contains("5. schedule"));
 }
 
+// --- targets ----------------------------------------------------------------
+
+#[test]
+fn targets_lists_the_builtin_profiles() {
+    let text = stdout_of(&["targets"]);
+    assert!(text.contains("ideal-simulator@1"));
+    assert!(text.contains("linear-nisq@1"));
+    assert!(
+        text.contains("synthetic"),
+        "the listing must not imply these are real devices"
+    );
+}
+
+#[test]
+fn a_target_reports_legality_and_cost() {
+    let text = stdout_of(&[
+        "compile",
+        example("bell.qasm").to_str().unwrap(),
+        "--target",
+        "ideal-simulator",
+        "--emit",
+        "qc-ir",
+    ]);
+    assert!(text.contains("-- target -- ideal-simulator@1"));
+    assert!(text.contains("legality: OK"));
+    assert!(text.contains("scalar score"));
+    assert!(
+        text.contains("from: depth_weight"),
+        "a scalar must arrive with the weights behind it"
+    );
+}
+
+#[test]
+fn a_restricted_target_names_the_offending_gate() {
+    let text = stdout_of(&[
+        "compile",
+        example("bell.qasm").to_str().unwrap(),
+        "--target",
+        "linear-nisq",
+        "--emit",
+        "qc-ir",
+    ]);
+    assert!(text.contains("violation(s)"));
+    assert!(text.contains("`h` is not in the target's basis set"));
+}
+
+#[test]
+fn target_json_carries_the_full_report() {
+    let value = json_of(&[
+        "compile",
+        example("bell.qasm").to_str().unwrap(),
+        "--target",
+        "linear-nisq",
+        "--emit",
+        "qc-ir",
+        "--json",
+    ]);
+
+    let target = &value["target"];
+    assert_eq!(target["profile"], "linear-nisq@1");
+    assert_eq!(target["backend_id"], "generic-nisq");
+    assert_eq!(target["legal"], false);
+    assert_eq!(target["violations"][0]["kind"], "unsupported_operation");
+    assert_eq!(target["violations"][0]["mnemonic"], "h");
+    assert_eq!(target["cost"]["non_native_gate_count"], 1);
+    assert!(
+        target["cost_model_configuration"]["two_qubit_weight"].is_string(),
+        "the weights behind the scalar must be machine-readable too"
+    );
+}
+
+#[test]
+fn analyze_accepts_a_target_too() {
+    let text = stdout_of(&[
+        "analyze",
+        example("bell.qasm").to_str().unwrap(),
+        "--target",
+        "ideal-simulator",
+    ]);
+    assert!(text.contains("-- target --"));
+}
+
+#[test]
+fn optimize_checks_the_optimized_circuit_against_the_target() {
+    // The optimized circuit is what would actually be submitted.
+    let value = json_of(&[
+        "optimize",
+        example("ghz3.qasm").to_str().unwrap(),
+        "--target",
+        "ideal-simulator",
+        "--emit",
+        "qc-ir",
+        "--json",
+    ]);
+    assert_eq!(value["target"]["cost"]["total_gate_count"], 7);
+}
+
+#[test]
+fn no_target_flag_means_no_target_section() {
+    let value = json_of(&[
+        "compile",
+        example("bell.qasm").to_str().unwrap(),
+        "--emit",
+        "qc-ir",
+        "--json",
+    ]);
+    assert!(value.get("target").is_none());
+}
+
 // --- failure paths ----------------------------------------------------------
+
+#[test]
+fn an_unknown_target_is_rejected_and_lists_the_valid_ones() {
+    let output = run(&[
+        "compile",
+        example("bell.qasm").to_str().unwrap(),
+        "--target",
+        "no-such-device",
+    ]);
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("unknown target"));
+    assert!(stderr.contains("ideal-simulator"));
+}
 
 #[test]
 fn a_missing_file_fails_with_a_clear_message() {

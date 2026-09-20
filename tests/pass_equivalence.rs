@@ -58,6 +58,8 @@ fn gate_strategy() -> impl Strategy<Value = GateSpec> {
             GateKind::Sdg,
             GateKind::T,
             GateKind::Tdg,
+            GateKind::SX,
+            GateKind::SXdg,
         ])
         .prop_map(GateSpec::Unary),
         // Rotations — the merge and exact-negation-cancel paths.

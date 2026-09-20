@@ -88,6 +88,9 @@ fn single_qubit_matrix(kind: &GateKind) -> Matrix2 {
         GateKind::Sdg => [[one, zero], [zero, c(0.0, -1.0)]],
         GateKind::T => [[one, zero], [zero, phase(std::f64::consts::FRAC_PI_4)]],
         GateKind::Tdg => [[one, zero], [zero, phase(-std::f64::consts::FRAC_PI_4)]],
+        // SX = sqrt(X) = 1/2 * [[1+i, 1-i], [1-i, 1+i]]; SXdg is its adjoint.
+        GateKind::SX => [[c(0.5, 0.5), c(0.5, -0.5)], [c(0.5, -0.5), c(0.5, 0.5)]],
+        GateKind::SXdg => [[c(0.5, -0.5), c(0.5, 0.5)], [c(0.5, 0.5), c(0.5, -0.5)]],
         GateKind::Rx(theta) => {
             let (cos, sin) = half_angle(theta);
             [[c(cos, 0.0), c(0.0, -sin)], [c(0.0, -sin), c(cos, 0.0)]]
@@ -248,6 +251,46 @@ mod self_tests {
             b.x(QubitId(0));
         });
         assert!(!same_state_up_to_global_phase(&a, &b_state));
+    }
+
+    #[test]
+    fn sx_squared_is_x() {
+        // The defining property of sqrt(X) — this is what validates the
+        // matrix above, independently of the pass that relies on it.
+        let twice = state(|b| {
+            b.gate(GateKind::SX, [QubitId(0)])
+                .gate(GateKind::SX, [QubitId(0)]);
+        });
+        let direct = state(|b| {
+            b.x(QubitId(0));
+        });
+        assert!(same_state_up_to_global_phase(&twice, &direct));
+    }
+
+    #[test]
+    fn sx_then_sxdg_is_the_identity() {
+        let round_trip = state(|b| {
+            b.h(QubitId(0))
+                .gate(GateKind::SX, [QubitId(0)])
+                .gate(GateKind::SXdg, [QubitId(0)]);
+        });
+        let untouched = state(|b| {
+            b.h(QubitId(0));
+        });
+        assert!(same_state_up_to_global_phase(&round_trip, &untouched));
+    }
+
+    #[test]
+    fn sx_is_not_self_inverse() {
+        // Guards the cancellation table: `SX; SX` must NOT be treated as a
+        // cancelling pair. Measured from |0>, not from H|0> — the latter is
+        // the +1 eigenstate of X, where `SX; SX == X` genuinely is a no-op.
+        let twice = state(|b| {
+            b.gate(GateKind::SX, [QubitId(0)])
+                .gate(GateKind::SX, [QubitId(0)]);
+        });
+        let untouched = state(|_| {});
+        assert!(!same_state_up_to_global_phase(&twice, &untouched));
     }
 
     #[test]
