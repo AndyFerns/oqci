@@ -1,7 +1,10 @@
 # QCO-IR → QIR Lowering
 
 **Status:** Phase 0 (stable). **Boundary:** QIR emission is the end of Phase 0;
-there is no backend execution. This document specifies the lowering implemented
+QIR is not the execution path: a backend's executable representation is a
+separate artifact, built by a separate stage, because Stage C §5 forbids
+treating emitted QIR as a guarantee that anything will run
+(see [Backend Contract](backend_contract.md)). This document specifies the lowering implemented
 in `src/ir/qir.rs`: the target format, the op → QIR mapping table, and the two
 documented conformance caveats.
 
