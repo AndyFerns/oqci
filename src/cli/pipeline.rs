@@ -22,15 +22,17 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use crate::analysis::{analyze, diff_circuits};
+use crate::backend::ExecutionSettings;
 use crate::cli::CliError;
 use crate::cli::snapshot::{
-    PassRecordView, PipelineReport, StageSnapshot, diff_view, graph_of, instructions_of,
-    target_report,
+    PassRecordView, PipelineReport, StageSnapshot, diff_view, executable_view, graph_of,
+    instructions_of, lowering_view, target_report,
 };
-use crate::frontend::parse_openqasm3_named;
-use crate::ir::{Circuit, bind_parameters, emit_qir, qc_to_qco};
-use crate::pass::{PassManager, PassSelection};
-use crate::target::{BasisProfile, cost};
+use crate::compile::{CompilationArtifacts, CompilerConfig, Stop};
+use crate::ir::{Circuit, emit_qir, qc_to_qco};
+use crate::lowering::LoweringConfig;
+use crate::pass::PassSelection;
+use crate::target::{BasisProfile, WeightedCostModel, cost};
 
 /// Which stages to include in a report.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -58,29 +60,6 @@ impl Stage {
     }
 }
 
-/// Parses a source file into QC-IR, applying any `--bind` values.
-///
-/// The circuit's name comes from the file stem, so the emitted QIR entry
-/// point matches the file a reader is looking at.
-///
-/// # Errors
-///
-/// [`CliError::Frontend`] for a malformed or unsupported program, or
-/// [`CliError::Ir`] if a binding is rejected.
-pub fn parse(
-    path: &Path,
-    source: &str,
-    bindings: &HashMap<String, f64>,
-) -> Result<Circuit, CliError> {
-    let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("main");
-    let circuit = parse_openqasm3_named(source, name)?;
-
-    if bindings.is_empty() {
-        return Ok(circuit);
-    }
-    Ok(bind_parameters(&circuit, bindings)?)
-}
-
 /// Runs frontend → QC-IR → QCO-IR → QIR, recording each requested stage.
 ///
 /// # Errors
@@ -95,11 +74,41 @@ pub fn run_compile(
     emit: &[Stage],
     target: Option<&BasisProfile>,
 ) -> Result<PipelineReport, CliError> {
-    let circuit = parse(path, source, bindings)?;
-    let mut report = new_report(path, &circuit);
-    report.stages = stages_for(&circuit, emit)?;
-    report.target = target_for(&circuit, target)?;
+    // Everything before rendering comes from the orchestrator, so the CLI
+    // cannot drift from the library (spec 19: the CLI "must not duplicate
+    // compiler logic"). Only presentation lives here.
+    let artifacts = orchestrate(
+        path,
+        source,
+        bindings,
+        &PassSelection::only::<[&str; 0], &str>([]),
+    )?;
+    let mut report = new_report(path, &artifacts.source_circuit);
+    report.stages = stages_for(&artifacts.source_circuit, emit)?;
+    report.target = target_for(&artifacts.source_circuit, target)?;
     Ok(report)
+}
+
+/// Runs the frontend and, optionally, the pass pipeline through the shared
+/// orchestrator.
+///
+/// `compile` is the single path from source text to artifacts. Routing every
+/// command through it is what keeps the numbers a user sees identical to the
+/// numbers the compiler computed.
+fn orchestrate(
+    path: &Path,
+    source: &str,
+    bindings: &HashMap<String, f64>,
+    passes: &PassSelection,
+) -> Result<CompilationArtifacts, CliError> {
+    let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("main");
+    let config = CompilerConfig {
+        bindings: bindings.clone(),
+        passes: passes.clone(),
+        stop: Stop::Optimized,
+        ..CompilerConfig::default()
+    };
+    Ok(crate::compile::compile_named(source, name, &config)?)
 }
 
 /// Evaluates a circuit against a target profile, when one was selected.
@@ -113,14 +122,23 @@ fn target_for(
     let Some(profile) = target else {
         return Ok(None);
     };
-    let cost_model = cost::resolve(profile.cost_model_id()).ok_or_else(|| {
+    let cost_model = cost_model_for(profile)?;
+    Ok(Some(target_report(circuit, profile, &cost_model)?))
+}
+
+/// The cost model a profile names, or a usage error naming both.
+///
+/// Resolution can fail: `cost::resolve` returns `None` for an unknown id
+/// rather than substituting a default, because a result recording a cost
+/// model that did not produce it is false provenance (Stage E §9).
+fn cost_model_for(profile: &BasisProfile) -> Result<WeightedCostModel, CliError> {
+    cost::resolve(profile.cost_model_id()).ok_or_else(|| {
         CliError::Usage(format!(
             "target `{}` references unknown cost model `{}`",
             profile.id(),
             profile.cost_model_id()
         ))
-    })?;
-    Ok(Some(target_report(circuit, profile, &cost_model)?))
+    })
 }
 
 /// Runs frontend → QC-IR → pass pipeline → QCO-IR → QIR.
@@ -137,14 +155,21 @@ pub fn run_optimize(
     want_diff: bool,
     target: Option<&BasisProfile>,
 ) -> Result<PipelineReport, CliError> {
-    let original = parse(path, source, bindings)?;
-    let result = PassManager::default_pipeline().run(&original, selection)?;
+    let artifacts = orchestrate(path, source, bindings, selection)?;
+    let original = artifacts.source_circuit.clone();
+    let optimized = artifacts.optimized.clone();
 
-    let mut report = new_report(path, &result.circuit);
-    report.passes = Some(result.records.iter().map(PassRecordView::new).collect());
+    let mut report = new_report(path, &optimized);
+    report.passes = Some(
+        artifacts
+            .pass_records
+            .iter()
+            .map(PassRecordView::new)
+            .collect(),
+    );
     // The optimized circuit is what would actually be submitted, so that is
     // what gets checked against the target.
-    report.target = target_for(&result.circuit, target)?;
+    report.target = target_for(&optimized, target)?;
 
     // The pre-optimization circuit, so a reader can see what it started from.
     if emit.contains(&Stage::QcIr) {
@@ -158,7 +183,7 @@ pub fn run_optimize(
         });
     }
     report.stages.extend(
-        stages_for(&result.circuit, emit)?
+        stages_for(&optimized, emit)?
             .into_iter()
             .map(|mut snapshot| {
                 // Distinguish the post-pass circuit from the input above.
@@ -170,7 +195,124 @@ pub fn run_optimize(
     );
 
     if want_diff {
-        report.diff = Some(diff_view(&diff_circuits(&original, &result.circuit)));
+        report.diff = Some(diff_view(&diff_circuits(&original, &optimized)));
+    }
+    Ok(report)
+}
+
+/// Everything [`run_lower`] needs.
+///
+/// Bundled rather than passed as nine positional arguments, where `want_diff`
+/// and `prepare` would sit next to each other as two bare `bool`s — a call
+/// site that is easy to get backwards and impossible to read.
+pub struct LowerRequest<'a> {
+    /// Values for symbolic parameters.
+    pub bindings: &'a HashMap<String, f64>,
+    /// Which backend to compile for.
+    pub backend: &'a str,
+    /// How to lower.
+    pub lowering: LoweringConfig,
+    /// Shots and seed, carried into the provenance record.
+    pub settings: ExecutionSettings,
+    /// Which stages to snapshot.
+    pub emit: &'a [Stage],
+    /// Whether to include a before/after diff.
+    pub want_diff: bool,
+    /// Whether to go on and build the executable.
+    pub prepare: bool,
+}
+
+/// Runs the whole pipeline through to target lowering, and optionally to a
+/// prepared executable.
+///
+/// The one command that exercises every stage the compiler has. Everything it
+/// reports comes from [`crate::compile::compile_named`], so `oqci lower` and a
+/// library caller cannot disagree about what happened.
+///
+/// # Errors
+///
+/// [`CliError::Compile`] when any stage refuses, or [`CliError::Usage`] for an
+/// unknown backend.
+pub fn run_lower(
+    path: &Path,
+    source: &str,
+    request: &LowerRequest<'_>,
+) -> Result<PipelineReport, CliError> {
+    let backend = request.backend;
+    let emit = request.emit;
+
+    let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("main");
+    let config = CompilerConfig {
+        bindings: request.bindings.clone(),
+        backend: Some(backend.to_string()),
+        lowering: request.lowering.clone(),
+        settings: request.settings.clone(),
+        stop: if request.prepare {
+            Stop::Prepared
+        } else {
+            Stop::Lowered
+        },
+        ..CompilerConfig::default()
+    };
+    let artifacts = crate::compile::compile_named(source, name, &config)?;
+
+    let lowered = artifacts
+        .lowered
+        .as_ref()
+        .expect("lowering ran, so there is a lowered circuit");
+
+    let mut report = new_report(path, &lowered.circuit);
+    report.passes = Some(
+        artifacts
+            .pass_records
+            .iter()
+            .map(PassRecordView::new)
+            .collect(),
+    );
+    report.lowering = Some(lowering_view(backend, lowered));
+    report.executable = artifacts.executable.as_ref().map(executable_view);
+
+    // The pre-lowering circuit, so a reader can see what it started from.
+    if emit.contains(&Stage::QcIr) {
+        report.stages.push(StageSnapshot {
+            stage: "qc-ir".into(),
+            metrics: Some(artifacts.source_metrics.clone()),
+            instructions: Some(instructions_of(&artifacts.source_circuit)),
+            graph: None,
+            qir: None,
+            unavailable: None,
+        });
+    }
+    report.stages.extend(
+        stages_for(&lowered.circuit, emit)?
+            .into_iter()
+            .map(|mut snapshot| {
+                if snapshot.stage == "qc-ir" {
+                    snapshot.stage = "lowered".into();
+                }
+                snapshot
+            }),
+    );
+
+    // The cost the *target* assigns, not one this tool invented (Stage E).
+    //
+    // Asked of the backend rather than looked up in `builtin`, which only
+    // knows the profiles it enumerates: resolving by id meant a backend with
+    // its own profile — `ibm-illustrative` — silently printed no target or
+    // cost section at all, with nothing to say why.
+    if let Some(backend) = crate::backend::by_id(backend) {
+        report.target = Some(target_report(
+            &lowered.circuit,
+            backend.profile(),
+            backend.cost_model(),
+        )?);
+    }
+
+    if request.want_diff {
+        report.diff = Some(diff_view(&diff_circuits(
+            &artifacts.source_circuit,
+            &lowered.circuit,
+        )));
     }
     Ok(report)
 }
@@ -185,6 +327,8 @@ fn new_report(path: &Path, circuit: &Circuit) -> PipelineReport {
         passes: None,
         diff: None,
         target: None,
+        lowering: None,
+        executable: None,
     }
 }
 
@@ -352,7 +496,16 @@ mod tests {
             None,
         )
         .unwrap_err();
-        assert!(matches!(error, CliError::Frontend(_)));
+        // Arrives through the orchestrator now, and `#[error(transparent)]`
+        // means the message a user sees is the frontend's own either way.
+        assert!(
+            matches!(
+                error,
+                CliError::Compile(crate::compile::CompileError::Frontend { .. })
+            ),
+            "got {error}"
+        );
+        assert!(error.to_string().contains("expected"), "{error}");
     }
 
     #[test]
