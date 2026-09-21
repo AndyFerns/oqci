@@ -1,7 +1,7 @@
 # OQCI Source-of-Truth Documentation Index
 
-Status: Active planning baseline  
-Last verified against repository: 2026-09-21  
+Status: Active planning baseline
+Last verified against repository: 2026-09-21
 Repository: `https://github.com/AndyFerns/oqci`  
 Branch reviewed: `master`  
 Current repository version: `0.3.0`
