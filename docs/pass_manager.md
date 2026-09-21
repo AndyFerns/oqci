@@ -14,11 +14,14 @@ before/after hooks, error propagation, and ablation support.
 pub trait Pass: Send + Sync {
     fn id(&self) -> &'static str;
     fn description(&self) -> &'static str;
-    fn run(&self, circuit: &Circuit) -> Result<PassOutput, PassError>;
+    fn run(&self, circuit: &Circuit, context: &PassContext<'_>)
+        -> Result<PassOutput, PassError>;
 }
 ```
 
-A pass is a `Circuit → Circuit` function. Passes that need dependency
+A pass is a `Circuit → Circuit` function. The `context` carries the selected
+target when there is one; every pass receives it and most ignore it, for
+reasons set out under "Not implemented" below. Passes that need dependency
 structure call `qc_to_qco` internally and replay the result through
 `CircuitBuilder`.
 
@@ -213,21 +216,53 @@ implemented merely because a module or diagram names it — the following from
 
 | Spec | Status |
 |---|---|
-| §8.6 Qubit mapping | not implemented |
-| §8.7 Routing / SWAP insertion | not implemented |
-| §8.8 Basis decomposition | not implemented |
 | §8.3 general gate fusion | only additive-parameter fusion, as described above |
 
-The first three are no longer blocked on a missing target model — topology,
-basis sets and constraints now exist in [`target_model.md`](target_model.md).
-What is missing is the passes that *consume* them.
+§8.6 (qubit mapping), §8.7 (routing) and §8.8 (basis decomposition) used to be
+listed here too. They are now implemented — but **not as passes**, and not in
+this module. They live in [`lowering.md`](lowering.md), for a reason worth
+stating:
 
-**No pass is target-aware.** `Pass::run` takes only a `&Circuit`: there is no
-target or cost context on the trait, so Stage E §8's "a pass may consult
-target cost information where appropriate" is not yet satisfied. Nothing in
-this module reads a `BasisProfile`, and every pass here is target-independent
-by construction. That changes when mapping and routing arrive, since those
-are the first passes that genuinely need the data.
+A `Pass` is `Circuit -> Circuit`, and `tests/pass_equivalence.rs` asserts that
+a registered pass leaves the state vector alone up to global phase. That is a
+*false* specification for lowering, whose output is deliberately a permutation
+of the input over a wider register. Had lowering been written as a `Pass`,
+someone would eventually have added it to `default_pipeline` and the property
+suite would have begun asserting something untrue about it. Stage D §4
+independently requires that target description, target lowering and routing
+not be conflated.
+
+**A pass may now consult the target, though none of the shipped ones does.**
+`Pass::run` takes a `&PassContext`:
+
+```rust
+fn run(&self, circuit: &Circuit, context: &PassContext<'_>) -> Result<PassOutput, PassError>;
+```
+
+`PassContext` carries an optional `&BasisProfile` and an optional
+`&dyn CostModel`. Both are optional because target-independent compilation is
+a first-class mode rather than a degraded one, and a pass that needs target
+data and finds none must say so rather than invent a stand-in profile —
+`crate::target` is the single source of what a backend accepts, and a pass
+manufacturing a second one is exactly the drift this layering prevents.
+
+There is deliberately **no convenience overload** taking only a circuit.
+Callers write `&PassContext::none()`, so "this pipeline ran without target
+information" is visible at the call site instead of implied by an absent
+argument. The same pass can legitimately produce different output in the two
+cases, and a reader should not have to know that to see it.
+
+This closes **Stage E exit criterion 3** — "optimization can consult
+backend-defined costs" —
+(`pass::tests::a_pass_can_consult_the_selected_target` demonstrates a pass
+reading both the profile and the cost model, and
+`an_absent_target_is_visible_to_a_pass_rather_than_faked` the other half).
+It is honest to add that all four shipped passes bind it as `_context`. That
+is Stage E §8 working as designed rather than an omission — "target-aware
+behavior must not make every pass backend-specific" — and the genuine
+consumers of target data today are the lowering steps, not the optimizer.
 
 Also absent: a fixed-point pass scheduler (the pipeline order is fixed and
-finite), pass plugins (§18.2), and any target-aware scheduling.
+finite), pass plugins (§18.2), any target-aware scheduling, and any pass whose
+*decisions* are steered by the cost model rather than merely reported
+alongside it.
