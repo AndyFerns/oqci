@@ -36,7 +36,7 @@ use std::collections::HashMap;
 
 use crate::ir::{Circuit, GateKind, Instruction, Param};
 use crate::pass::adjacency::{matched_pair, unanimous_successors};
-use crate::pass::{Pass, PassError, PassOutput, rebuild};
+use crate::pass::{Pass, PassContext, PassError, PassOutput, rebuild};
 
 /// Merges adjacent same-axis rotations. See the [module docs](self).
 pub struct RotationMerge;
@@ -50,7 +50,7 @@ impl Pass for RotationMerge {
         "combine adjacent same-axis rotations (Rz(a); Rz(b) -> Rz(a+b))"
     }
 
-    fn run(&self, circuit: &Circuit) -> Result<PassOutput, PassError> {
+    fn run(&self, circuit: &Circuit, _context: &PassContext<'_>) -> Result<PassOutput, PassError> {
         let mut current = circuit.clone();
         let mut merged = 0usize;
 
@@ -172,7 +172,9 @@ mod tests {
         b.alloc_qubits(3);
         b.alloc_clbits(1);
         build(&mut b);
-        RotationMerge.run(&b.build().unwrap()).unwrap()
+        RotationMerge
+            .run(&b.build().unwrap(), &PassContext::none())
+            .unwrap()
     }
 
     fn only_gate(out: &PassOutput) -> &GateKind {
