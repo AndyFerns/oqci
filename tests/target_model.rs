@@ -7,7 +7,7 @@
 
 use oqci::frontend::parse_openqasm3_named;
 use oqci::ir::{CircuitBuilder, GateKind, Param};
-use oqci::pass::{PassManager, PassSelection};
+use oqci::pass::{PassContext, PassManager, PassSelection};
 use oqci::target::{
     BasisProfileBuilder, MeasurementSupport, PhysicalQubit, Topology, Violation, builtin, check,
     cost::{CostModel, resolve},
@@ -230,7 +230,7 @@ fn optimization_lowers_the_cost_it_is_measured_by() {
 
     let before = model.evaluate(&circuit, &profile).unwrap();
     let optimized = PassManager::default_pipeline()
-        .run(&circuit, &PassSelection::All)
+        .run(&circuit, &PassSelection::All, &PassContext::none())
         .unwrap()
         .circuit;
     let after = model.evaluate(&optimized, &profile).unwrap();
