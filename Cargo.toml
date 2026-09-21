@@ -1,7 +1,7 @@
 [package]
 name = "oqci"
 description = "The Open Quantum Compiler Infrastructure"
-version = "0.2.0"
+version = "0.3.0"
 readme = "README.md"
 edition = "2024"
 
