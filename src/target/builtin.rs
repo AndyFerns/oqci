@@ -85,8 +85,30 @@ pub fn linear_nisq(qubit_count: u32) -> BasisProfile {
         mid_circuit_measurement: false,
         reset: false,
     })
-    .decomposition_rule("h-to-rz-sx")
-    .decomposition_rule("u-to-rz-sx")
+    // Every registered gate outside the basis needs a route into it, or the
+    // profile cannot be lowered to. `RuleSet::new` proves that closure holds
+    // rather than taking this list on trust, and a gap here is a build
+    // failure rather than a circuit that fails to compile later. `x` and the
+    // rest of the basis need no rule; they are already native.
+    .decomposition_rules([
+        "id-to-nothing",
+        "y-to-rz-x",
+        "z-to-rz",
+        "h-to-rz-sx",
+        "s-to-rz",
+        "sdg-to-rz",
+        "t-to-rz",
+        "tdg-to-rz",
+        "sxdg-to-sx",
+        "rx-to-rz-sx",
+        "ry-to-rz-sx",
+        "p-to-rz",
+        "u-to-rz-sx",
+        "cy-to-cx",
+        "cz-to-cx",
+        "swap-to-cx",
+        "ccx-to-cx",
+    ])
     .capability("linear-connectivity")
     .cost_model("nisq-weighted")
     .build()
@@ -193,11 +215,31 @@ mod tests {
     }
 
     #[test]
-    fn the_nisq_profile_records_the_rules_it_expects() {
-        assert_eq!(
-            linear_nisq(5).decomposition_rules(),
-            vec!["h-to-rz-sx", "u-to-rz-sx"]
-        );
+    fn the_nisq_profile_names_a_rule_for_every_gate_outside_its_basis() {
+        // Asserting the *property* rather than a fixed list: what matters is
+        // that nothing registered is left without a route into the basis, and
+        // a hardcoded list would have to be edited every time the gate set
+        // changes — which is precisely when this check earns its keep.
+        // `crate::lowering::RuleSet::new` proves the rules then close over
+        // the basis; this only checks that each one is named.
+        let profile = linear_nisq(5);
+        let named = profile.decomposition_rules();
+
+        for mnemonic in [
+            "id", "y", "z", "h", "s", "sdg", "t", "tdg", "sxdg", "rx", "ry", "p", "u", "cy", "cz",
+            "swap", "ccx",
+        ] {
+            assert!(
+                !profile.supports_operation(mnemonic),
+                "`{mnemonic}` is in the basis, so this list is stale"
+            );
+            assert!(
+                named
+                    .iter()
+                    .any(|id| id.starts_with(&format!("{mnemonic}-to-"))),
+                "no decomposition rule named for `{mnemonic}`"
+            );
+        }
     }
 
     #[test]
