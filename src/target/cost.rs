@@ -52,10 +52,10 @@ pub struct Cost {
     pub depth: usize,
     /// `Swap` operations present in the circuit.
     ///
-    /// Routing does not exist yet, so today this only counts swaps the program
-    /// itself contained. It is a real field rather than a placeholder because
-    /// Stage E §4 requires routing overhead to be a retained component, and a
-    /// routed circuit will populate it without this type changing.
+    /// Counts every `Swap` in the circuit: the ones the program contained and
+    /// the ones routing inserted to repair connectivity. §8.7 requires routing
+    /// overhead to be reported, and `Lowered::swaps_inserted` separates out
+    /// the routing contribution for a caller who needs the two apart.
     pub swap_count: usize,
     /// Operations that are in the target's basis set.
     pub native_gate_count: usize,
