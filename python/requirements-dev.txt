@@ -5,5 +5,9 @@
 # python/tests afterwards: the extraction relies on `QuantumCircuit.data`,
 # `.operation.name/.params`, and `find_bit(...).index` keeping their shape.
 qiskit>=2.0,<3.0
+# Aer executes what OQCI prepares. The build script skips the py-* stages
+# when a dependency is missing, so a machine without Aer is unaffected.
+qiskit-aer>=0.14
+
 maturin>=1.7,<2.0
 pytest>=8.0
