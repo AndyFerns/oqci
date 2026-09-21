@@ -20,7 +20,9 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 
 use crate::analysis::{CircuitDiff, ResourceReport};
+use crate::backend::Executable;
 use crate::ir::{Circuit, GateKind, Instruction, Param, QcoCircuit, Wire};
+use crate::lowering::Lowered;
 use crate::pass::PassRecord;
 use crate::target::{BasisProfile, Cost, CostModel, Violation, check};
 
@@ -47,6 +49,12 @@ pub struct PipelineReport {
     /// Target legality and cost, when `--target` named a profile.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<TargetReportView>,
+    /// What target lowering did, when it ran.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lowering: Option<LoweringView>,
+    /// The prepared executable, when `prepare` ran.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub executable: Option<ExecutableView>,
 }
 
 /// How a circuit fares against a specific backend target.
@@ -74,6 +82,59 @@ pub struct TargetReportView {
     pub cost_model_configuration: BTreeMap<String, String>,
     /// The structured cost breakdown.
     pub cost: Cost,
+}
+
+/// What lowering did, for reporting.
+#[derive(Debug, Clone, Serialize)]
+pub struct LoweringView {
+    /// The backend compiled for.
+    pub backend: String,
+    /// The target profile, as `id@version`.
+    pub profile: String,
+    /// Where each logical qubit started, as `logical -> physical`.
+    pub initial_layout: Vec<u32>,
+    /// Where each ended, after routing.
+    pub final_layout: Vec<u32>,
+    /// SWAPs routing inserted.
+    pub swaps_inserted: usize,
+    /// Reversed two-qubit operations repaired.
+    pub orientations_repaired: usize,
+    /// Decomposition rules that fired.
+    pub rules_applied: Vec<String>,
+    /// Each step of the schedule.
+    pub steps: Vec<LoweringStepView>,
+    /// Whether the result is legal for the target.
+    pub legal: bool,
+    /// Anything still wrong with it.
+    pub violations: Vec<Violation>,
+}
+
+/// One step of the lowering schedule.
+#[derive(Debug, Clone, Serialize)]
+pub struct LoweringStepView {
+    /// Step identifier.
+    pub id: String,
+    /// Operations after it.
+    pub op_count: usize,
+    /// What it did.
+    pub detail: String,
+}
+
+/// A prepared executable, for `oqci prepare`.
+#[derive(Debug, Clone, Serialize)]
+pub struct ExecutableView {
+    /// Which backend it was prepared for.
+    pub backend_id: String,
+    /// Physical qubits used.
+    pub num_qubits: u32,
+    /// Classical bits written.
+    pub num_clbits: u32,
+    /// Distinct operations it uses.
+    pub operations: Vec<String>,
+    /// Whether it measures anything.
+    pub has_measurement: bool,
+    /// The artifact itself, ready to hand to an execution adapter.
+    pub executable: Executable,
 }
 
 /// One stage's output.
@@ -365,6 +426,48 @@ pub fn target_report(
 }
 
 /// Builds a view of a circuit diff.
+/// Builds the lowering view from a lowered circuit.
+#[must_use]
+pub fn lowering_view(backend: &str, lowered: &Lowered) -> LoweringView {
+    LoweringView {
+        backend: backend.to_string(),
+        profile: lowered.profile_id.clone(),
+        initial_layout: lowered.initial_layout.permutation(),
+        final_layout: lowered.final_layout.permutation(),
+        swaps_inserted: lowered.swaps_inserted,
+        orientations_repaired: lowered.orientations_repaired,
+        rules_applied: lowered.rules_applied.clone(),
+        steps: lowered
+            .steps
+            .iter()
+            .map(|step| LoweringStepView {
+                id: step.id.to_string(),
+                op_count: step.op_count,
+                detail: step.detail.clone(),
+            })
+            .collect(),
+        legal: lowered.legality.is_legal(),
+        violations: lowered.legality.violations.clone(),
+    }
+}
+
+/// Builds the executable view from a prepared artifact.
+#[must_use]
+pub fn executable_view(executable: &Executable) -> ExecutableView {
+    ExecutableView {
+        backend_id: executable.backend_id.clone(),
+        num_qubits: executable.num_qubits,
+        num_clbits: executable.num_clbits,
+        operations: executable
+            .operations()
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect(),
+        has_measurement: executable.has_measurement(),
+        executable: executable.clone(),
+    }
+}
+
 pub fn diff_view(diff: &CircuitDiff) -> Vec<DiffEntryView> {
     diff.entries
         .iter()
@@ -471,6 +574,8 @@ mod tests {
             passes: None,
             diff: None,
             target: None,
+            lowering: None,
+            executable: None,
         };
         let json = serde_json::to_string(&report).unwrap();
         assert!(json.contains("\"frontend\":\"openqasm3\""));
