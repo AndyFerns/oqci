@@ -69,6 +69,7 @@ pub fn human(report: &PipelineReport) -> String {
         render_stage(&mut out, stage);
     }
 
+    render_lowering(&mut out, report);
     render_target(&mut out, report);
 
     if let Some(diff) = &report.diff {
@@ -89,6 +90,118 @@ pub fn human(report: &PipelineReport) -> String {
 ///
 /// Lives in one place so a command cannot accept `--target` and then quietly
 /// fail to display the answer.
+/// The lowering section: layout, routing, decomposition and legality.
+///
+/// Shared by the human renderer and `analyze`, the same way `render_target`
+/// is, so the two views cannot drift.
+fn render_lowering(out: &mut String, report: &PipelineReport) {
+    let Some(lowering) = &report.lowering else {
+        return;
+    };
+
+    out.push_str(&format!(
+        "
+-- lowering -- backend `{}`, target {}
+",
+        lowering.backend, lowering.profile
+    ));
+    out.push_str(&format!(
+        "  layout   {} -> {}
+",
+        format_layout(&lowering.initial_layout),
+        format_layout(&lowering.final_layout)
+    ));
+    out.push_str(&format!(
+        "  routing  {} swap(s) inserted, {} orientation(s) repaired
+",
+        lowering.swaps_inserted, lowering.orientations_repaired
+    ));
+    if lowering.rules_applied.is_empty() {
+        out.push_str(
+            "  rules    none needed
+",
+        );
+    } else {
+        out.push_str(&format!(
+            "  rules    {}
+",
+            lowering.rules_applied.join(", ")
+        ));
+    }
+
+    out.push_str(
+        "
+  steps:
+",
+    );
+    for step in &lowering.steps {
+        out.push_str(&format!(
+            "    {:<22} {:>4} op(s)  {}
+",
+            step.id, step.op_count, step.detail
+        ));
+    }
+
+    if lowering.legal {
+        out.push_str(
+            "
+  legal for this target
+",
+        );
+    } else {
+        out.push_str(&format!(
+            "
+  NOT legal: {} violation(s)
+",
+            lowering.violations.len()
+        ));
+        for violation in &lowering.violations {
+            out.push_str(&format!(
+                "    {}
+",
+                describe_violation(violation)
+            ));
+        }
+    }
+
+    if let Some(executable) = &report.executable {
+        out.push_str(&format!(
+            "
+-- executable -- {} op(s) for `{}`, {} qubit(s), {} clbit(s)
+",
+            executable.executable.ops.len(),
+            executable.backend_id,
+            executable.num_qubits,
+            executable.num_clbits
+        ));
+        out.push_str(&format!(
+            "  operations {}
+",
+            executable.operations.join(", ")
+        ));
+        if !executable.has_measurement {
+            out.push_str(
+                "  no measurement: this executable produces no counts
+",
+            );
+        }
+    }
+}
+
+/// Renders a layout as `q0->#q1, ...`.
+fn format_layout(permutation: &[u32]) -> String {
+    let body: Vec<String> = permutation
+        .iter()
+        .enumerate()
+        .map(|(logical, physical)| format!("%q{logical}->#q{physical}"))
+        .collect();
+    if body.is_empty() {
+        "(empty)".to_string()
+    } else {
+        body.join(", ")
+    }
+}
+
 fn render_target(out: &mut String, report: &PipelineReport) {
     if let Some(target) = &report.target {
         let _ = write!(
@@ -276,6 +389,7 @@ pub fn resource_report(report: &PipelineReport) -> String {
         );
     }
 
+    render_lowering(&mut out, report);
     render_target(&mut out, report);
 
     out
