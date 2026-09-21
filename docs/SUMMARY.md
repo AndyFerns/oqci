@@ -23,9 +23,12 @@
 # Targets
 
 - [Target Model](target_model.md)
+- [Target Lowering](lowering.md)
+- [Backend Contract](backend_contract.md)
 
 # Tooling
 
+- [Compiler Orchestration](compiler.md)
 - [Command Line](cli.md)
 
 # Architecture Decisions

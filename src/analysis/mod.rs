@@ -14,7 +14,7 @@
 //!   own account of itself.
 //!
 //! Target-native gate counts and routing overhead are also named in §13 but
-//! require a target profile that does not exist yet; they are absent rather
+//! require per-operation calibration data no profile carries; they are absent rather
 //! than reported as zero.
 
 pub mod diff;

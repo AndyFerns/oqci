@@ -15,7 +15,13 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 qiskit = ["qiskit>=1.0"]
+aer = ["qiskit>=1.0", "qiskit-aer>=0.14"]
 
 [tool.maturin]
-module-name = "oqci_native"
+module-name = "oqci._native"
 manifest-path = "Cargo.toml"
+# A mixed layout: the pure-Python `oqci` package sits alongside the compiled
+# `oqci_native` extension. Spec 17 asks the SDK for circuit import, compiler
+# invocation, configuration, backend selection, analysis and result access,
+# which is more than an extension module of loose functions should carry.
+python-source = "."

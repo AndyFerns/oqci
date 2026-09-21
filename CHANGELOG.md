@@ -10,13 +10,151 @@ mirrored in `Cargo.toml`; bump both with `scripts/bump-version.{sh,bat}`.
 While the major version is `0`, the public API and IR contracts are unstable
 and may change without a major bump (per SemVer §4).
 
-## [Unreleased]
+## [0.3.0] - 2026-09-21
+
+Two phases of work land together here: the **target model**, which was
+pending, and the **backend** built on top of it. The backend sections come
+first because they are what the version is for; the target-model sections
+follow, unchanged from when they were written.
+
+### Added (backend)
+
+#### Target lowering (`src/lowering/`)
+
+- **Qubit mapping** (§8.6) — `Layout` is an injective logical-to-physical
+  assignment with both directions kept in step, and `LayoutStrategy` has two
+  implementations: `TrivialLayout` (logical *n* on physical *n*, the
+  assumption `check` always made, now named) and `DenseLayout`, which seats
+  interacting qubits near each other. Layout choice can only change the SWAP
+  count, never whether a circuit is correct.
+- **Routing** (§8.7) — `ShortestPathRouter` walks the instruction list in
+  program order, deletes nothing, reorders nothing, and only *inserts* `Swap`s.
+  That one sentence discharges §33.14: no operation can be optimized away
+  across a measurement barrier if nothing ever moves past anything.
+  Deterministic, with no lookahead; the extra SWAPs relative to a SABRE-style
+  router are a documented quality gap rather than a hidden one.
+- **Basis decomposition** (§8.8) — a rule model covering every field Stage D
+  §5 requires, with 18 verified built-in rules. `RuleSet::new` proves the rule
+  graph acyclic before any circuit is touched, which makes termination a
+  theorem rather than an iteration cap.
+- **The lowering schedule** — arity reduction, layout, routing, basis
+  decomposition, orientation repair, single-qubit cleanup, verify. Two of
+  those orderings are load-bearing, and `docs/lowering.md` explains both.
+- `lower` re-runs `check` on its own output and refuses to return a circuit
+  the target rejects. It either returns something the target model itself
+  certifies, or an error naming what it could not fix.
+
+#### Backend contract (`src/backend/`)
+
+- The `Backend` trait, with target lowering, validation, execution
+  preparation and execution as four separately-failable stages (Stage C §3,
+  §10). Backend selection is a registry lookup, so the compiler core contains
+  no vendor branching (Stage C §6).
+- `Executable` — a structured operation list, deliberately **not** QIR
+  (Stage C §5 forbids treating emitted QIR as an execution guarantee) and not
+  OpenQASM 3 (its Qiskit loader is a separate package this project does not
+  depend on, and a third-party parser between "verified" and "runs" is a
+  trust-path problem).
+- `Provenance` covering every field Stage C §9 and Stage E §9 list, including
+  the git commit, captured at build time by a new `build.rs` that degrades to
+  `"unknown"` outside a checkout. Compilation, submission and execution
+  durations are three independent fields, never derived from one another
+  (Stage C §8).
+- Three backends: `simulator`, `simulator-nisq`, and `ibm-illustrative` — the
+  last of which is **synthetic and describes no real device**.
+- **No backend executes in this process.** Each returns a typed
+  `ExecutionNotAvailableInProcess` naming where execution actually happens.
+  For IBM that is because `qiskit-ibm-runtime` is absent, no credentials
+  exist, and §33.4 forbids writing a vendor API from memory; **no claim of IBM
+  hardware executability is made** (§33.12). For the simulator it is because
+  the project's non-goals rule out writing one.
+
+#### Compiler orchestration (`src/compile.rs`)
+
+- `compile` performs §6's pipeline end to end, and is now the single path from
+  source text to artifacts. The CLI and the Python SDK both go through it, so
+  the numbers a user sees are the numbers the compiler computed.
+
+#### CLI
+
+- `oqci lower` (with `--backend`, `--layout`, `--no-route`, `--no-decompose`),
+  `oqci prepare` (with `--shots`, `--seed`, `-o`), and `oqci backends`.
+
+#### Python SDK (`python/`)
+
+- A pure-Python `oqci` package beside the compiled extension, covering §17's
+  list: circuit import, compiler invocation, configuration, backend selection,
+  analysis and result access.
+- `oqci.backends.aer` executes a prepared executable on Qiskit Aer (§15.1),
+  replaying it by direct `QuantumCircuit` method call rather than through a
+  text format. Noise models are accepted from the caller and **never
+  invented** — noise policy belongs to Stage G (§33.15).
+
+#### Verification
+
+- `tests/lowering_equivalence.rs` — the central property. For generated
+  circuits on generated devices, lowering either refuses with an error the
+  test independently confirms, or produces a circuit that is semantically
+  equivalent modulo the final layout, legal, and deterministic. Equivalence is
+  an isometry comparison; comparing full unitaries would fail on *correct*
+  routing, and the module docs give the counterexample.
+- Coverage floors assert the generators actually reach SWAP insertion,
+  orientation repair, non-involutive layouts and wide gates. Without them a
+  property suite can be green while exercising nothing.
+- `python/tests/test_rules.py` re-checks every decomposition rule against
+  Qiskit's `quantum_info.Operator`, deriving the exactness column rather than
+  trusting it. Two independent implementations of gate semantics now have to
+  agree on every run.
+- `python/tests/test_aer.py` compiles and executes on Aer, checking measured
+  distributions — the first tests in the project that check OQCI's output
+  against something other than OQCI.
+- Evidence the suite can fail: dropping one `H` from the `Cx` orientation
+  repair produced an overlap of `1.3e-15` where `8` was required. Restoring it
+  returned the suite to green.
+
+### Changed (backend)
+
+- **`Pass::run` takes a `&PassContext`**, carrying an optional target profile
+  and cost model. The five existing passes ignore it. This closes Stage E exit
+  criterion 3 — optimization *can* consult backend-defined costs — while
+  keeping Stage E §8's rule that target awareness must not make every pass
+  backend-specific. A breaking change for anyone implementing `Pass`.
+- `PassManager::run` takes the same context. Callers pass
+  `&PassContext::none()` explicitly, so "ran without target information" is
+  visible at the call site rather than implied by an absent argument.
+- `BasisProfile` now derives `Deserialize` **through the builder**, so a
+  target description read from outside the compiler is validated exactly as a
+  constructed one is. This is what lets an IBM target be supplied rather than
+  hard-coded (§9.2).
+- `builtin::linear_nisq` names 17 decomposition rules instead of two. It could
+  not previously be lowered to: the first `Swap` routing inserted would have
+  had no rule, and nothing would have noticed until a circuit failed.
+- The compiled extension moved to `oqci._native`, as maturin's mixed layout
+  requires. `import oqci_native` still works, through a shim.
+- `Topology` gained `CouplingMode` and path queries. "Are these two qubits
+  connected?" turns out to be three different questions, and conflating them
+  is the entire bug class the enum exists to prevent.
+
+### Fixed (backend)
+
+- **`check` reported a symbolic parameter as legal** whenever the target
+  declared no domain for that operation. The `Param::Symbol` arm sat behind
+  the `parameter_constraint` lookup, so `rz(theta)` against
+  `builtin::linear_nisq` — which declares no constraints — passed validation
+  despite being unexecutable on every backend. Found while making `check` the
+  postcondition oracle for lowering: an oracle with a hole in it certifies
+  circuits that cannot run.
+- Routing now searches for a path *around* measured wires rather than
+  filtering a single best path against them. On a ring two paths can be
+  equally short, and discarding the first because it crossed a measured wire
+  refused circuits the second handled perfectly well.
+
+### Added (target model)
 
 The **target model**: how a backend describes what it accepts and what it
 finds expensive. Target *description* only — mapping, routing, basis
 decomposition and execution remain absent, and are the next roadmap step.
 
-### Added
 
 #### `SX` / `SXdg` in the registered gate set
 
@@ -62,7 +200,7 @@ decomposition and execution remain absent, and are the next roadmap step.
   checked, since that is what would be submitted. `--json` carries all of it.
 - A scalar score is never printed without the weights that produced it.
 
-### Changed
+### Changed (target model)
 
 - `BasisProfile::supports_operation` answers for `"measure"`/`"reset"` from
   `MeasurementSupport` rather than the basis set, so a profile cannot
@@ -70,17 +208,35 @@ decomposition and execution remain absent, and are the next roadmap step.
 - `src/ir/qir.rs`'s doc comment now lists `sx`/`sxdg` among the extended
   intrinsics.
 
-### Not included (deferred to the next roadmap step)
+### Not included
 
-- Qubit mapping (§8.6), routing/SWAP insertion (§8.7) and basis decomposition
-  (§8.8). The data they need now exists; the passes that consume it do not.
-- Executable decomposition-rule data. Profiles record rule *identifiers*; the
-  Stage D §5 model (source op, target sequence, parameter transformation,
-  operand mapping, exactness) lands with the pass that executes it.
-- Target context on the `Pass` trait, so Stage E §8 is not yet satisfied.
-- Per-operation cost and error/noise metadata in profiles (Stage D §2), which
-  has no legitimate value to hold until a real backend supplies it.
-- Backend execution and result retrieval (§9, §10).
+Five items were deferred when the target model landed. Four of them are
+implemented above — qubit mapping, routing, basis decomposition and target
+context on the `Pass` trait — and the fifth remains open, along with what the
+backend work deferred in turn.
+
+- **Live IBM submission and result retrieval.** Everything up to a validated
+  executable and its provenance is implemented and tested; the submission call
+  is not. `qiskit-ibm-runtime` is not installed, no credentials exist, and
+  §33.4 forbids implementing a vendor API from memory when the SDK cannot be
+  checked. Writing untested code on the path between a verified circuit and
+  real hardware would be worse than an explicit boundary, so `execute` returns
+  a typed error naming it. **No claim of IBM hardware executability is made**
+  (§33.12).
+- **Per-operation cost and error/noise metadata in profiles** (Stage D §2).
+  Still has no legitimate value to hold: both built-in profiles are synthetic,
+  and a profile asserting error rates nobody measured would be a fabricated
+  record. This lands with a real backend adapter.
+- **Cirq and CUDA-Q execution adapters** (§15.2). The backend contract is
+  SDK-agnostic and the executable representation is not Qiskit-specific, so
+  these are adapter work rather than compiler work.
+- **Lookahead routing.** The deterministic shortest-path router inserts more
+  SWAPs than a SABRE-style one would. The gap is real and unmeasured;
+  `docs/lowering.md` states it rather than leaving it to be discovered.
+- **Cost-model-guided lowering.** The cost model evaluates lowered circuits
+  but does not yet steer any decision inside lowering.
+- **Benchmark infrastructure** (§20) and the Stage G experimental protocol,
+  which remains unlocked.
 
 ## [0.2.0] - 2026-09-16
 

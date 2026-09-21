@@ -45,6 +45,7 @@ use std::time::{Duration, Instant};
 
 use crate::analysis::{ResourceReport, analyze};
 use crate::ir::{Circuit, IrError};
+use crate::target::{BasisProfile, CostModel};
 
 pub use cancellation::GateCancellation;
 pub use canonicalize::Canonicalize;
@@ -108,6 +109,84 @@ impl PassOutput {
     }
 }
 
+/// What a pass may consult about the target it is compiling for.
+///
+/// Stage E exit criterion 3 requires that "optimization can consult
+/// backend-defined costs", and Stage E §8 immediately qualifies it: target
+/// awareness "must not make every pass backend-specific". A context every
+/// pass receives and most passes ignore is the shape that takes — generic
+/// transformations stay generic, and a pass that genuinely needs target data
+/// has somewhere to get it from.
+///
+/// Both fields are optional because target-independent compilation is a
+/// first-class mode, not a degraded one. A pass that requires target data and
+/// finds none must say so rather than guess a default: [`crate::target`] is
+/// the single source of what a backend accepts, and a pass inventing a
+/// stand-in profile would be a second one.
+///
+/// # Why there is no `run(circuit)` convenience overload
+///
+/// Callers construct [`PassContext::none`] explicitly. "This pipeline ran
+/// without target information" is then visible at the call site instead of
+/// implied by an absent argument — which matters because the same pass can
+/// legitimately produce different output in the two cases.
+#[derive(Default, Clone, Copy)]
+pub struct PassContext<'a> {
+    profile: Option<&'a BasisProfile>,
+    cost_model: Option<&'a dyn CostModel>,
+}
+
+impl<'a> PassContext<'a> {
+    /// No target information — target-independent compilation.
+    #[must_use]
+    pub fn none() -> Self {
+        PassContext::default()
+    }
+
+    /// A context carrying the selected target profile.
+    #[must_use]
+    pub fn with_profile(profile: &'a BasisProfile) -> Self {
+        PassContext {
+            profile: Some(profile),
+            cost_model: None,
+        }
+    }
+
+    /// Adds the target's cost model.
+    #[must_use]
+    pub fn and_cost_model(mut self, cost_model: &'a dyn CostModel) -> Self {
+        self.cost_model = Some(cost_model);
+        self
+    }
+
+    /// The selected target profile, if compilation is target-aware.
+    #[must_use]
+    pub fn profile(&self) -> Option<&'a BasisProfile> {
+        self.profile
+    }
+
+    /// The target's cost model, if one was supplied.
+    #[must_use]
+    pub fn cost_model(&self) -> Option<&'a dyn CostModel> {
+        self.cost_model
+    }
+
+    /// Whether any target information is available.
+    #[must_use]
+    pub fn is_target_aware(&self) -> bool {
+        self.profile.is_some() || self.cost_model.is_some()
+    }
+}
+
+impl std::fmt::Debug for PassContext<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PassContext")
+            .field("profile", &self.profile.map(BasisProfile::qualified_id))
+            .field("cost_model", &self.cost_model.map(CostModel::id))
+            .finish()
+    }
+}
+
 /// A single compiler pass.
 ///
 /// Implementors must be deterministic: the same input circuit must always
@@ -123,11 +202,15 @@ pub trait Pass: Send + Sync {
 
     /// Runs the pass.
     ///
+    /// `context` carries the target being compiled for, when there is one.
+    /// A target-independent pass ignores it; see [`PassContext`] for why it
+    /// is threaded through every pass rather than only the ones that use it.
+    ///
     /// # Errors
     ///
     /// Returns [`PassError::Ir`] if the pass produced a circuit that fails
     /// QC-IR validation, or if an internal IR operation failed.
-    fn run(&self, circuit: &Circuit) -> Result<PassOutput, PassError>;
+    fn run(&self, circuit: &Circuit, context: &PassContext<'_>) -> Result<PassOutput, PassError>;
 }
 
 /// Which passes a pipeline run should execute.
@@ -208,14 +291,16 @@ impl PassPipelineResult {
 ///
 /// ```
 /// use oqci::ir::CircuitBuilder;
-/// use oqci::pass::{PassManager, PassSelection};
+/// use oqci::pass::{PassContext, PassManager, PassSelection};
 ///
 /// let mut b = CircuitBuilder::new("cancels");
 /// let q0 = b.alloc_qubit();
 /// b.h(q0).h(q0);                      // H ; H is the identity
 ///
+/// // `PassContext::none()` is target-independent compilation, stated rather
+/// // than implied — see `PassContext`.
 /// let result = PassManager::default_pipeline()
-///     .run(&b.build().unwrap(), &PassSelection::All)
+///     .run(&b.build().unwrap(), &PassSelection::All, &PassContext::none())
 ///     .unwrap();
 ///
 /// assert!(result.circuit.is_empty());
@@ -286,6 +371,7 @@ impl PassManager {
         &self,
         circuit: &Circuit,
         selection: &PassSelection,
+        context: &PassContext<'_>,
     ) -> Result<PassPipelineResult, PassError> {
         let mut current = circuit.clone();
         let mut records = Vec::with_capacity(self.passes.len());
@@ -309,7 +395,7 @@ impl PassManager {
             }
 
             let started = Instant::now();
-            let output = pass.run(&current)?;
+            let output = pass.run(&current, context)?;
             let duration = started.elapsed();
 
             current = output.circuit;
@@ -384,6 +470,80 @@ mod tests {
     use super::*;
     use crate::ir::CircuitBuilder;
 
+    /// A pass that records what the context told it, so the channel itself
+    /// can be tested rather than assumed. No shipped pass is target-aware
+    /// yet; this proves the wiring is real before one is.
+    struct ReportsTarget;
+
+    impl Pass for ReportsTarget {
+        fn id(&self) -> &'static str {
+            "reports-target"
+        }
+        fn description(&self) -> &'static str {
+            "test pass: reports the target it was given"
+        }
+        fn run(
+            &self,
+            circuit: &Circuit,
+            context: &PassContext<'_>,
+        ) -> Result<PassOutput, PassError> {
+            let note = match (context.profile(), context.cost_model()) {
+                (Some(profile), Some(model)) => {
+                    format!("{} via {}", profile.qualified_id(), model.id())
+                }
+                (Some(profile), None) => profile.qualified_id(),
+                _ => "target-independent".to_string(),
+            };
+            Ok(PassOutput::unchanged(circuit.clone()).with_note(note))
+        }
+    }
+
+    #[test]
+    fn a_pass_can_consult_the_selected_target() {
+        // Stage E exit criterion 3, as an executable assertion.
+        let profile = crate::target::builtin::linear_nisq(3);
+        let model = crate::target::cost::resolve(profile.cost_model_id()).unwrap();
+        let context = PassContext::with_profile(&profile).and_cost_model(&model);
+
+        assert!(context.is_target_aware());
+
+        let mut manager = PassManager::new();
+        manager.register(Box::new(ReportsTarget));
+        let result = manager
+            .run(&cancellable(), &PassSelection::All, &context)
+            .unwrap();
+
+        assert_eq!(
+            result.records[0].notes,
+            vec!["linear-nisq@1 via nisq-weighted"]
+        );
+    }
+
+    #[test]
+    fn an_absent_target_is_visible_to_a_pass_rather_than_faked() {
+        // A pass that needs target data must be able to tell that it has
+        // none, instead of receiving an invented stand-in profile.
+        let context = PassContext::none();
+        assert!(!context.is_target_aware());
+        assert!(context.profile().is_none());
+        assert!(context.cost_model().is_none());
+
+        let mut manager = PassManager::new();
+        manager.register(Box::new(ReportsTarget));
+        let result = manager
+            .run(&cancellable(), &PassSelection::All, &context)
+            .unwrap();
+        assert_eq!(result.records[0].notes, vec!["target-independent"]);
+    }
+
+    #[test]
+    fn a_context_can_carry_a_profile_without_a_cost_model() {
+        let profile = crate::target::builtin::ideal_simulator();
+        let context = PassContext::with_profile(&profile);
+        assert!(context.is_target_aware());
+        assert!(context.cost_model().is_none());
+    }
+
     /// A pass that does nothing, for exercising the manager itself.
     struct Noop;
     impl Pass for Noop {
@@ -393,7 +553,11 @@ mod tests {
         fn description(&self) -> &'static str {
             "does nothing"
         }
-        fn run(&self, circuit: &Circuit) -> Result<PassOutput, PassError> {
+        fn run(
+            &self,
+            circuit: &Circuit,
+            _context: &PassContext<'_>,
+        ) -> Result<PassOutput, PassError> {
             Ok(PassOutput::unchanged(circuit.clone()))
         }
     }
@@ -407,7 +571,7 @@ mod tests {
         fn description(&self) -> &'static str {
             "always fails"
         }
-        fn run(&self, _: &Circuit) -> Result<PassOutput, PassError> {
+        fn run(&self, _: &Circuit, _: &PassContext<'_>) -> Result<PassOutput, PassError> {
             Err(PassError::from_ir("failing", IrError::CyclicGraph))
         }
     }
@@ -428,7 +592,9 @@ mod tests {
             .register(Box::new(Schedule));
         assert_eq!(manager.pass_ids(), vec!["canonicalize", "noop", "schedule"]);
 
-        let result = manager.run(&cancellable(), &PassSelection::All).unwrap();
+        let result = manager
+            .run(&cancellable(), &PassSelection::All, &PassContext::none())
+            .unwrap();
         let ids: Vec<&str> = result.records.iter().map(|r| r.id.as_str()).collect();
         assert_eq!(ids, vec!["canonicalize", "noop", "schedule"]);
     }
@@ -453,6 +619,7 @@ mod tests {
             .run(
                 &cancellable(),
                 &PassSelection::all_except(["gate-cancellation"]),
+                &PassContext::none(),
             )
             .unwrap();
 
@@ -473,7 +640,11 @@ mod tests {
     #[test]
     fn only_selection_runs_just_those_passes() {
         let result = PassManager::default_pipeline()
-            .run(&cancellable(), &PassSelection::only(["schedule"]))
+            .run(
+                &cancellable(),
+                &PassSelection::only(["schedule"]),
+                &PassContext::none(),
+            )
             .unwrap();
 
         assert_eq!(result.records.len(), 5, "every pass is still reported");
@@ -491,8 +662,12 @@ mod tests {
     fn the_pipeline_is_deterministic() {
         let circuit = cancellable();
         let manager = PassManager::default_pipeline();
-        let first = manager.run(&circuit, &PassSelection::All).unwrap();
-        let second = manager.run(&circuit, &PassSelection::All).unwrap();
+        let first = manager
+            .run(&circuit, &PassSelection::All, &PassContext::none())
+            .unwrap();
+        let second = manager
+            .run(&circuit, &PassSelection::All, &PassContext::none())
+            .unwrap();
         assert_eq!(first.circuit, second.circuit);
         assert_eq!(
             first.records.iter().map(|r| r.changed).collect::<Vec<_>>(),
@@ -509,7 +684,7 @@ mod tests {
         let circuit = b.build().unwrap();
 
         let result = PassManager::default_pipeline()
-            .run(&circuit, &PassSelection::All)
+            .run(&circuit, &PassSelection::All, &PassContext::none())
             .unwrap();
         assert!(!result.changed());
         assert_eq!(result.circuit, circuit);
@@ -521,7 +696,7 @@ mod tests {
         manager.register(Box::new(Failing)).register(Box::new(Noop));
 
         let error = manager
-            .run(&cancellable(), &PassSelection::All)
+            .run(&cancellable(), &PassSelection::All, &PassContext::none())
             .unwrap_err();
         assert!(matches!(&error, PassError::Ir { pass, .. } if pass == "failing"));
         assert!(error.to_string().contains("failing"));
@@ -530,7 +705,7 @@ mod tests {
     #[test]
     fn records_carry_before_and_after_metrics() {
         let result = PassManager::default_pipeline()
-            .run(&cancellable(), &PassSelection::All)
+            .run(&cancellable(), &PassSelection::All, &PassContext::none())
             .unwrap();
 
         let cancellation = result

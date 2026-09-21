@@ -12,23 +12,34 @@ program — and, in `watch` mode, to keep seeing it as you edit.
 that belongs in the Rust library — it should invoke the same public compiler
 APIs."
 
-That is structural here, not aspirational. `src/cli/pipeline.rs` is the only
-module that calls the compiler, and it does nothing but delegate:
+That is structural here, not aspirational — and it got stronger in `0.3.0`.
+The CLI used to call the frontend, the pass manager and the emitters itself,
+in the right order. It now calls `crate::compile`, the orchestrator, and does
+nothing but render what comes back:
 
 | What you see | Who computed it |
 |---|---|
-| parsed circuit | `frontend::parse_openqasm3_named` |
-| bound parameters | `ir::bind_parameters` |
-| dependency graph | `ir::qc_to_qco` |
-| QIR text | `ir::emit_qir` |
-| pass table | `pass::PassManager` |
+| parsed and bound circuit | `compile::compile_named` → `frontend`, `ir::bind_parameters` |
+| pass table | `compile::compile_named` → `pass::PassManager` |
 | every metric | `analysis::analyze` |
 | the diff | `analysis::diff_circuits` |
+| dependency graph | `ir::qc_to_qco` |
+| QIR text | `ir::emit_qir` |
+| layout, SWAP count, rules applied | `lowering::lower` |
+| legality and cost | `target::check`, the backend's own `CostModel` |
+| the executable | `backend::Executable::from_lowered` |
+
+The difference matters because the CLI is no longer the only caller. The
+Python SDK and library callers take the same path, so there is exactly one
+implementation of "what compiling means" and no way for the tool's view of a
+circuit to drift from the compiler's — see [`compiler.md`](compiler.md).
+
+One visible consequence: the CLI no longer imports the frontend at all. When
+that refactor landed, the compiler stopped building until the now-unused
+`parse_openqasm3_named` import was removed, which is about as direct a proof
+of the property as one gets.
 
 No gate is interpreted, no metric recomputed, no circuit rewritten in the CLI.
-Every number printed came from the same function the pass manager uses for its
-own bookkeeping, so the tool's view of a circuit and the compiler's cannot
-drift apart.
 
 ## Commands
 
@@ -36,9 +47,15 @@ drift apart.
 oqci compile  <input.qasm> [--emit STAGES] [--bind NAME=VALUE] [--target ID] [--json]
 oqci optimize <input.qasm> [--emit STAGES] [--passes IDS] [--disable IDS] [--diff] [--bind …] [--target ID] [--json]
 oqci analyze  <input.qasm> [--optimized] [--bind …] [--target ID] [--json]
+oqci lower    <input.qasm> --backend ID [--layout trivial|dense] [--no-route]
+                                          [--no-decompose] [--emit STAGES] [--diff]
+                                          [--bind …] [--json]
+oqci prepare  <input.qasm> --backend ID [--layout …] [--shots N] [--seed N]
+                                          [-o FILE] [--bind …]
 oqci watch    <input.qasm> [--mode compile|optimize] [...same flags] [--json]
 oqci passes
 oqci targets
+oqci backends
 ```
 
 Input is OpenQASM 3 (see [`openqasm_frontend.md`](openqasm_frontend.md)). The
@@ -142,6 +159,136 @@ Re-runs on every save and re-renders. Two details make it usable:
   edited is malformed most of the time; exiting exactly when you are
   mid-edit would defeat the purpose.
 
+### lower
+
+Compiles a program *onto a device* and shows the whole schedule. This is the
+command that exercises every stage the compiler has.
+
+```bash
+oqci lower examples/ghz3.qasm --backend simulator-nisq
+```
+
+```text
+-- lowering -- backend `simulator-nisq`, target linear-nisq@1
+  layout   %q0->#q0, %q1->#q1, %q2->#q2 -> %q0->#q0, %q1->#q1, %q2->#q2
+  routing  0 swap(s) inserted, 0 orientation(s) repaired
+  rules    h-to-rz-sx
+
+  steps:
+    arity-reduction           7 op(s)  0 wide gate(s) reduced
+    layout                    7 op(s)  trivial layout: %q0->#q0, %q1->#q1, %q2->#q2
+    routing                   7 op(s)  0 swap(s) inserted
+    basis-decomposition      11 op(s)  2 operation(s) rewritten
+    orientation-repair       11 op(s)  0 reversed operation(s) repaired
+    single-qubit-cleanup     11 op(s)  0 operation(s) rewritten
+    verify                   11 op(s)  legal
+
+  legal for this target
+```
+
+Both layouts are printed because routing moves qubits: the initial one says
+where each logical qubit started, the final one where it ended up, and without
+the second you cannot tell which physical wire a measurement result came from.
+
+`--backend` is required and is not the same flag as `--target`. `--target`
+*checks* a circuit against a profile and reports; `--backend` selects a device
+and actually compiles for it. See `oqci backends` for the list.
+
+`--layout` picks the initial placement. `trivial` puts logical *n* on physical
+*n*; `dense` seats interacting qubits near each other. Layout choice can only
+change how many SWAPs routing needs — it cannot make a circuit incorrect, so
+this is a cost knob, not a correctness one.
+
+`--no-route` and `--no-decompose` are **inspection aids, not compilation
+modes**. They let you see the circuit at an intermediate point, and the result
+is usually illegal. The report says so rather than pretending otherwise:
+
+```bash
+oqci lower far.qasm --backend simulator-nisq --no-route
+```
+
+```text
+  routing  0 swap(s) inserted, 0 orientation(s) repaired
+  ...
+  NOT legal: 1 violation(s)
+    [3] no coupling #q0 -> #q2 on this device
+```
+
+(The index is `3` rather than `1` because decomposition still ran: the `h`
+became three gates before the `cx` was reached.)
+
+Lowering can also *refuse*, and every refusal names what it could not fix —
+a circuit wider than the device, two qubits in different connected components,
+an operation with no decomposition rule, a symbolic parameter a rule would
+have had to transform. See [`lowering.md`](lowering.md) for the full table.
+
+### prepare
+
+Lowers a program and writes the executable a backend would run.
+
+```bash
+oqci prepare examples/bell.qasm --backend simulator-nisq --shots 512 --seed 7
+```
+
+```json
+{
+  "backend_id": "simulator-nisq",
+  "num_qubits": 2,
+  "num_clbits": 2,
+  "ops": [
+    { "op": "rz", "qubits": [0], "params": [1.5707963267948966], "clbit": null },
+    { "op": "sx", "qubits": [0], "params": [], "clbit": null },
+    …
+  ],
+  "settings": { "shots": 512, "seed": 7, "memory": false },
+  "provenance": { "backend_id": "simulator-nisq", "profile_id": "linear-nisq@1", … }
+}
+```
+
+`-o FILE` writes it to a file instead of stdout. The artifact is what
+`oqci.backends.aer.run` consumes — see [`../python/README.md`](../python/README.md).
+
+Two things about this output are deliberate. It is **not QIR**: Stage C §5
+forbids treating emitted QIR as a guarantee that anything will run, so the
+executable representation is a separate artifact from a separate stage. And it
+names the backend it was prepared for, because an executable is not portable
+between devices and the artifact should say so rather than leaving it to
+convention.
+
+`--seed` has no default. Choosing one would be picking an experimental
+parameter that the benchmarking protocol owns (§33.15); it is recorded when
+you supply it and absent when you do not.
+
+`prepare` refuses a circuit with an unbound parameter, with advice rather than
+a guess:
+
+```text
+error: instruction 0 is not executable: parameter `theta` is still symbolic;
+       bind parameters before preparing for execution
+```
+
+### backends
+
+```bash
+oqci backends
+```
+
+```text
+backends:
+  simulator            unconstrained simulator: all-to-all connectivity, full gate set
+  simulator-nisq       simulator constrained to a linear NISQ basis and topology
+  ibm-illustrative     synthetic IBM-shaped target; describes no real device and cannot execute
+
+No backend executes in this process.
+`oqci prepare` writes the artifact; an execution adapter runs it.
+```
+
+That last line is the important one. The compiler prepares executables; it
+does not run them. Qiskit Aer runs a prepared circuit through the Python
+adapter, and live hardware submission is not implemented —
+[`backend_contract.md`](backend_contract.md) explains why in full, including
+why `ibm-illustrative` is synthetic and what is *not* being claimed about it.
+
 ### passes
 
 Lists the default pipeline in execution order — the ids `--passes` and
@@ -232,6 +379,38 @@ consumes — everything the terminal shows is in it:
   "diff": [ { "marker": "-", "text": "x %q2" } ]
 }
 ```
+
+`oqci lower --json` adds two more fields:
+
+```json
+{
+  "lowering": {
+    "backend": "simulator-nisq",
+    "profile": "linear-nisq@1",
+    "initial_layout": [0, 1, 2],
+    "final_layout": [1, 0, 2],
+    "swaps_inserted": 1,
+    "orientations_repaired": 0,
+    "rules_applied": ["h-to-rz-sx", "swap-to-cx"],
+    "steps": [ { "id": "routing", "op_count": 9, "detail": "1 swap(s) inserted" } ],
+    "legal": true,
+    "violations": []
+  },
+  "executable": {
+    "backend_id": "simulator-nisq",
+    "operations": ["cx", "measure", "rz", "sx"],
+    "has_measurement": true,
+    "executable": { "ops": [...], "provenance": {...} }
+  }
+}
+```
+
+The nested `executable.executable` is the artifact itself — byte-identical to
+what `oqci prepare` writes — with the fields around it a summary for a reader
+who does not want to scan the operation list.
+
+The layouts are arrays indexed by logical qubit: `"final_layout": [1, 0, 2]`
+means logical `q0` ended on physical `#q1`.
 
 Notes on the schema:
 

@@ -25,7 +25,7 @@ It's Rust-native at its core (fast, and the invariants are enforced by the type 
 
 ## Project status
 
-**Current version: `0.2.0`.** This is early-stage, actively-developed infrastructure - treat anything not checked off below as *not there yet*, regardless of what a directory name or diagram might suggest.
+**Current version: `0.3.0`.** This is early-stage, actively-developed infrastructure - treat anything not checked off below as *not there yet*, regardless of what a directory name or diagram might suggest.
 
 | Layer | Status | Notes |
 |---|---|---|
@@ -35,10 +35,14 @@ It's Rust-native at its core (fast, and the invariants are enforced by the type 
 | Qiskit frontend | ✅ Implemented | Pure-Rust translation core plus a PyO3 boundary exposed to Python. See [`python/README.md`](python/README.md). |
 | Cirq / CUDA-Q frontends | ⛔ Not started | Reserved in the design; no code yet. |
 | Pass manager | ✅ Implemented | Explicit registration/ordering, enable/disable per pass, deterministic execution, ablation support. See [`docs/pass_manager.md`](docs/pass_manager.md). |
-| Optimization passes | ✅ Implemented (target-independent only) | Canonicalization, gate cancellation, rotation merging, and scheduling-as-analysis - all verified against an independent state-vector simulator, not just unit-tested. |
-| Qubit mapping / routing / basis decomposition | ⛔ Not started | Blocked on a target/basis-profile model that doesn't exist yet. |
-| `oqci` CLI | ✅ Implemented | Inspect every pipeline stage for a real program, including a live `--watch` mode. See [`docs/cli.md`](docs/cli.md). |
-| Backend execution (simulators, hardware) | ⛔ Not started | QIR emission is the current output boundary. |
+| Optimization passes | ✅ Implemented (target-independent only) | Canonicalization, gate cancellation, rotation merging, and scheduling-as-analysis - all verified against an independent state-vector simulator, not just unit-tested. Passes can now consult the selected target, though none of the shipped ones needs to. |
+| Target model | ✅ Implemented | Basis profiles, **directed** connectivity, legality checking, and a cost model the *target* supplies rather than the optimizer assuming. See [`docs/target_model.md`](docs/target_model.md). |
+| Qubit mapping / routing / basis decomposition | ✅ Implemented | Layout, deterministic shortest-path routing with SWAP insertion, and 18 decomposition rules — each verified against *two* independent implementations of gate semantics. Lowering re-checks its own output and refuses to return a circuit the target rejects. See [`docs/lowering.md`](docs/lowering.md). |
+| Backend contract | ✅ Implemented | Lowering, validation, execution preparation and execution as four distinct stages, with full provenance on every result. See [`docs/backend_contract.md`](docs/backend_contract.md). |
+| Compiler orchestration | ✅ Implemented | One path from source to artifacts, taken by the CLI, the Python SDK and library callers alike. See [`docs/compiler.md`](docs/compiler.md). |
+| `oqci` CLI | ✅ Implemented | Inspect every pipeline stage for a real program — now including `lower` and `prepare` — plus a live `watch` mode. See [`docs/cli.md`](docs/cli.md). |
+| Simulator execution | ✅ Implemented | `oqci.backends.aer` runs a prepared circuit on Qiskit Aer, which is how the compiler's output is checked against something other than itself. |
+| IBM hardware execution | 🚧 Prepared, not submitted | Lowering, validation, the executable artifact and its provenance all exist and are tested. **Submission does not.** That needs an SDK this project doesn't depend on and credentials it doesn't have — and untested code between a verified circuit and real hardware is worse than an honest gap. **No claim is made that anything here will run on an IBM device.** |
 | MLIR integration | ⛔ Not started (by design) | Rust owns the IR first; MLIR comes later, per the [locked architecture decisions](docs/core_architecture/index.md). |
 | Benchmark suite | ⛔ Not started | [`benchmarks/`](benchmarks/) is a placeholder; the experimental protocol isn't locked yet either. |
 
@@ -57,6 +61,10 @@ cargo run -- compile examples/bell.qasm
 That parses a small OpenQASM 3 program and prints the QC-IR, the dependency graph, and the emitted QIR, all in one shot. A couple more things worth trying:
 
 ```bash
+# Compile a circuit for a device it doesn't fit on, and watch it get fixed:
+# routing inserts SWAPs, decomposition rewrites every gate into the basis.
+cargo run -- lower examples/ghz3.qasm --backend simulator-nisq
+
 # See an optimization pass actually cancel a redundant gate pair, with a diff.
 cargo run -- optimize examples/ghz3.qasm --diff
 

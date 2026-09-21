@@ -1,0 +1,16 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+#
+# Provenance of the seed below: it was found by a *deliberately* broken
+# compiler, not by a real regression. One of the two H gates was removed from
+# the Cx orientation repair in `src/lowering/routing.rs` to check that this
+# suite can actually fail, and this is the minimal case it shrank to — a
+# three-qubit line with a `Swap` across it, which routes, decomposes into
+# CNOTs, and then needs an orientation repair on the reversed one. The bug was
+# reverted immediately; the seed is kept because it is the smallest input that
+# exercises routing, decomposition and orientation repair together.
+cc fed63249e75d6ab2aad7cf7fe1c31bfdb3c9c59194bba6a6bbfd5d9888f5726c # shrinks to (circuit, profile) = (Circuit { name: "generated", num_qubits: 3, num_clbits: 0, instructions: [Gate { kind: H, qubits: [QubitId(0)] }, Gate { kind: H, qubits: [QubitId(1)] }, Gate { kind: H, qubits: [QubitId(2)] }, Gate { kind: Swap, qubits: [QubitId(0), QubitId(2)] }] }, BasisProfile { id: "generated", version: "1", backend_id: "test", topology: Topology { qubit_count: 3, edges: {(0, 1), (1, 0), (1, 2), (2, 1)} }, supported_operations: {"cx", "rz", "sx", "x"}, parameter_constraints: {}, decomposition_rules: {"ccx-to-cx", "cy-to-cx", "cz-to-cx", "h-to-rz-sx", "id-to-nothing", "p-to-rz", "rx-to-rz-sx", "ry-to-rz-sx", "s-to-rz", "sdg-to-rz", "swap-to-cx", "sxdg-to-sx", "t-to-rz", "tdg-to-rz", "u-to-rz-sx", "y-to-rz-x", "z-to-rz"}, measurement: MeasurementSupport { measurement: true, mid_circuit_measurement: true, reset: true }, capabilities: {}, cost_model_id: "uniform" })

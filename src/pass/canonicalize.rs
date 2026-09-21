@@ -25,7 +25,7 @@
 //! circuit, which is not this pass's call to make.
 
 use crate::ir::{Circuit, GateKind, Instruction, Param};
-use crate::pass::{Pass, PassError, PassOutput, rebuild};
+use crate::pass::{Pass, PassContext, PassError, PassOutput, rebuild};
 
 /// Removes provably-identity operations. See the [module docs](self).
 pub struct Canonicalize;
@@ -39,7 +39,7 @@ impl Pass for Canonicalize {
         "remove identity gates and exact zero-angle rotations"
     }
 
-    fn run(&self, circuit: &Circuit) -> Result<PassOutput, PassError> {
+    fn run(&self, circuit: &Circuit, _context: &PassContext<'_>) -> Result<PassOutput, PassError> {
         let kept: Vec<Instruction> = circuit
             .instructions()
             .iter()
@@ -91,7 +91,9 @@ mod tests {
         b.alloc_qubits(2);
         b.alloc_clbits(1);
         build(&mut b);
-        Canonicalize.run(&b.build().unwrap()).unwrap()
+        Canonicalize
+            .run(&b.build().unwrap(), &PassContext::none())
+            .unwrap()
     }
 
     #[test]

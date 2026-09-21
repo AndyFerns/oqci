@@ -346,7 +346,7 @@ profile learning about it.
 | Qubits | caller-supplied, `linear` |
 | Basis | `rz`, `sx`, `x`, `cx`, `measure` |
 | Measurement | measurement yes; mid-circuit no; reset no |
-| Decomposition rule ids | `h-to-rz-sx`, `u-to-rz-sx` |
+| Decomposition rule ids | 17 of them — one for every registered gate outside the basis. See [`lowering.md`](lowering.md) for the table. |
 | Capabilities | `linear-connectivity` |
 | Cost model reference | `nisq-weighted` |
 
@@ -362,27 +362,81 @@ device would declare one direction only.
 `all()` returns both, with `linear-nisq` instantiated at width 5 so the set is
 enumerable; `by_id` looks one up by `BasisProfile::id`.
 
+A third profile exists but is not in `builtin`: `ibm-illustrative`, which the
+IBM backend carries (`src/backend/ibm.rs`). It is a five-qubit ring with two
+**one-way** couplings, so it is the profile that actually exercises directed
+connectivity end to end. Like the two above it is synthetic and describes no
+real device — its own `capabilities` say `synthetic-not-a-real-device` so the
+disclaimer survives into any result that cites it.
+
+## Profiles supplied from outside
+
+`BasisProfile` derives `Deserialize`, but **through the builder**:
+
+```rust
+#[serde(try_from = "BasisProfileBuilder")]
+```
+
+That indirection is the point. The profile's fields are private and its
+invariants are established by `BasisProfileBuilder::build`, so deriving
+`Deserialize` directly would have created a second, unvalidated way to make
+one — and the whole reason a profile is deserializable is to accept *target
+data from outside the compiler*, which is the input least worth trusting. A
+description with an out-of-range coupling, a parameter constraint on an
+operation the device does not support, or a blank identifier is rejected with
+the same error a caller would have got from the builder.
+
+This is what §9.2 asks for — "do not hard-code one physical IBM device name
+into the compiler core". `IbmBackend::from_target_json` is the constructor
+that matters; the built-in profile exists only so the path can be exercised
+without a network. Covered by
+`target::profile::deserialization_tests::deserialization_cannot_smuggle_past_the_builders_validation`,
+which also checks that a **directed** coupling survives the round trip: losing
+directionality would silently turn a one-way device into a symmetric one and
+make every routing decision wrong.
+
 ## Not implemented
 
 Per `final-deliverables-spec.md`'s Critical Rule — a feature is not implemented
 merely because a directory, interface, diagram or README names it — the
 following are **absent**:
 
+Note first what has **moved** rather than remained absent. Everything below
+used to be listed here as missing; it now lives one layer up, in
+[`lowering.md`](lowering.md) and [`backend_contract.md`](backend_contract.md),
+because Stage D §4 keeps target *description* and target *application* apart:
+
+| Spec | Where it lives now |
+|---|---|
+| §8.6 Qubit mapping | `src/lowering/layout.rs` — `Layout` and two strategies. `check` still reads a circuit's qubit `n` as physical `n`, which for a lowered circuit is exact rather than an assumption. |
+| §8.7 Routing / SWAP insertion | `src/lowering/routing.rs`. `Cost::swap_count` now counts routing's insertions as well as the program's own; `Lowered::swaps_inserted` separates them. |
+| §8.8 Basis decomposition | `src/lowering/decompose.rs` and `rules.rs`. Non-native operations are rewritten, not merely reported. |
+| §9, §10 Backend execution | `src/backend/`. There is an executable representation and a backend contract — but **nothing executes in the compiler process**; see [`backend_contract.md`](backend_contract.md). |
+| Stage D §5 decomposition-rule data | `src/lowering/rules.rs`. The identifiers a profile records are now keys into a real rule library, and `RuleSet::new` reads them. Two of §5's fields are still deliberately not stored, for reasons that document explains. |
+
+Stage D exit criteria **3, 5 and 7** are met as a result: abstract operations
+are lowered to the profile (`tests/lowering.rs`), decomposition rules are
+tested against two independent implementations of gate semantics
+(`tests/decomposition.rs` and `python/tests/test_rules.py`), and mapping and
+routing consume the topology without any vendor logic in the optimizer.
+
+What is genuinely still absent here:
+
 | Spec | Status |
 |---|---|
-| §8.6 Qubit mapping | not implemented. No layout representation exists; `check` uses the identity layout. |
-| §8.7 Routing / SWAP insertion | not implemented. `Cost::swap_count` counts only swaps already in the program. |
-| §8.8 Basis decomposition | not implemented. Non-native operations are *reported*, never rewritten. |
-| §9, §10 Backend execution | not implemented. Nothing here submits, runs or retrieves results; there is no execution adapter and no executable representation type. |
-| Stage D §5 decomposition-rule data | **identifiers only.** A profile records rule ids as strings. The data model §5 specifies — source operation, target sequence, parameter transformation, operand mapping, exactness, cost implications — lands with the pass that executes it, so it can be designed against a real consumer rather than guessed at now. Nothing currently reads these ids. |
+| Live hardware submission (Stage C §8) | not implemented, and not for want of trying: the SDK is absent, there are no credentials, and §33.4 forbids writing a vendor API from memory. **No claim of IBM hardware executability is made.** |
 
 Also absent:
 
-- **Target context on the `Pass` trait.** `Pass::run` still takes only
-  `&Circuit` (see [`pass_manager.md`](pass_manager.md)); no pass can consult a
-  profile or a cost model. Stage E §8 anticipates target-aware passes, and
-  Stage E exit criterion 3 ("optimization can consult backend-defined costs")
-  is therefore not yet met.
+- **A pass that *uses* target context.** `Pass::run` now takes a
+  `&PassContext` carrying an optional profile and cost model, and the
+  orchestrator populates it whenever a backend is selected — so Stage E exit
+  criterion 3 is met, and `pass::tests::a_pass_can_consult_the_selected_target`
+  demonstrates it. But none of the four shipped generic passes reads it; all
+  four bind it as `_context`. That is Stage E §8 working as intended rather
+  than a gap ("target-aware behavior must not make every pass
+  backend-specific"), and the real consumers are the lowering steps — but it
+  does mean no shipped *optimization* consults cost yet.
 - **A pluggable cost-model registry.** `cost::resolve` maps the two built-in
   ids (`uniform`, `nisq-weighted`) to configured `WeightedCostModel`s, and
   returns `None` for anything else rather than substituting a default — a
@@ -397,5 +451,11 @@ Also absent:
   always `None` today.
 - **A `CostModel::explain` method.** Stage E §3 sketches one; the structured
   `Cost` serves the same purpose here, since every component is already public.
-- **Backend-supplied profiles.** There is no loader, no deserialization path
-  and no adapter; profiles are built in Rust through `BasisProfileBuilder`.
+- **Cost-model-guided lowering.** The cost model evaluates a lowered circuit
+  but steers no decision inside lowering: routing picks shortest paths by hop
+  count, not by cost. Making it a genuine consumer is the natural next use of
+  the channel the `PassContext` opened.
+- ~~**Backend-supplied profiles.**~~ **Now present** — see "Profiles supplied
+  from outside" above. Until this phase there was no loader and no
+  deserialization path, and a profile could only be built in Rust through
+  `BasisProfileBuilder`.

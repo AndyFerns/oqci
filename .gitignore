@@ -11,6 +11,7 @@ __pycache__/
 
 # Packaging / test
 .pytest_cache/
+*.pyd
 test_outputs/
 
 # IDE

@@ -18,6 +18,25 @@
 //! choice: someone fixing a circuit by hand, or a future routing pass sizing
 //! up how much work a target needs, wants the whole list.
 //!
+//! # What a clean report does and does not certify
+//!
+//! [`check`] is used as the postcondition oracle for target lowering, so what
+//! it *misses* matters as much as what it catches. A clean report asserts
+//! that every operation is in the basis, every declared parameter domain is
+//! respected, no parameter is unbound, and measurement/reset constraints
+//! hold. It does **not** assert:
+//!
+//! - **connectivity for operations of arity other than two.** A three-qubit
+//!   `Ccx` is never checked against the coupling map, because a coupling map
+//!   only describes pairs. Reducing arity is lowering's job, and lowering
+//!   asserts it separately rather than relying on this function.
+//! - **that operand order carries any particular meaning.** For every
+//!   two-qubit operation, `qubits[0]` is read as the control and `qubits[1]`
+//!   as the target, `Swap` included — so a symmetric operation emitted in a
+//!   non-native order is reported as a connectivity violation. That is
+//!   deliberate: [`crate::target::topology`] does not assume an undirected
+//!   edge (Stage D §7), and this function will not either.
+//!
 //! # Logical qubits are interpreted as physical ones
 //!
 //! Until layout exists, a circuit's [`crate::ir::QubitId`] `n` is checked
@@ -87,7 +106,12 @@ pub enum Violation {
         /// Declared upper bound.
         max: f64,
     },
-    /// A parameter is still symbolic, so its domain cannot be checked.
+    /// A parameter is still symbolic.
+    ///
+    /// Reported whether or not the profile declares a domain for the
+    /// operation: no execution API accepts a symbol, so an unbound parameter
+    /// makes a circuit unexecutable on every target, not merely
+    /// undomain-checkable on this one.
     UnboundParameter {
         /// Program index of the offending instruction.
         index: usize,
@@ -229,31 +253,39 @@ fn check_gate(
         }
     }
 
-    let Some(constraint) = profile.parameter_constraint(mnemonic) else {
-        return;
-    };
+    // An unbound parameter is a violation on its own, independently of any
+    // declared domain: no execution API accepts a symbol, so a circuit
+    // carrying one cannot run on *any* target. Checking this only for
+    // operations that happen to declare a `ParameterConstraint` would leave
+    // `rz(theta)` reported legal against a profile with no `rz` constraint —
+    // which is exactly the kind of "passes validation, cannot execute"
+    // certificate this layer exists to prevent. Stage F §8 makes parameter
+    // binding an explicit compiler/backend step for this reason.
+    let constraint = profile.parameter_constraint(mnemonic);
     for param in kind.params() {
         match param {
-            Param::Concrete(angle) if !constraint.admits(angle.radians()) => {
-                violations.push(Violation::ParameterOutOfRange {
-                    index,
-                    mnemonic: mnemonic.to_string(),
-                    value: angle.radians(),
-                    min: constraint.min,
-                    max: constraint.max,
-                });
-            }
             Param::Symbol(symbol) => {
-                // A domain cannot be checked against an unknown value, and
-                // assuming it fits would be exactly the silent guess this
-                // layer exists to prevent.
                 violations.push(Violation::UnboundParameter {
                     index,
                     mnemonic: mnemonic.to_string(),
                     symbol,
                 });
             }
-            Param::Concrete(_) => {}
+            Param::Concrete(angle) => {
+                // A domain, when the profile declares one, is checked against
+                // the concrete value.
+                if let Some(constraint) = constraint
+                    && !constraint.admits(angle.radians())
+                {
+                    violations.push(Violation::ParameterOutOfRange {
+                        index,
+                        mnemonic: mnemonic.to_string(),
+                        value: angle.radians(),
+                        min: constraint.min,
+                        max: constraint.max,
+                    });
+                }
+            }
         }
     }
 }
@@ -423,6 +455,62 @@ mod tests {
             check(&c, &constrained).violations.first(),
             Some(Violation::UnboundParameter { symbol, .. }) if symbol == "theta"
         ));
+    }
+
+    #[test]
+    fn an_unbound_parameter_is_reported_without_a_declared_domain() {
+        // Regression: the symbolic check used to sit behind the
+        // `parameter_constraint` lookup, so a profile that declared no domain
+        // for `rz` — which `builtin::linear_nisq` does not — reported a
+        // symbolic `rz` as fully legal. Nothing downstream could catch it:
+        // the state-vector harness panics on symbolic parameters, so a
+        // wrongly-transformed symbol had no oracle at all.
+        let unconstrained = BasisProfileBuilder::new("t", "1", "b", Topology::linear(2))
+            .operations(["rz"])
+            .cost_model("c")
+            .build()
+            .unwrap();
+        assert!(unconstrained.parameter_constraint("rz").is_none());
+
+        let c = circuit(|b| {
+            b.rz(Param::symbol("theta"), QubitId(0));
+        });
+        assert_eq!(
+            check(&c, &unconstrained).violations,
+            vec![Violation::UnboundParameter {
+                index: 0,
+                mnemonic: "rz".into(),
+                symbol: "theta".into(),
+            }]
+        );
+    }
+
+    #[test]
+    fn every_unbound_parameter_of_a_multi_parameter_gate_is_reported() {
+        let unconstrained = BasisProfileBuilder::new("t", "1", "b", Topology::linear(2))
+            .operations(["u"])
+            .cost_model("c")
+            .build()
+            .unwrap();
+        let c = circuit(|b| {
+            b.gate(
+                GateKind::U {
+                    theta: Param::symbol("a"),
+                    phi: Param::concrete(0.5),
+                    lambda: Param::symbol("b"),
+                },
+                [QubitId(0)],
+            );
+        });
+        let symbols: Vec<String> = check(&c, &unconstrained)
+            .violations
+            .into_iter()
+            .filter_map(|v| match v {
+                Violation::UnboundParameter { symbol, .. } => Some(symbol),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(symbols, vec!["a".to_string(), "b".to_string()]);
     }
 
     #[test]

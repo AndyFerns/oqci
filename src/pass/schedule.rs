@@ -19,7 +19,7 @@
 //! preserves is as good a choice as any.
 
 use crate::ir::{Circuit, qc_to_qco};
-use crate::pass::{Pass, PassError, PassOutput};
+use crate::pass::{Pass, PassContext, PassError, PassOutput};
 
 /// Reports scheduling depth and width without modifying the circuit. See the
 /// [module docs](self).
@@ -34,7 +34,7 @@ impl Pass for Schedule {
         "report ASAP scheduling layers (analysis only; never reorders)"
     }
 
-    fn run(&self, circuit: &Circuit) -> Result<PassOutput, PassError> {
+    fn run(&self, circuit: &Circuit, _context: &PassContext<'_>) -> Result<PassOutput, PassError> {
         let dag = qc_to_qco(circuit).map_err(|e| PassError::from_ir(self.id(), e))?;
         let layers = dag.layers().map_err(|e| PassError::from_ir(self.id(), e))?;
 
@@ -56,7 +56,9 @@ mod tests {
     fn run(build: impl FnOnce(&mut CircuitBuilder)) -> PassOutput {
         let mut b = CircuitBuilder::new("c");
         build(&mut b);
-        Schedule.run(&b.build().unwrap()).unwrap()
+        Schedule
+            .run(&b.build().unwrap(), &PassContext::none())
+            .unwrap()
     }
 
     #[test]
@@ -67,7 +69,7 @@ mod tests {
         b.h(q0).cx(q0, q1).x(q1);
         let circuit = b.build().unwrap();
 
-        let out = Schedule.run(&circuit).unwrap();
+        let out = Schedule.run(&circuit, &PassContext::none()).unwrap();
         assert!(!out.changed);
         assert_eq!(out.circuit, circuit, "analysis passes rewrite nothing");
     }

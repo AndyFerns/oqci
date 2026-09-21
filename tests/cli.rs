@@ -433,3 +433,245 @@ fn every_example_compiles() {
         );
     }
 }
+
+// --- lowering and backends --------------------------------------------------
+
+#[test]
+fn backends_lists_what_can_be_compiled_for() {
+    let out = stdout_of(&["backends"]);
+    assert!(out.contains("simulator"));
+    assert!(out.contains("ibm-illustrative"));
+    // The listing must not leave anyone thinking a circuit will run here.
+    assert!(out.contains("No backend executes in this process"));
+}
+
+#[test]
+fn lower_reports_the_whole_schedule() {
+    let out = stdout_of(&[
+        "lower",
+        example("ghz3.qasm").to_str().unwrap(),
+        "--backend",
+        "simulator-nisq",
+    ]);
+    for step in [
+        "arity-reduction",
+        "layout",
+        "routing",
+        "basis-decomposition",
+        "orientation-repair",
+        "single-qubit-cleanup",
+        "verify",
+    ] {
+        assert!(out.contains(step), "`{step}` missing from:\n{out}");
+    }
+    assert!(out.contains("legal for this target"));
+}
+
+#[test]
+fn lower_emits_json_matching_the_schema() {
+    let out = stdout_of(&[
+        "lower",
+        example("bell.qasm").to_str().unwrap(),
+        "--backend",
+        "simulator-nisq",
+        "--json",
+    ]);
+    let json: serde_json::Value = serde_json::from_str(&out).expect("valid JSON");
+    let lowering = &json["lowering"];
+    assert_eq!(lowering["backend"], "simulator-nisq");
+    assert_eq!(lowering["profile"], "linear-nisq@1");
+    assert_eq!(lowering["legal"], true);
+    assert!(lowering["initial_layout"].is_array());
+    assert!(lowering["steps"].as_array().unwrap().len() >= 7);
+}
+
+#[test]
+fn lower_can_skip_routing_and_says_the_result_is_illegal() {
+    // `--no-route` is an inspection aid, not a compilation mode. The report
+    // must not present an unroutable circuit as ready to run.
+    let far = temp_qasm("far.qasm", "qubit[3] q; h q[0]; cx q[0], q[2];");
+    let out = stdout_of(&[
+        "lower",
+        far.to_str().unwrap(),
+        "--backend",
+        "simulator-nisq",
+        "--no-route",
+    ]);
+    assert!(out.contains("0 swap(s) inserted"));
+    assert!(out.contains("NOT legal"), "got:\n{out}");
+}
+
+#[test]
+fn a_dense_layout_can_be_requested() {
+    let far = temp_qasm("dense.qasm", "qubit[4] q; cx q[0], q[3]; cx q[0], q[3];");
+    let out = stdout_of(&[
+        "lower",
+        far.to_str().unwrap(),
+        "--backend",
+        "simulator-nisq",
+        "--layout",
+        "dense",
+    ]);
+    assert!(out.contains("dense layout"), "got:\n{out}");
+}
+
+#[test]
+fn an_unknown_backend_is_rejected_with_the_alternatives() {
+    let output = run(&[
+        "lower",
+        example("bell.qasm").to_str().unwrap(),
+        "--backend",
+        "no-such-machine",
+    ]);
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("simulator"), "got: {stderr}");
+}
+
+#[test]
+fn a_circuit_the_device_cannot_run_fails_with_a_reason() {
+    // Wider than the device. The exit code matters as much as the message:
+    // a script must be able to tell that nothing usable was produced.
+    let wide = temp_qasm("wide.qasm", "qubit[9] q; h q[0]; cx q[0], q[8];");
+    let output = run(&[
+        "lower",
+        wide.to_str().unwrap(),
+        "--backend",
+        "simulator-nisq",
+    ]);
+    assert!(!output.status.success());
+}
+
+#[test]
+fn prepare_writes_a_replayable_executable() {
+    let out = stdout_of(&[
+        "prepare",
+        example("bell.qasm").to_str().unwrap(),
+        "--backend",
+        "simulator-nisq",
+        "--shots",
+        "512",
+        "--seed",
+        "7",
+    ]);
+    let executable: serde_json::Value = serde_json::from_str(&out).expect("valid JSON");
+
+    assert_eq!(executable["backend_id"], "simulator-nisq");
+    assert_eq!(executable["settings"]["shots"], 512);
+    assert_eq!(executable["settings"]["seed"], 7);
+
+    // Every operation must be one the target actually supports.
+    for op in executable["ops"].as_array().unwrap() {
+        let name = op["op"].as_str().unwrap();
+        assert!(
+            ["rz", "sx", "x", "cx", "measure"].contains(&name),
+            "`{name}` is outside the linear-nisq basis"
+        );
+    }
+}
+
+#[test]
+fn prepare_records_the_provenance_of_what_it_built() {
+    let out = stdout_of(&[
+        "prepare",
+        example("bell.qasm").to_str().unwrap(),
+        "--backend",
+        "simulator-nisq",
+    ]);
+    let executable: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let provenance = &executable["provenance"];
+
+    assert_eq!(provenance["backend_id"], "simulator-nisq");
+    assert_eq!(provenance["profile_id"], "linear-nisq@1");
+    assert_eq!(provenance["compiler_version"], env!("CARGO_PKG_VERSION"));
+    assert!(
+        provenance["git_commit"]
+            .as_str()
+            .is_some_and(|c| !c.is_empty())
+    );
+    assert!(
+        !provenance["cost_model_configuration"]
+            .as_object()
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn prepare_can_write_to_a_file() {
+    let out_path = std::env::temp_dir().join("oqci-prepared.json");
+    let _ = std::fs::remove_file(&out_path);
+
+    let output = run(&[
+        "prepare",
+        example("bell.qasm").to_str().unwrap(),
+        "--backend",
+        "simulator",
+        "-o",
+        out_path.to_str().unwrap(),
+    ]);
+    assert!(output.status.success());
+
+    let body = std::fs::read_to_string(&out_path).expect("the file was written");
+    let executable: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(executable["backend_id"], "simulator");
+    let _ = std::fs::remove_file(&out_path);
+}
+
+#[test]
+fn preparing_an_unbound_circuit_refuses_rather_than_guessing_a_value() {
+    // `parameterized.qasm` has a free parameter. No execution API accepts a
+    // symbol, and substituting one here would run a different circuit from
+    // the one that was written.
+    let output = run(&[
+        "prepare",
+        example("parameterized.qasm").to_str().unwrap(),
+        "--backend",
+        "simulator",
+    ]);
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("bind"),
+        "the error should say what to do: {stderr}"
+    );
+}
+
+#[test]
+fn binding_the_parameter_makes_the_same_circuit_preparable() {
+    let output = run(&[
+        "prepare",
+        example("parameterized.qasm").to_str().unwrap(),
+        "--backend",
+        "simulator",
+        "--bind",
+        "theta=0.5",
+        "--bind",
+        "phi=1.25",
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn lower_output_is_stable_across_runs() {
+    let args = [
+        "lower",
+        "examples/ghz3.qasm",
+        "--backend",
+        "ibm-illustrative",
+        "--layout",
+        "dense",
+    ];
+    assert_eq!(stdout_of(&args), stdout_of(&args));
+}
+
+/// Writes a scratch program and returns its path.
+fn temp_qasm(name: &str, body: &str) -> std::path::PathBuf {
+    let path = std::env::temp_dir().join(format!("oqci-cli-{name}"));
+    std::fs::write(&path, body).expect("scratch file");
+    path
+}

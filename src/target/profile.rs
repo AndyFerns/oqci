@@ -36,7 +36,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::target::topology::{PhysicalQubit, Topology};
 
@@ -87,7 +87,7 @@ pub enum TargetError {
 /// Stage D §2 lists "parameter domains/constraints" among what a profile must
 /// describe: hardware that implements `rz` by frame change may accept any
 /// angle, while a pulse-calibrated rotation may not.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ParameterConstraint {
     /// Smallest accepted value, inclusive.
     pub min: f64,
@@ -118,7 +118,7 @@ impl ParameterConstraint {
 /// Stage D §2 lists measurement and reset constraints separately from the gate
 /// set because they constrain differently: a device may measure only at the end
 /// of a circuit, or may not implement reset at all.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MeasurementSupport {
     /// Whether the device can measure at all.
     pub measurement: bool,
@@ -152,7 +152,8 @@ impl Default for MeasurementSupport {
 /// Build one with [`BasisProfileBuilder`]; the fields are private so that a
 /// profile in hand is always one that passed validation, mirroring how
 /// [`crate::ir::Circuit`] relates to [`crate::ir::CircuitBuilder`].
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "BasisProfileBuilder")]
 pub struct BasisProfile {
     id: String,
     version: String,
@@ -273,7 +274,8 @@ impl BasisProfile {
 }
 
 /// Builder for [`BasisProfile`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
 pub struct BasisProfileBuilder {
     id: String,
     version: String,
@@ -338,6 +340,40 @@ impl BasisProfileBuilder {
     ) -> Self {
         self.parameter_constraints
             .insert(mnemonic.into(), constraint);
+        self
+    }
+
+    /// An empty builder, for deserialization.
+    ///
+    /// Not a useful profile on its own: every required field is blank, and
+    /// [`BasisProfileBuilder::build`] rejects it. That is the point —
+    /// `#[serde(default)]` lets a target description omit optional fields
+    /// without letting it omit the mandatory ones.
+    fn empty() -> Self {
+        BasisProfileBuilder {
+            id: String::new(),
+            version: String::new(),
+            backend_id: String::new(),
+            topology: Topology::disconnected(0),
+            supported_operations: BTreeSet::new(),
+            parameter_constraints: BTreeMap::new(),
+            decomposition_rules: BTreeSet::new(),
+            measurement: MeasurementSupport::unrestricted(),
+            capabilities: BTreeSet::new(),
+            cost_model_id: String::new(),
+        }
+    }
+
+    /// Records several decomposition-rule identifiers at once.
+    #[must_use]
+    pub fn decomposition_rules<I, S>(mut self, rule_ids: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        for id in rule_ids {
+            self.decomposition_rules.insert(id.into());
+        }
         self
     }
 
@@ -423,6 +459,149 @@ impl BasisProfileBuilder {
             capabilities: self.capabilities,
             cost_model_id: self.cost_model_id,
         })
+    }
+}
+
+impl Default for BasisProfileBuilder {
+    fn default() -> Self {
+        BasisProfileBuilder::empty()
+    }
+}
+
+/// Deserialization goes through the same validation as construction.
+///
+/// `BasisProfile`'s fields are private and its invariants are established by
+/// [`BasisProfileBuilder::build`], so deriving `Deserialize` on the profile
+/// directly would have created a second, unvalidated way to make one — and
+/// the whole reason the profile is deserializable is to accept *target data
+/// from outside the compiler*, which is exactly the input least worth
+/// trusting. A description with an out-of-range coupling, a constraint on an
+/// operation the device does not support, or a blank identifier is rejected
+/// here, with the same error a caller would have got from the builder.
+impl TryFrom<BasisProfileBuilder> for BasisProfile {
+    type Error = TargetError;
+
+    fn try_from(builder: BasisProfileBuilder) -> Result<Self, Self::Error> {
+        builder.build()
+    }
+}
+
+#[cfg(test)]
+mod deserialization_tests {
+    use super::*;
+
+    fn valid() -> BasisProfile {
+        BasisProfileBuilder::new("t", "1", "b", Topology::linear(3))
+            .operations(["rz", "cx"])
+            .parameter_constraint("rz", ParameterConstraint::new(-1.0, 1.0))
+            .cost_model("uniform")
+            .build()
+            .unwrap()
+    }
+
+    #[test]
+    fn a_profile_survives_a_round_trip_intact() {
+        let original = valid();
+        let json = serde_json::to_string(&original).unwrap();
+        let parsed: BasisProfile = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, parsed);
+    }
+
+    #[test]
+    fn a_directed_coupling_survives_the_round_trip() {
+        // The property a target description exists to carry. Losing
+        // directionality here would silently turn a one-way device into a
+        // symmetric one and make every routing decision wrong.
+        let mut topology = Topology::disconnected(2);
+        topology.add_directed(PhysicalQubit(0), PhysicalQubit(1));
+        let original = BasisProfileBuilder::new("d", "1", "b", topology)
+            .operations(["cx"])
+            .cost_model("uniform")
+            .build()
+            .unwrap();
+
+        let parsed: BasisProfile =
+            serde_json::from_str(&serde_json::to_string(&original).unwrap()).unwrap();
+        assert!(
+            parsed
+                .topology()
+                .supports(PhysicalQubit(0), PhysicalQubit(1))
+        );
+        assert!(
+            !parsed
+                .topology()
+                .supports(PhysicalQubit(1), PhysicalQubit(0))
+        );
+    }
+
+    #[test]
+    fn deserialization_cannot_smuggle_past_the_builders_validation() {
+        // The reason `BasisProfile` deserializes through the builder rather
+        // than deriving directly. Target descriptions come from outside the
+        // compiler, which makes them the input least worth trusting: a
+        // derived `Deserialize` would have been a second, unvalidated way to
+        // construct a profile.
+        let out_of_range = r#"{
+            "id": "bad", "version": "1", "backend_id": "b",
+            "topology": { "qubit_count": 2, "edges": [[0, 7]] },
+            "supported_operations": ["cx"],
+            "parameter_constraints": {},
+            "decomposition_rules": [],
+            "measurement": { "measurement": true, "mid_circuit_measurement": true, "reset": true },
+            "capabilities": [],
+            "cost_model_id": "uniform"
+        }"#;
+        let error = serde_json::from_str::<BasisProfile>(out_of_range).unwrap_err();
+        assert!(
+            error.to_string().contains("outside"),
+            "an out-of-range coupling must be rejected: {error}"
+        );
+
+        let blank_id = r#"{
+            "id": "", "version": "1", "backend_id": "b",
+            "topology": { "qubit_count": 2, "edges": [] },
+            "supported_operations": ["cx"],
+            "parameter_constraints": {},
+            "decomposition_rules": [],
+            "measurement": { "measurement": true, "mid_circuit_measurement": true, "reset": true },
+            "capabilities": [],
+            "cost_model_id": "uniform"
+        }"#;
+        assert!(serde_json::from_str::<BasisProfile>(blank_id).is_err());
+
+        let constraint_without_operation = r#"{
+            "id": "bad", "version": "1", "backend_id": "b",
+            "topology": { "qubit_count": 2, "edges": [] },
+            "supported_operations": ["cx"],
+            "parameter_constraints": { "rz": { "min": -1.0, "max": 1.0 } },
+            "decomposition_rules": [],
+            "measurement": { "measurement": true, "mid_circuit_measurement": true, "reset": true },
+            "capabilities": [],
+            "cost_model_id": "uniform"
+        }"#;
+        assert!(serde_json::from_str::<BasisProfile>(constraint_without_operation).is_err());
+    }
+
+    #[test]
+    fn optional_fields_may_be_omitted_but_required_ones_may_not() {
+        let minimal = r#"{
+            "id": "m", "version": "1", "backend_id": "b",
+            "topology": { "qubit_count": 2, "edges": [[0, 1], [1, 0]] },
+            "supported_operations": ["cx"],
+            "cost_model_id": "uniform"
+        }"#;
+        let profile: BasisProfile = serde_json::from_str(minimal).unwrap();
+        assert_eq!(profile.qualified_id(), "m@1");
+        assert!(profile.decomposition_rules().is_empty());
+        assert!(
+            profile.measurement().measurement,
+            "the default is unrestricted"
+        );
+
+        let missing_id = r#"{ "version": "1", "backend_id": "b",
+            "topology": { "qubit_count": 1, "edges": [] },
+            "supported_operations": [], "cost_model_id": "uniform" }"#;
+        assert!(serde_json::from_str::<BasisProfile>(missing_id).is_err());
     }
 }
 
