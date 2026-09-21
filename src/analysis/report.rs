@@ -15,7 +15,8 @@ use crate::ir::{Circuit, GateKind, Instruction, IrError, qc_to_qco};
 ///
 /// Counts describe the circuit **as currently represented**. Target-native
 /// gate counts and routing overhead (also named in §13) require a target
-/// profile, which does not exist yet — they are deliberately absent rather
+/// profile's per-operation calibration data, which no profile carries — they
+/// are deliberately absent rather
 /// than reported as zero.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize)]
 pub struct ResourceReport {
