@@ -65,6 +65,14 @@ pub enum CliError {
     /// JSON serialization failed.
     #[error("cannot serialize report: {0}")]
     Json(#[from] serde_json::Error),
+    /// Compilation failed — frontend, passes, lowering or preparation.
+    ///
+    /// Carried transparently because the orchestrator's errors are already
+    /// written for a reader: re-wrapping them would only put a layer of
+    /// "compilation failed:" in front of a message that already says what
+    /// went wrong and what to do about it.
+    #[error(transparent)]
+    Compile(#[from] crate::compile::CompileError),
     /// A command-line argument was not usable.
     #[error("{0}")]
     Usage(String),
@@ -91,6 +99,12 @@ enum Command {
     Analyze(AnalyzeArgs),
     /// Re-run compile or optimize whenever the file changes.
     Watch(WatchArgs),
+    /// Lower a program onto a backend, showing layout, routing and decomposition.
+    Lower(LowerArgs),
+    /// Lower a program and write the executable a backend would run.
+    Prepare(PrepareArgs),
+    /// List the backends this build can compile for.
+    Backends,
     /// List the registered optimization passes.
     Passes,
     /// List the built-in target profiles.
@@ -138,6 +152,96 @@ struct OptimizeArgs {
     /// Show a before/after instruction diff.
     #[arg(long)]
     diff: bool,
+}
+
+/// Which initial layout to use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum LayoutArg {
+    /// Logical `n` on physical `n`.
+    Trivial,
+    /// Seat interacting qubits near each other.
+    Dense,
+}
+
+impl LayoutArg {
+    fn choice(self) -> crate::lowering::LayoutChoice {
+        match self {
+            LayoutArg::Trivial => crate::lowering::LayoutChoice::Trivial,
+            LayoutArg::Dense => crate::lowering::LayoutChoice::Dense,
+        }
+    }
+}
+
+/// Options shared by `lower` and `prepare`.
+#[derive(Debug, clap::Args)]
+struct LoweringArgs {
+    /// Backend to compile for. See `oqci backends`.
+    #[arg(long, value_name = "ID")]
+    backend: String,
+
+    /// Initial layout strategy.
+    #[arg(long, value_enum, default_value_t = LayoutArg::Trivial)]
+    layout: LayoutArg,
+
+    /// Skip SWAP insertion. An inspection aid: the result is usually illegal,
+    /// and the report says so.
+    #[arg(long)]
+    no_route: bool,
+
+    /// Skip basis decomposition, leaving abstract gates in place.
+    #[arg(long)]
+    no_decompose: bool,
+}
+
+impl LoweringArgs {
+    fn config(&self) -> crate::lowering::LoweringConfig {
+        crate::lowering::LoweringConfig {
+            layout: self.layout.choice(),
+            route: !self.no_route,
+            decompose: !self.no_decompose,
+        }
+    }
+}
+
+#[derive(Debug, clap::Args)]
+struct LowerArgs {
+    #[command(flatten)]
+    input: InputArgs,
+
+    #[command(flatten)]
+    lowering: LoweringArgs,
+
+    /// Which stages to print.
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = [Stage::QcIr])]
+    emit: Vec<Stage>,
+
+    /// Show what lowering changed, as a diff.
+    #[arg(long)]
+    diff: bool,
+}
+
+#[derive(Debug, clap::Args)]
+struct PrepareArgs {
+    #[command(flatten)]
+    input: InputArgs,
+
+    #[command(flatten)]
+    lowering: LoweringArgs,
+
+    /// How many times the executable should be run.
+    #[arg(long, default_value_t = 1024)]
+    shots: u32,
+
+    /// Simulator seed, for a reproducible run.
+    ///
+    /// Not defaulted: choosing one would be picking an experimental parameter
+    /// that the benchmarking protocol owns.
+    #[arg(long)]
+    seed: Option<u64>,
+
+    /// Write the executable JSON here instead of to stdout.
+    #[arg(short = 'o', long, value_name = "FILE")]
+    output: Option<PathBuf>,
 }
 
 #[derive(Debug, clap::Args)]
@@ -236,6 +340,49 @@ fn dispatch(cli: Cli) -> Result<(), CliError> {
                 )?
             };
             emit_report(&report, args.input.json, true)
+        }
+        Command::Lower(args) => {
+            let input = prepare(&args.input, &args.emit)?;
+            let report = pipeline::run_lower(
+                &args.input.input,
+                &input.source,
+                &pipeline::LowerRequest {
+                    bindings: &input.bindings,
+                    backend: &args.lowering.backend,
+                    lowering: args.lowering.config(),
+                    settings: crate::backend::ExecutionSettings::default(),
+                    emit: &input.emit,
+                    want_diff: args.diff,
+                    prepare: false,
+                },
+            )?;
+            emit_report(&report, args.input.json, false)
+        }
+        Command::Prepare(args) => {
+            let input = prepare(&args.input, &[])?;
+            let settings = crate::backend::ExecutionSettings {
+                shots: args.shots,
+                seed: args.seed,
+                memory: false,
+            };
+            let report = pipeline::run_lower(
+                &args.input.input,
+                &input.source,
+                &pipeline::LowerRequest {
+                    bindings: &input.bindings,
+                    backend: &args.lowering.backend,
+                    lowering: args.lowering.config(),
+                    settings,
+                    emit: &[],
+                    want_diff: false,
+                    prepare: true,
+                },
+            )?;
+            write_executable(&report, args.output.as_deref(), args.input.json)
+        }
+        Command::Backends => {
+            list_backends();
+            Ok(())
         }
         Command::Watch(args) => run_watch(&args),
         Command::Passes => {
@@ -395,6 +542,52 @@ fn run_watch(args: &WatchArgs) -> Result<(), CliError> {
     })
 }
 
+/// Writes the prepared executable, to a file or to stdout.
+fn write_executable(
+    report: &snapshot::PipelineReport,
+    output: Option<&std::path::Path>,
+    json: bool,
+) -> Result<(), CliError> {
+    let view = report
+        .executable
+        .as_ref()
+        .expect("prepare always produces an executable");
+    let body = serde_json::to_string_pretty(&view.executable)?;
+
+    match output {
+        Some(path) => {
+            std::fs::write(path, &body).map_err(|source| CliError::Io {
+                path: path.display().to_string(),
+                source,
+            })?;
+            if !json {
+                println!(
+                    "wrote {} operation(s) for `{}` to {}",
+                    view.executable.ops.len(),
+                    view.backend_id,
+                    path.display()
+                );
+            }
+            Ok(())
+        }
+        None => {
+            println!("{body}");
+            Ok(())
+        }
+    }
+}
+
+/// Lists the backends this build can compile for.
+fn list_backends() {
+    println!("backends:");
+    for (id, description) in crate::compile::available_backends() {
+        println!("  {id:<20} {description}");
+    }
+    println!();
+    println!("No backend executes in this process.");
+    println!("`oqci prepare` writes the artifact; an execution adapter runs it.");
+}
+
 fn list_passes() {
     let manager = PassManager::default_pipeline();
     println!("default pipeline, in order:\n");
@@ -428,6 +621,11 @@ fn list_targets() {
         "use --target ID on `compile`, `optimize` or `analyze` to check a circuit\n\
          against one. Both profiles are synthetic: neither describes real hardware."
     );
+    println!();
+    println!("`--target ID` checks a circuit against one of these and reports.");
+    println!("To compile *for* a device, use `--backend` — see `oqci backends`,");
+    println!("which lists one more profile that a backend carries rather than");
+    println!("this registry.");
 }
 
 #[cfg(test)]
