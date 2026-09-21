@@ -20,7 +20,9 @@ mod support;
 use proptest::prelude::*;
 
 use oqci::ir::{Circuit, CircuitBuilder, GateKind, Param, QubitId};
-use oqci::pass::{Canonicalize, GateCancellation, Pass, PassManager, PassSelection, RotationMerge};
+use oqci::pass::{
+    Canonicalize, GateCancellation, Pass, PassContext, PassManager, PassSelection, RotationMerge,
+};
 use support::statevector::{same_state_up_to_global_phase, simulate};
 
 /// Angles drawn from a small set including exact negatives and zero, so that
@@ -141,7 +143,7 @@ fn circuit_strategy() -> impl Strategy<Value = Circuit> {
 /// shows the circuit that broke it.
 fn assert_preserves_semantics(pass: &dyn Pass, circuit: &Circuit) {
     let output = pass
-        .run(circuit)
+        .run(circuit, &PassContext::none())
         .unwrap_or_else(|e| panic!("{} failed on {:?}: {e}", pass.id(), circuit.instructions()));
 
     let before = simulate(circuit);
@@ -177,7 +179,7 @@ proptest! {
     #[test]
     fn the_default_pipeline_preserves_semantics(circuit in circuit_strategy()) {
         let result = PassManager::default_pipeline()
-            .run(&circuit, &PassSelection::All)
+            .run(&circuit, &PassSelection::All, &PassContext::none())
             .expect("the default pipeline should not fail");
 
         let before = simulate(&circuit);
@@ -193,7 +195,7 @@ proptest! {
     #[test]
     fn optimization_never_increases_operation_count(circuit in circuit_strategy()) {
         let result = PassManager::default_pipeline()
-            .run(&circuit, &PassSelection::All)
+            .run(&circuit, &PassSelection::All, &PassContext::none())
             .expect("the default pipeline should not fail");
         prop_assert!(result.circuit.len() <= circuit.len());
     }
@@ -305,7 +307,7 @@ fn a_fully_cancelling_circuit_collapses_to_the_identity() {
         b.h(QubitId(0)).x(QubitId(0)).x(QubitId(0)).h(QubitId(0));
     });
     let result = PassManager::default_pipeline()
-        .run(&c, &PassSelection::All)
+        .run(&c, &PassSelection::All, &PassContext::none())
         .unwrap();
 
     assert!(result.circuit.is_empty(), "everything should cancel");
