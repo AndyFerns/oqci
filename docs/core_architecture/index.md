@@ -1,10 +1,10 @@
 # OQCI Source-of-Truth Documentation Index
 
 Status: Active planning baseline  
-Last verified against repository: 2026-09-16  
+Last verified against repository: 2026-09-21  
 Repository: `https://github.com/AndyFerns/oqci`  
 Branch reviewed: `master`  
-Current repository version: `0.2.0`
+Current repository version: `0.3.0`
 
 ## Purpose
 
@@ -78,33 +78,74 @@ An implementation agent must not silently override a locked decision because ano
 
 At the verified `master` state:
 
-- the repository is at version `0.2.0`;
-- the implemented core is the Phase 0 IR foundation plus the frontend layer;
+- the repository is at version `0.3.0`;
+- the implemented core is the Phase 0 IR foundation, the frontend layer, the
+  pass manager, the target model, target lowering, the backend contract and
+  compiler orchestration;
 - QC-IR exists;
 - QCO-IR exists;
 - deterministic QC-IR → QCO-IR conversion exists;
 - QCO-IR → textual LLVM-compatible QIR emission exists;
 - validation/error infrastructure exists;
-- test coverage exists for the current IR/pipeline;
-- symbolic/numeric gate parameters (`Param`) and explicit parameter binding exist, satisfying the Stage F IR requirement;
-- an OpenQASM 3 frontend exists over a documented subset (`docs/openqasm_frontend.md`);
-- a Qiskit adapter exists, split into a pure-Rust translation core and a PyO3 boundary (`docs/qiskit_adapter.md`);
-- a pass manager and four target-independent passes exist — canonicalization, gate cancellation, rotation merging, and scheduling-as-analysis (`docs/pass_manager.md`);
-- pass correctness is verified by property-based state-vector equivalence testing (`tests/pass_equivalence.rs`);
-- an analysis module provides gate counts, depth and circuit diffing (`src/analysis/`);
-- an `oqci` CLI exposes every pipeline stage, including a live `watch` mode and a JSON schema (`docs/cli.md`);
-- a target model exists — basis profiles, directed topology, circuit-vs-target legality checking, and a backend-supplied cost model (`docs/target_model.md`), satisfying Stage D exit criteria 1, 2, 4, 6 and 8;
-- `SX`/`SXdg` were added to the registered gate set under an explicit architecture decision (`docs/architecture_decision_sx_basis_gate.md`), the first amendment to the Stage A §4 closed-enum invariant;
-- `src/` contains the IR, frontend, pass, analysis, target and CLI subsystems;
-- **qubit mapping, routing, basis decomposition, execution-backend and compiler-orchestration subsystems are not yet implemented** — the target data they need now exists, but the passes that consume it do not (Stage D exit criteria 3, 5, 7 and Stage E exit criterion 3 remain open);
-- `python/` is a real PyO3 crate covering the frontend → QIR path only; the compiler/pass/backend/analysis APIs of §17 do not exist yet;
+- symbolic/numeric gate parameters (`Param`) and explicit parameter binding
+  exist, satisfying the Stage F IR requirement;
+- an OpenQASM 3 frontend exists over a documented subset
+  (`docs/openqasm_frontend.md`);
+- a Qiskit adapter exists, split into a pure-Rust translation core and a PyO3
+  boundary (`docs/qiskit_adapter.md`);
+- a pass manager and four target-independent passes exist, and `Pass::run`
+  now receives a `PassContext` carrying the selected target, which closes
+  Stage E exit criterion 3 (`docs/pass_manager.md`);
+- pass correctness is verified by property-based state-vector equivalence
+  testing (`tests/pass_equivalence.rs`);
+- an analysis module provides gate counts, depth and circuit diffing
+  (`src/analysis/`);
+- a target model exists — basis profiles, directed topology with path
+  queries, legality checking and a backend-supplied cost model
+  (`docs/target_model.md`);
+- `SX`/`SXdg` are in the registered gate set under an explicit architecture
+  decision (`docs/architecture_decision_sx_basis_gate.md`);
+- **target lowering exists** — qubit mapping (§8.6), routing with SWAP
+  insertion (§8.7) and basis decomposition (§8.8), with an executable
+  decomposition-rule model covering Stage D §5 and a verification step that
+  re-checks lowering's own output (`docs/lowering.md`). This satisfies
+  Stage D exit criteria 3, 5 and 7;
+- **a backend contract exists** — target lowering, validation, execution
+  preparation and execution as four distinct stages, with a structured
+  executable representation and full Stage C §9 provenance
+  (`docs/backend_contract.md`);
+- **a compiler orchestrator exists** (§6), and is the single path the CLI,
+  the Python SDK and library callers all take (`docs/compiler.md`);
+- an `oqci` CLI exposes every stage, including `lower`, `prepare`, `backends`
+  and a live `watch` mode (`docs/cli.md`);
+- a Python SDK covers §17's surface, and `oqci.backends.aer` executes a
+  prepared circuit on Qiskit Aer (§15.1), which is the first verification of
+  OQCI's output against an implementation other than its own;
+- **no backend executes inside the compiler process.** Each returns a typed
+  `ExecutionNotAvailableInProcess`. For the simulator that is because the
+  project's non-goals rule out writing one; for IBM it is because
+  `qiskit-ibm-runtime` and credentials are both absent, and §33.4 forbids
+  implementing a vendor API from memory. **Live IBM submission and result
+  retrieval are not implemented, and no claim of IBM hardware executability
+  is made** (§33.12);
+- per-operation cost and error/noise metadata on profiles (Stage D §2) remain
+  absent, deliberately: both built-in profiles are synthetic, and a profile
+  asserting error rates nobody measured would be a fabricated record;
+- Cirq and CUDA-Q execution adapters (§15.2) are not implemented;
 - `benchmarks/` is not yet a populated benchmark suite;
 - `mlir_compat.rs` exists as the future MLIR boundary but the full MLIR integration is not implemented.
 
-The repository's changelog defines `0.0.1` as the Phase 0 IR core, and
-`0.2.0` as the frontend layer, the Stage F parameter work, the pass manager
-with its target-independent passes, and the CLI. Target modelling and
-backend execution remain deliberately absent.
+The repository's changelog defines `0.0.1` as the Phase 0 IR core, `0.2.0`
+as the frontend layer, the Stage F parameter work, the pass manager with its
+target-independent passes and the CLI, and `0.3.0` as the target model
+together with the backend: lowering, the backend contract, orchestration and
+a simulator execution path.
+
+What remains before the non-G definition of done is met is the hardware half
+of Stage C §8 — authentication, backend discovery, submission and result
+retrieval against a live device — plus the benchmark infrastructure of §20.
+Everything the compiler can verify without a quantum computer is verified;
+what is left is precisely what needs one.
 
 ## How to Use These Documents
 
