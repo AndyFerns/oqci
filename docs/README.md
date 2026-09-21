@@ -1,10 +1,22 @@
 # OQCI Documentation
 
 Documentation for **OQCI** (Open Quantum Compiler Infrastructure). This index
-covers the IR core, its conversions, QIR lowering, the frontend layer
-(OpenQASM 3 and Qiskit), and the target-independent optimization passes.
-There is still **no backend execution** and **no target model**; QIR emission
-remains the output boundary.
+covers the IR core and its conversions, QIR lowering, the frontend layer
+(OpenQASM 3 and Qiskit), the target-independent optimization passes, and — as
+of `0.3.0` — the target model, target lowering, the backend contract and the
+compiler orchestrator.
+
+The compiler now takes a program all the way to a validated, target-legal
+executable. Two things it deliberately does **not** do:
+
+- **It does not execute.** Every backend's `execute` returns a typed "not
+  available in this process" error naming where execution happens instead:
+  Qiskit Aer, through the Python adapter. Live hardware submission is not
+  implemented, and no claim of hardware executability is made — see
+  [Backend Contract](backend_contract.md).
+- **It does not treat QIR as executable.** QIR remains a lowering artifact;
+  a backend's executable representation is a separate thing built by a
+  separate stage, because Stage C §5 forbids conflating the two.
 
 ## Pipeline at a glance
 
