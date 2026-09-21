@@ -176,6 +176,86 @@ fn swap_qubits(state: &mut [Complex64], a: usize, b: usize, n: usize) {
     }
 }
 
+/// Simulates a circuit, refusing to allocate an unreasonable state vector.
+///
+/// The guard matters because lowering targets a *device*: `ideal-simulator`
+/// declares 32 qubits, and a routed circuit against it could legitimately
+/// carry a register this harness would need 2^32 amplitudes to represent.
+/// Panicking with a readable message beats exhausting memory.
+///
+/// # Panics
+///
+/// If the circuit declares more than `max_qubits`, or for any reason
+/// [`simulate`] would.
+pub fn simulate_bounded(circuit: &Circuit, max_qubits: u32) -> Vec<Complex64> {
+    assert!(
+        circuit.num_qubits() <= max_qubits,
+        "refusing to simulate {} qubits (limit {max_qubits}):          a state vector that size is {} amplitudes",
+        circuit.num_qubits(),
+        1u128 << circuit.num_qubits()
+    );
+    simulate(circuit)
+}
+
+/// `tr(A* B)` for two operators given as lists of columns.
+///
+/// Used to compare operators rather than states. The crucial property is that
+/// the per-column overlaps are **summed before** a modulus is taken anywhere,
+/// which is what forces a single shared global phase. Comparing each column
+/// against its counterpart up to that column's own phase is a strictly weaker
+/// claim, and a false one: it accepts a rewrite that negates one basis state
+/// and leaves the others, which changes every superposition.
+///
+/// # Panics
+///
+/// If the two operators have different shapes.
+pub fn overlap_trace(a: &[Vec<Complex64>], b: &[Vec<Complex64>]) -> Complex64 {
+    assert_eq!(a.len(), b.len(), "operators have different column counts");
+    a.iter()
+        .zip(b)
+        .map(|(x, y)| {
+            assert_eq!(x.len(), y.len(), "columns have different dimensions");
+            x.iter()
+                .zip(y)
+                .map(|(p, q)| p.conj() * q)
+                .sum::<Complex64>()
+        })
+        .sum()
+}
+
+/// Simulates `circuit` with the given qubits pre-flipped to `|1>`.
+///
+/// The preparation is done with `X` gates, which are exact and contribute no
+/// phase, so this reuses [`simulate`] unchanged rather than reaching into the
+/// state vector directly.
+///
+/// # Panics
+///
+/// As [`simulate_bounded`], and if a prepared qubit is outside the register.
+pub fn simulate_from_basis_state(
+    circuit: &Circuit,
+    set_bits: &[u32],
+    max_qubits: u32,
+) -> Vec<Complex64> {
+    use oqci::ir::{CircuitBuilder, QubitId};
+
+    let mut b = CircuitBuilder::new(circuit.name());
+    b.alloc_qubits(circuit.num_qubits());
+    b.alloc_clbits(circuit.num_clbits());
+    for bit in set_bits {
+        b.x(QubitId(*bit));
+    }
+    for instruction in circuit.instructions() {
+        match instruction {
+            Instruction::Gate { kind, qubits } => {
+                b.gate(kind.clone(), qubits.clone());
+            }
+            other => panic!("the equivalence harness only handles unitary circuits, got {other:?}"),
+        }
+    }
+    simulate_bounded(&b.build().expect("valid prepared circuit"), max_qubits)
+}
+
 /// Whether two state vectors describe the same physical state, i.e. are equal
 /// up to an unobservable global phase.
 ///
