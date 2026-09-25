@@ -1,10 +1,10 @@
 # OQCI Source-of-Truth Documentation Index
 
 Status: Active planning baseline
-Last verified against repository: 2026-09-21
+Last verified against repository: 2026-09-25
 Repository: `https://github.com/AndyFerns/oqci`  
 Branch reviewed: `master`  
-Current repository version: `0.3.0`
+Current repository version: `0.4.0`
 
 ## Purpose
 
@@ -78,7 +78,7 @@ An implementation agent must not silently override a locked decision because ano
 
 At the verified `master` state:
 
-- the repository is at version `0.3.0`;
+- the repository is at version `0.4.0`;
 - the implemented core is the Phase 0 IR foundation, the frontend layer, the
   pass manager, the target model, target lowering, the backend contract and
   compiler orchestration;
@@ -133,13 +133,24 @@ At the verified `master` state:
   asserting error rates nobody measured would be a fabricated record;
 - Cirq and CUDA-Q execution adapters (§15.2) are not implemented;
 - `benchmarks/` is not yet a populated benchmark suite;
-- `mlir_compat.rs` exists as the future MLIR boundary but the full MLIR integration is not implemented.
+- `mlir_compat.rs` exists as the future MLIR boundary but the full MLIR integration is not implemented;
+- **a live visualization companion exists** (`server/`, `frontend/`) — a
+  browser view of the pipeline, live-updating on save, with a pass-by-pass
+  and swap/rule-by-rule replay that cross-validates itself against a real
+  `compile_named`/`lower()` call on every request rather than trusting its
+  own reconstruction (`docs/visualization.md`). It is read-only by
+  construction: the only change made to this crate to build it is a single
+  visibility flip (`src/cli/mod.rs`), and nothing in `src/pass/`,
+  `src/lowering/`, or any other compiler-logic file was touched. It is a
+  local dev-companion only — no hosted, multi-user, or authenticated mode
+  exists.
 
 The repository's changelog defines `0.0.1` as the Phase 0 IR core, `0.2.0`
 as the frontend layer, the Stage F parameter work, the pass manager with its
-target-independent passes and the CLI, and `0.3.0` as the target model
-together with the backend: lowering, the backend contract, orchestration and
-a simulator execution path.
+target-independent passes and the CLI, `0.3.0` as the target model together
+with the backend: lowering, the backend contract, orchestration and a
+simulator execution path, and `0.4.0` as the live visualization companion
+described above — a new consumer of the compiler, not a change to it.
 
 What remains before the non-G definition of done is met is the hardware half
 of Stage C §8 — authentication, backend discovery, submission and result

@@ -25,7 +25,7 @@ It's Rust-native at its core (fast, and the invariants are enforced by the type 
 
 ## Project status
 
-**Current version: `0.3.0`.** This is early-stage, actively-developed infrastructure - treat anything not checked off below as *not there yet*, regardless of what a directory name or diagram might suggest.
+**Current version: `0.4.0`.** This is early-stage, actively-developed infrastructure - treat anything not checked off below as *not there yet*, regardless of what a directory name or diagram might suggest.
 
 | Layer | Status | Notes |
 |---|---|---|
