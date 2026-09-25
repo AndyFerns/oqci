@@ -1,0 +1,56 @@
+.device-topology {
+  background: var(--panel-bg);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.device-topology__modes {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.mode-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.mode-btn--active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.topology-node {
+  fill: var(--panel-bg-alt);
+  stroke: var(--border);
+  stroke-width: 1.5;
+  transition: all 0.3s ease;
+}
+
+.topology-node--occupied {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.topology-node__label {
+  font-family: var(--mono);
+  font-size: 10px;
+  fill: var(--text);
+  pointer-events: none;
+}
+
+.topology-node--occupied + .topology-node__label {
+  fill: #0b0d12;
+}
+
+.topology-node__sublabel {
+  font-family: var(--mono);
+  font-size: 9px;
+  fill: var(--text-dim);
+}

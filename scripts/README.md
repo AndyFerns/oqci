@@ -84,6 +84,38 @@ brew install mdbook
 scoop install mdbook
 ```
 
+## Visualization dev servers
+
+`dev-visualization.*` starts `oqci-server` and the `frontend/` dev server
+together and guarantees both are stopped together; `stop-visualization.*` is
+a standalone safety net for when they weren't. See
+[`docs/visualization.md`](../docs/visualization.md).
+
+| Platform | Start | Stop | Shutdown mechanism |
+|----------|-------|------|---------------------|
+| Linux, macOS, Git Bash | [`dev-visualization.sh`](dev-visualization.sh) | [`stop-visualization.sh`](stop-visualization.sh) | Ctrl+C — `trap` kills both process groups |
+| PowerShell 7+ | [`dev-visualization.ps1`](dev-visualization.ps1) | [`stop-visualization.ps1`](stop-visualization.ps1) | Ctrl+C — `try/finally` runs `taskkill /T` on both |
+| `cmd.exe` | [`dev-visualization.bat`](dev-visualization.bat) | [`stop-visualization.bat`](stop-visualization.bat) | a keypress in the launcher window — batch cannot reliably trap Ctrl+C to run cleanup code, so this script doesn't pretend to; each server gets its own titled window instead |
+
+```bash
+scripts/dev-visualization.sh --backend simulator-nisq
+scripts/stop-visualization.sh                          # emergency cleanup, any time
+```
+
+```powershell
+scripts\dev-visualization.ps1 -Backend simulator-nisq
+scripts\stop-visualization.ps1
+```
+
+```bat
+scripts\dev-visualization.bat --backend simulator-nisq
+scripts\stop-visualization.bat
+```
+
+All six accept the server and frontend ports as arguments (`--server-port`/
+`--frontend-port`, or positionally for the `stop-*` scripts) if you're not
+using the defaults (4173 / 5173).
+
 ## CI
 
 The GitHub Actions workflow at
