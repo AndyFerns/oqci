@@ -30,6 +30,7 @@
 
 - [Compiler Orchestration](compiler.md)
 - [Command Line](cli.md)
+- [Live Visualization](visualization.md)
 
 # Architecture Decisions
 
