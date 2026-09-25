@@ -26,7 +26,13 @@
 
 mod pipeline;
 mod render;
-mod snapshot;
+/// Stage-snapshot view types (`PipelineReport` and friends).
+///
+/// Public so an external crate — e.g. a visualization server — can read the
+/// same JSON contract this CLI's `--json` flag prints, through the same
+/// builder functions, without duplicating any of it. See
+/// `docs/visualization.md`.
+pub mod snapshot;
 mod watch;
 
 use std::collections::HashMap;
