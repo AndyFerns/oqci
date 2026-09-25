@@ -1,0 +1,229 @@
+:root {
+  --bg: #0b0d12;
+  --panel-bg: #12151c;
+  --panel-bg-alt: #1a1e28;
+  --border: #2a2f3d;
+  --text: #e6e8ee;
+  --text-dim: #8890a0;
+  --accent: #5ec9b8;
+  --ok: #6fce7f;
+  --warn: #e0a857;
+  --wire: #4a5163;
+  --wire-classical: #3a4050;
+  --mono: "SFMono-Regular", "Consolas", "Menlo", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+}
+
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px 24px 60px;
+}
+
+.app__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.app__header h1 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+}
+
+.app__connect {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app__path-input {
+  background: var(--panel-bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 10px;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  width: 260px;
+}
+
+.app__connect button {
+  background: var(--accent);
+  color: #0b0d12;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.app__connect button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--warn);
+  display: inline-block;
+}
+
+.status-dot--on {
+  background: var(--ok);
+}
+
+.app__watched {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.app__watched code {
+  color: var(--accent);
+}
+
+.app__unbound {
+  color: var(--warn);
+}
+
+.app__error {
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
+
+.app__waiting {
+  text-align: center;
+  padding: 60px 0;
+}
+
+.app__tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.app__tab {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-transform: capitalize;
+  border-bottom: 2px solid transparent;
+}
+
+.app__tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panel--split {
+  flex-direction: row;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.panel__col {
+  flex: 2;
+  min-width: 400px;
+}
+
+.panel__col--narrow {
+  flex: 1;
+  min-width: 320px;
+}
+
+.app__stage-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.app__stage-tab {
+  background: var(--panel-bg-alt);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 14px;
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.app__stage-tab--active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.qir-text {
+  background: var(--panel-bg-alt);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+  color: var(--text-dim);
+}
+
+.diff-view {
+  background: var(--panel-bg-alt);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+
+.diff-line {
+  padding: 1px 0;
+  white-space: pre;
+}
+
+.diff-line--removed {
+  color: var(--warn);
+}
+
+.diff-line--added {
+  color: var(--ok);
+}
+
+.diff-line--unchanged {
+  color: var(--text-dim);
+}
