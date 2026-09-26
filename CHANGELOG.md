@@ -10,6 +10,61 @@ mirrored in `Cargo.toml`; bump both with `scripts/bump-version.{sh,bat}`.
 While the major version is `0`, the public API and IR contracts are unstable
 and may change without a major bump (per SemVer §4).
 
+## [0.4.0] - 2026-09-25
+
+A companion, not a new compiler: `server/` and `frontend/` add a live,
+browser-based view of the pipeline this version's own binaries already
+compute — nothing about compilation itself changes here.
+
+### Added
+
+#### Live visualization (`server/`, `frontend/`)
+
+- **`oqci-server`** (`server/`, new workspace member): a local WebSocket
+  server that watches a `.qasm` file and, on every save, runs the real,
+  unmodified `compile_named` — the exact entry point the CLI and Python SDK
+  already go through — and streams the result as JSON.
+- **Ground truth + self-validating replay** (`server/src/compile.rs`,
+  `server/src/replay.rs`): every push is either read directly from that one
+  real compile call, or reconstructed by calling the compiler's own public
+  functions again — `PassManager`, `decompose()`, `RoutingStrategy::route()`,
+  `repair_orientation()` — for pass-by-pass and swap/rule-by-rule detail the
+  coarse schema doesn't retain. Every reconstruction is cross-checked against
+  the real call before being shown; a mismatch reports itself `degraded`
+  rather than displaying a reconstruction that might not match what the
+  compiler actually did. `replay.rs`'s own tests include a negative control
+  that feeds a deliberately wrong ground truth and asserts the check actually
+  fires.
+- **The only change to the `oqci` crate itself**: `src/cli/mod.rs`'s
+  `mod snapshot;` becomes `pub mod snapshot;`, so the server can read the
+  same `PipelineReport`-building functions (`instructions_of`, `graph_of`,
+  `target_report`, …) the CLI's `--json` flag already uses, through the same
+  public API every other consumer goes through. No `src/pass/`,
+  `src/lowering/`, `src/compile.rs`, `src/target/`, `src/backend/`,
+  `src/ir/`, or `src/frontend/` file changed.
+- **`frontend/`** (React + TypeScript + Vite): a piano-roll circuit diagram
+  laid out from the compiler's own `QcoCircuit::layers()` data, a
+  `react-flow` view of the QCO-IR dependency graph, a pass timeline
+  (scrub through each optimization pass), a lowering timeline (scrub through
+  layout/routing/decomposition down to individual SWAPs and individual
+  decomposition-rule firings, with an animated device-topology overlay), and
+  cost/legality and provenance panels.
+- `docs/visualization.md` — the wire contract, the replay technique in full,
+  and why it needs no compiler changes. `server/README.md` and
+  `frontend/README.md`.
+- Cross-platform dev-server launcher/cleanup scripts:
+  `scripts/dev-visualization.{sh,ps1,bat}` and
+  `scripts/stop-visualization.{sh,ps1,bat}`. The `.sh`/`.ps1` pair genuinely
+  traps Ctrl+C to stop both process trees together; `.bat` does not pretend
+  cmd.exe can do that reliably, and uses a titled-window-plus-keypress
+  pattern instead.
+
+### Changed
+
+- `scripts/bump-version.{sh,bat}` now also sync `server/Cargo.toml`'s
+  `[package]` version, alongside the root and `python/` manifests they
+  already kept in step.
+
 ## [0.3.0] - 2026-09-21
 
 Two phases of work land together here: the **target model**, which was
@@ -522,6 +577,8 @@ the first usable milestone; Phase 1 will bump the minor.
 - Backend execution (simulators, hardware) — beyond the QIR emission boundary.
 - Python bindings — only empty PyO3 placeholders exist under `python/`.
 
-[Unreleased]: https://github.com/AndyFerns/oqci/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/AndyFerns/oqci/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/AndyFerns/oqci/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/AndyFerns/oqci/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AndyFerns/oqci/compare/v0.0.1...v0.2.0
 [0.0.1]: https://github.com/AndyFerns/oqci/releases/tag/v0.0.1

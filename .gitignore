@@ -2,6 +2,11 @@
 /target/
 *.pdb
 
+# Frontend (server/src is a real workspace crate and is tracked; frontend/ is
+# a separate Vite/npm project, not a Cargo workspace member)
+frontend/node_modules/
+frontend/dist/
+
 # Python
 .venv/
 __pycache__/

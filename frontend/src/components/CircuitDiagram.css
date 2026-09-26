@@ -1,0 +1,81 @@
+.circuit-diagram {
+  overflow-x: auto;
+  background: var(--panel-bg);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.circuit-diagram__title {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wire {
+  stroke: var(--wire);
+  stroke-width: 1.5;
+}
+
+.wire--classical {
+  stroke: var(--wire-classical);
+  stroke-width: 1.2;
+}
+
+.wire-label {
+  fill: var(--text-dim);
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
+.op__connector {
+  stroke: var(--text-dim);
+  stroke-width: 2;
+  transition: all 0.35s ease;
+}
+
+.op__connector--classical {
+  stroke: var(--wire-classical);
+  stroke-dasharray: 2 2;
+}
+
+.op__box {
+  stroke: var(--panel-bg);
+  stroke-width: 1.5;
+  transition: all 0.35s ease;
+}
+
+.op__node {
+  transition: all 0.35s ease;
+}
+
+.op__label {
+  fill: #0b0d12;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--mono);
+  pointer-events: none;
+}
+
+.op__multi-label {
+  fill: var(--text-dim);
+  font-size: 10px;
+  font-family: var(--mono);
+  text-transform: uppercase;
+}
+
+.op--highlight .op__box,
+.op--highlight .op__node {
+  filter: drop-shadow(0 0 6px var(--accent));
+  stroke: var(--accent);
+}
+
+:root {
+  --gate: #5b8cdb;
+  --multi: #e07a5f;
+  --swap: #f2cc8f;
+  --meter: #81b29a;
+  --reset: #9b8fb5;
+}

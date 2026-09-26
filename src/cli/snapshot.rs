@@ -425,7 +425,6 @@ pub fn target_report(
     })
 }
 
-/// Builds a view of a circuit diff.
 /// Builds the lowering view from a lowered circuit.
 #[must_use]
 pub fn lowering_view(backend: &str, lowered: &Lowered) -> LoweringView {
@@ -468,6 +467,7 @@ pub fn executable_view(executable: &Executable) -> ExecutableView {
     }
 }
 
+/// Builds a view of a circuit diff.
 pub fn diff_view(diff: &CircuitDiff) -> Vec<DiffEntryView> {
     diff.entries
         .iter()

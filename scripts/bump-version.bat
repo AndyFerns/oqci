@@ -5,8 +5,8 @@ rem
 rem The repo-root VERSION file is the single source of truth for the project
 rem version (semantic versioning, MAJOR.MINOR.PATCH). Run this whenever you cut
 rem a change worth versioning; it bumps VERSION and keeps every workspace
-rem member's Cargo.toml [package] version -- root and python\ -- in sync so
-rem none of them can drift.
+rem member's Cargo.toml [package] version -- root, python\ and server\ -- in
+rem sync so none of them can drift.
 rem
 rem When to bump what (semantic versioning):
 rem   major  - breaking change to a public API or IR contract (0.x: still allowed)
@@ -32,6 +32,7 @@ set "ROOT=%CD%"
 set "VERSION_FILE=%ROOT%\VERSION"
 set "CARGO_FILE=%ROOT%\Cargo.toml"
 set "PYTHON_CARGO_FILE=%ROOT%\python\Cargo.toml"
+set "SERVER_CARGO_FILE=%ROOT%\server\Cargo.toml"
 
 if "%~1"=="" (
     echo error: missing argument 1^>^&2
@@ -109,6 +110,11 @@ if exist "%PYTHON_CARGO_FILE%" (
     call :sync_cargo "%PYTHON_CARGO_FILE%"
     if errorlevel 1 (echo error: could not update %PYTHON_CARGO_FILE% 1^>^&2 & popd ^>nul & exit /b 3)
     set "UPDATED=!UPDATED!, python\Cargo.toml"
+)
+if exist "%SERVER_CARGO_FILE%" (
+    call :sync_cargo "%SERVER_CARGO_FILE%"
+    if errorlevel 1 (echo error: could not update %SERVER_CARGO_FILE% 1^>^&2 & popd ^>nul & exit /b 3)
+    set "UPDATED=!UPDATED!, server\Cargo.toml"
 )
 
 echo version: %CURRENT% -^> !NEW!

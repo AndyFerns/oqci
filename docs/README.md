@@ -2,9 +2,10 @@
 
 Documentation for **OQCI** (Open Quantum Compiler Infrastructure). This index
 covers the IR core and its conversions, QIR lowering, the frontend layer
-(OpenQASM 3 and Qiskit), the target-independent optimization passes, and — as
-of `0.3.0` — the target model, target lowering, the backend contract and the
-compiler orchestrator.
+(OpenQASM 3 and Qiskit), the target-independent optimization passes, the
+target model, target lowering, the backend contract, the compiler
+orchestrator, and — as of `0.4.0` — a live, browser-based visualization
+companion built entirely as a read-only consumer of the compiler below.
 
 The compiler now takes a program all the way to a validated, target-legal
 executable. Two things it deliberately does **not** do:
@@ -43,7 +44,11 @@ program, or `oqci watch <file>` to keep seeing them as you edit — see
 | [`qiskit_adapter.md`](qiskit_adapter.md) | **The Qiskit adapter.** The vendor-neutral `QiskitCircuitIr` handoff, the PyO3 boundary, the verified Qiskit version, and known limitations. |
 | [`pass_manager.md`](pass_manager.md) | **The pass manager and optimization passes.** The `Pass` contract, the default pipeline and why it is ordered that way, each pass's exact rewrite rules and exclusions, and how correctness is verified. |
 | [`target_model.md`](target_model.md) | **Basis profiles, topology and cost.** How a backend describes what it accepts and what it finds expensive, how a circuit is checked against it, and what target-aware work is still absent. |
+| [`lowering.md`](lowering.md) | **Target lowering.** Layout, routing with SWAP insertion, basis decomposition, and the invariant chain that makes the result legal rather than merely finished. |
+| [`backend_contract.md`](backend_contract.md) | **The backend contract.** Lowering, validation, execution preparation and execution as four distinct stages, the structured executable representation, and full provenance. |
+| [`compiler.md`](compiler.md) | **The compiler orchestrator.** The single path from source text to artifacts every consumer — CLI, Python SDK, visualization server — takes. |
 | [`cli.md`](cli.md) | **The `oqci` command line.** Inspecting every pipeline stage, pass-by-pass reports, before/after diffs, watch mode, and the JSON schema. |
+| [`visualization.md`](visualization.md) | **Live visualization.** The `server`/`frontend` companion's wire contract, and the self-validating replay technique that gives it pass-by-pass and swap/rule-by-rule detail without any change to compiler logic. |
 | [`architecture_decision_sx_basis_gate.md`](architecture_decision_sx_basis_gate.md) | **ADR.** Why `SX`/`SXdg` were added to the closed gate set, and what that does and does not license. |
 | [`mlir_dialect.md`](mlir_dialect.md) | **The `quantum` MLIR dialect spec.** Types, ops, attribute-vs-operand rules, the complete op↔Rust correspondence table, the Phase 2 integration path, and the implied TableGen skeleton. |
 | [`qir_lowering.md`](qir_lowering.md) | **Lowering rules.** Target QIR format, the op → QIR intrinsic mapping table, angle/qubit encoding, and the two documented conformance caveats (extended intrinsics, mid-circuit measurement). |
@@ -69,6 +74,8 @@ program, or `oqci watch <file>` to keep seeing them as you edit — see
 | Metrics and diffing | `src/analysis/` |
 | Target profiles, topology, legality, cost | `src/target/` |
 | CLI inspector | `src/cli/` |
+| Visualization server (ground truth + self-validating replay) | `server/src/` |
+| Visualization frontend | `frontend/src/` |
 | Frontend contract (`FrontendError`) | `src/frontend/error.rs` |
 | Shared gate-name table | `src/frontend/gate_map.rs` |
 | OpenQASM 3 frontend (lexer/parser/AST/translate) | `src/frontend/openqasm/` |

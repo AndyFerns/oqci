@@ -4,8 +4,8 @@
 # The repo-root `VERSION` file is the single source of truth for the project
 # version (semantic versioning, MAJOR.MINOR.PATCH). Run this whenever you cut a
 # change worth versioning; it bumps `VERSION` and keeps every workspace
-# member's `Cargo.toml` [package] version — root and `python/` — in sync so
-# none of them can drift.
+# member's `Cargo.toml` [package] version — root, `python/` and `server/` —
+# in sync so none of them can drift.
 #
 # When to bump what (semantic versioning):
 #   major  — breaking change to a public API or IR contract (0.x: still allowed)
@@ -31,6 +31,7 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION_FILE="$ROOT/VERSION"
 CARGO_FILE="$ROOT/Cargo.toml"
 PYTHON_CARGO_FILE="$ROOT/python/Cargo.toml"
+SERVER_CARGO_FILE="$ROOT/server/Cargo.toml"
 
 die() { echo "error: $*" >&2; exit "${2:-3}"; }
 
@@ -102,6 +103,10 @@ sync_cargo_version "$CARGO_FILE"
 if [ -f "$PYTHON_CARGO_FILE" ]; then
     sync_cargo_version "$PYTHON_CARGO_FILE"
     updated="$updated, python/Cargo.toml"
+fi
+if [ -f "$SERVER_CARGO_FILE" ]; then
+    sync_cargo_version "$SERVER_CARGO_FILE"
+    updated="$updated, server/Cargo.toml"
 fi
 
 echo "version: $current -> $new"
