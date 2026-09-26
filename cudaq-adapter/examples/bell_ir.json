@@ -1,0 +1,12 @@
+{
+  "num_qubits": 2,
+  "operations": [
+    {"name": "h", "qubits": [0], "params": []},
+    {"name": "cx", "qubits": [0, 1], "params": []}
+  ],
+  "measurements": [],
+  "metadata": {
+    "algorithm": "Bell state",
+    "source": "oqci-unified-ir"
+  }
+}

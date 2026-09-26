@@ -1,0 +1,5 @@
+[
+  "tests/test_backend.py::test_backend_generates_bell",
+  "tests/test_frontend.py::test_bell_frontend",
+  "tests/test_frontend.py::test_rotation"
+]

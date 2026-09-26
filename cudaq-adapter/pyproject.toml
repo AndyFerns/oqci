@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oqci-cudaq-adapters"
+version = "0.1.0"
+description = "CUDA-Q frontend and backend adapters for the OQCI modular quantum compiler."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+cudaq = ["cudaq"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+oqci-cudaq = "oqci_cudaq.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["oqci_cudaq*"]
