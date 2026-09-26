@@ -492,8 +492,14 @@ mod tests {
     #[test]
     fn a_py_file_is_read_as_a_cudaq_kernel() {
         let source = "import cudaq\n\n@cudaq.kernel\ndef bell():\n    q = cudaq.qvector(2)\n    h(q[0])\n    x.ctrl(q[0], q[1])\n    mz(q)\n";
-        let report =
-            run_compile(Path::new("bell.py"), source, &HashMap::new(), &Stage::all(), None).unwrap();
+        let report = run_compile(
+            Path::new("bell.py"),
+            source,
+            &HashMap::new(),
+            &Stage::all(),
+            None,
+        )
+        .unwrap();
         assert_eq!(report.frontend, "cudaq");
         assert_eq!(report.circuit_name, "bell");
         let qc = report.stages.iter().find(|s| s.stage == "qc-ir").unwrap();

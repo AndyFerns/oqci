@@ -190,7 +190,9 @@ pub fn tokenize(region: &str, first_line: u32) -> Result<Vec<Token>, FrontendErr
 
         if c.is_ascii_digit() || (c == '.' && chars.get(i + 1).is_some_and(char::is_ascii_digit)) {
             let mut text = String::new();
-            while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.' || chars[i] == '_') {
+            while i < chars.len()
+                && (chars[i].is_ascii_digit() || chars[i] == '.' || chars[i] == '_')
+            {
                 if chars[i] != '_' {
                     text.push(chars[i]);
                 }
@@ -252,14 +254,19 @@ pub fn tokenize(region: &str, first_line: u32) -> Result<Vec<Token>, FrontendErr
             continue;
         }
 
-        if let Some(op) = OPERATORS
-            .iter()
-            .find(|op| op.chars().enumerate().all(|(k, ch)| chars.get(i + k) == Some(&ch)))
-        {
+        if let Some(op) = OPERATORS.iter().find(|op| {
+            op.chars()
+                .enumerate()
+                .all(|(k, ch)| chars.get(i + k) == Some(&ch))
+        }) {
             for _ in 0..op.len() {
                 advance!();
             }
-            push!(TokenKind::Operator((*op).to_string()), start_line, start_column);
+            push!(
+                TokenKind::Operator((*op).to_string()),
+                start_line,
+                start_column
+            );
             continue;
         }
 

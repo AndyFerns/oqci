@@ -52,9 +52,8 @@ fn per_qubit_measurement_matches_register_measurement() {
     let whole = qir_of_cudaq(&kernel(
         "q = cudaq.qvector(3)\nh(q[0])\nx.ctrl(q[0], q[1])\nx.ctrl(q[1], q[2])\nmz(q)",
     ));
-    let qasm = qir_of_qasm(
-        "qubit[3] q; bit[3] c; h q[0]; cx q[0], q[1]; cx q[1], q[2]; c = measure q;",
-    );
+    let qasm =
+        qir_of_qasm("qubit[3] q; bit[3] c; h q[0]; cx q[0], q[1]; cx q[1], q[2]; c = measure q;");
     assert_eq!(piecewise, qasm);
     assert_eq!(whole, qasm);
 }
@@ -86,8 +85,11 @@ fn a_float_parameter_binds_like_an_openqasm_input() {
         "itest",
     )
     .unwrap();
-    let qasm = parse_openqasm3_named("input float[64] theta; qubit[1] q; ry(theta) q[0];", "itest")
-        .unwrap();
+    let qasm = parse_openqasm3_named(
+        "input float[64] theta; qubit[1] q; ry(theta) q[0];",
+        "itest",
+    )
+    .unwrap();
     assert_eq!(cudaq.parameters(), qasm.parameters());
 
     let bindings = HashMap::from([("theta".to_string(), 0.75)]);

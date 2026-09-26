@@ -338,7 +338,17 @@ fn compile_qasm3<'py>(
     disable: Option<Vec<String>>,
 ) -> PyResult<PyObject> {
     compile_source(
-        py, source, "openqasm3", backend, bindings, name, shots, seed, layout, passes, disable,
+        py,
+        source,
+        "openqasm3",
+        backend,
+        bindings,
+        name,
+        shots,
+        seed,
+        layout,
+        passes,
+        disable,
     )
 }
 

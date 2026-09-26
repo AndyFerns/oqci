@@ -443,7 +443,10 @@ fn every_example_compiles() {
         );
         compiled += 1;
     }
-    assert!(compiled >= 4, "expected the checked-in examples, found {compiled}");
+    assert!(
+        compiled >= 4,
+        "expected the checked-in examples, found {compiled}"
+    );
 }
 
 #[test]

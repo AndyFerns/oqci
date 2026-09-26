@@ -135,9 +135,12 @@ pub enum ClientMessage {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ServerMessage {
+    // Boxed: a report is far larger than the other variants
+    // (clippy::large_enum_variant). Serde serializes a `Box` transparently,
+    // so the JSON on the wire is unchanged.
     PipelineReport {
         sequence: u64,
-        report: PipelineReport,
+        report: Box<PipelineReport>,
     },
     PassReplay {
         sequence: u64,

@@ -173,7 +173,8 @@ mod tests {
         // frontend built — so a CUDA-Q circuit must cross-validate exactly
         // as an OpenQASM one does.
         let backend = oqci::backend::by_id("simulator-nisq").unwrap();
-        let context = PassContext::with_profile(backend.profile()).and_cost_model(backend.cost_model());
+        let context =
+            PassContext::with_profile(backend.profile()).and_cost_model(backend.cost_model());
         let passes = crate::replay::replay_passes(
             &result.artifacts.source_circuit,
             &PassSelection::All,

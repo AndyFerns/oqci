@@ -597,7 +597,10 @@ mod tests {
         }
         assert_eq!(Frontend::from_id("cirq"), None);
         assert_eq!(Frontend::for_path(Path::new("bell.py")), Frontend::CudaQ);
-        assert_eq!(Frontend::for_path(Path::new("bell.qasm")), Frontend::OpenQasm3);
+        assert_eq!(
+            Frontend::for_path(Path::new("bell.qasm")),
+            Frontend::OpenQasm3
+        );
         assert_eq!(Frontend::for_path(Path::new("bell")), Frontend::OpenQasm3);
     }
 

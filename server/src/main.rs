@@ -51,7 +51,10 @@ struct Args {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env().add_directive("oqci_server=info".parse()?))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("oqci_server=info".parse()?),
+        )
         .init();
 
     let args = Args::parse();
@@ -89,7 +92,10 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let addr = SocketAddr::from(([127, 0, 0, 1], args.port));
-    tracing::info!("oqci-server listening on http://{addr}, root {}", state.root.display());
+    tracing::info!(
+        "oqci-server listening on http://{addr}, root {}",
+        state.root.display()
+    );
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
 

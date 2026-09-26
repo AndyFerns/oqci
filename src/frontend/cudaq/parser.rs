@@ -120,22 +120,55 @@ pub enum BinOp {
 /// Python keywords that open a construct outside the subset, with the reason
 /// given when one is found in a kernel body.
 const REFUSED_KEYWORDS: [(&str, &str); 22] = [
-    ("for", "loops (`for`) are outside the supported subset — unroll them; OQCI compiles static circuits only"),
-    ("while", "loops (`while`) are outside the supported subset; OQCI compiles static circuits only"),
-    ("if", "conditionals (`if`) are outside the supported subset; measurement-conditioned control flow is deferred (Stage F)"),
-    ("elif", "conditionals (`elif`) are outside the supported subset"),
-    ("else", "conditionals (`else`) are outside the supported subset"),
-    ("match", "`match` statements are outside the supported subset"),
-    ("return", "a kernel that returns a value is outside the supported subset"),
+    (
+        "for",
+        "loops (`for`) are outside the supported subset — unroll them; OQCI compiles static circuits only",
+    ),
+    (
+        "while",
+        "loops (`while`) are outside the supported subset; OQCI compiles static circuits only",
+    ),
+    (
+        "if",
+        "conditionals (`if`) are outside the supported subset; measurement-conditioned control flow is deferred (Stage F)",
+    ),
+    (
+        "elif",
+        "conditionals (`elif`) are outside the supported subset",
+    ),
+    (
+        "else",
+        "conditionals (`else`) are outside the supported subset",
+    ),
+    (
+        "match",
+        "`match` statements are outside the supported subset",
+    ),
+    (
+        "return",
+        "a kernel that returns a value is outside the supported subset",
+    ),
     ("def", "nested functions are outside the supported subset"),
-    ("class", "class definitions are outside the supported subset"),
+    (
+        "class",
+        "class definitions are outside the supported subset",
+    ),
     ("lambda", "lambdas are outside the supported subset"),
     ("with", "`with` blocks are outside the supported subset"),
     ("try", "`try` blocks are outside the supported subset"),
     ("except", "`except` blocks are outside the supported subset"),
-    ("finally", "`finally` blocks are outside the supported subset"),
-    ("import", "imports inside a kernel are outside the supported subset"),
-    ("from", "imports inside a kernel are outside the supported subset"),
+    (
+        "finally",
+        "`finally` blocks are outside the supported subset",
+    ),
+    (
+        "import",
+        "imports inside a kernel are outside the supported subset",
+    ),
+    (
+        "from",
+        "imports inside a kernel are outside the supported subset",
+    ),
     ("yield", "generators are outside the supported subset"),
     ("assert", "`assert` is outside the supported subset"),
     ("raise", "`raise` is outside the supported subset"),
@@ -211,7 +244,11 @@ pub fn extract(source: &str) -> Result<(String, u32), FrontendError> {
     let def_index = (decorator + 1..lines.len())
         .find(|&i| !is_blank(lines[i]))
         .ok_or_else(|| {
-            FrontendError::syntax("expected a `def` after `@cudaq.kernel`", decorator as u32 + 1, 1)
+            FrontendError::syntax(
+                "expected a `def` after `@cudaq.kernel`",
+                decorator as u32 + 1,
+                1,
+            )
         })?;
     let def_trimmed = lines[def_index].trim_start();
     if def_trimmed.starts_with('@') {
@@ -328,7 +365,11 @@ impl Parser {
     fn kernel(mut self) -> Result<Kernel, FrontendError> {
         let def = self.next();
         if def.kind != TokenKind::Ident("def".into()) {
-            return Err(FrontendError::syntax("expected `def`", def.line, def.column));
+            return Err(FrontendError::syntax(
+                "expected `def`",
+                def.line,
+                def.column,
+            ));
         }
         let def_column = def.column;
         let name = self.ident("a kernel name")?;
@@ -459,7 +500,9 @@ impl Parser {
             }
             TokenKind::Ident(word) => {
                 if let Some((_, reason)) = REFUSED_KEYWORDS.iter().find(|(kw, _)| kw == word) {
-                    return Err(FrontendError::unsupported(format!("{reason} (line {line})")));
+                    return Err(FrontendError::unsupported(format!(
+                        "{reason} (line {line})"
+                    )));
                 }
                 if word == "break" || word == "continue" {
                     return Err(FrontendError::unsupported(format!(
@@ -480,13 +523,15 @@ impl Parser {
         if matches!(self.peek_at(1), TokenKind::Equals) {
             return self.assignment().map(Some);
         }
-        if let TokenKind::Operator(op) = self.peek_at(1) {
-            if op.ends_with('=') && op != "==" && op != "!=" {
-                return Err(FrontendError::unsupported(format!(
-                    "augmented assignment `{op}` (line {line}); classical variables are \
-                     outside the supported subset"
-                )));
-            }
+        if let TokenKind::Operator(op) = self.peek_at(1)
+            && op.ends_with('=')
+            && op != "=="
+            && op != "!="
+        {
+            return Err(FrontendError::unsupported(format!(
+                "augmented assignment `{op}` (line {line}); classical variables are \
+                 outside the supported subset"
+            )));
         }
 
         let callee = self.dotted()?;
@@ -514,7 +559,14 @@ impl Parser {
         };
         let is_call = self.peek().kind == TokenKind::LParen;
 
-        match (callee.iter().map(String::as_str).collect::<Vec<_>>().as_slice(), is_call) {
+        match (
+            callee
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                .as_slice(),
+            is_call,
+        ) {
             (["cudaq", "qvector"], true) => {
                 let args = self.call_args()?;
                 self.end_of_statement()?;
@@ -791,7 +843,8 @@ if __name__ == "__main__":
     #[test]
     fn annotated_arguments_are_recorded_verbatim() {
         let kernel =
-            parse("@cudaq.kernel\ndef k(theta: float, xs: list[float]) -> None:\n    pass\n").unwrap();
+            parse("@cudaq.kernel\ndef k(theta: float, xs: list[float]) -> None:\n    pass\n")
+                .unwrap();
         assert_eq!(kernel.args[0].annotation.as_deref(), Some("float"));
         assert_eq!(kernel.args[1].annotation.as_deref(), Some("list[float]"));
     }
@@ -825,7 +878,9 @@ if __name__ == "__main__":
     #[test]
     fn two_kernels_are_refused() {
         let source = "@cudaq.kernel\ndef a():\n    pass\n@cudaq.kernel\ndef b():\n    pass\n";
-        assert!(matches!(parse(source), Err(FrontendError::Unsupported(m)) if m.contains("exactly one")));
+        assert!(
+            matches!(parse(source), Err(FrontendError::Unsupported(m)) if m.contains("exactly one"))
+        );
     }
 
     #[test]
@@ -844,9 +899,8 @@ if __name__ == "__main__":
             ("while True:\n        pass", "while"),
             ("return", "return"),
         ] {
-            let source = format!(
-                "@cudaq.kernel\ndef k():\n    q = cudaq.qvector(2)\n    {snippet}\n"
-            );
+            let source =
+                format!("@cudaq.kernel\ndef k():\n    q = cudaq.qvector(2)\n    {snippet}\n");
             let error = parse(&source).unwrap_err();
             assert!(
                 matches!(&error, FrontendError::Unsupported(m) if m.contains(word)),
@@ -878,8 +932,8 @@ if __name__ == "__main__":
 
     #[test]
     fn power_operator_is_refused() {
-        let error =
-            parse("@cudaq.kernel\ndef k():\n    q = cudaq.qubit()\n    rx(2 ** 3, q)\n").unwrap_err();
+        let error = parse("@cudaq.kernel\ndef k():\n    q = cudaq.qubit()\n    rx(2 ** 3, q)\n")
+            .unwrap_err();
         assert!(matches!(error, FrontendError::Unsupported(m) if m.contains("**")));
     }
 
@@ -887,6 +941,9 @@ if __name__ == "__main__":
     fn inconsistent_indentation_is_a_syntax_error() {
         let error =
             parse("@cudaq.kernel\ndef k():\n    q = cudaq.qubit()\n      h(q)\n").unwrap_err();
-        assert!(matches!(error, FrontendError::Syntax { line: 4, .. }), "{error:?}");
+        assert!(
+            matches!(error, FrontendError::Syntax { line: 4, .. }),
+            "{error:?}"
+        );
     }
 }

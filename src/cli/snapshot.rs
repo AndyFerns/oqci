@@ -1,9 +1,10 @@
 //! The stage-snapshot schema: what the compiler did, as data.
 //!
 //! Everything the CLI prints — human-readable or JSON — is rendered from a
-//! [`PipelineReport`]. Holding the report as data first, and formatting it
-//! second, is what lets `--json` and the default view be the same information
-//! rather than two independently-assembled stories about the same run. It is
+//! [`PipelineReport`](crate::cli::snapshot::PipelineReport). Holding the
+//! report as data first, and formatting it second, is what lets `--json`
+//! and the default view be the same information rather than two
+//! independently-assembled stories about the same run. It is
 //! also the contract a future dashboard consumes: point it at
 //! `oqci … --json` and it has everything this terminal shows.
 //!

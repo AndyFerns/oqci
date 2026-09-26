@@ -44,7 +44,12 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         return;
     };
     let Ok(first) = serde_json::from_str::<ClientMessage>(&first) else {
-        send_error(&mut sender, &mut sequence, "could not parse subscribe message").await;
+        send_error(
+            &mut sender,
+            &mut sequence,
+            "could not parse subscribe message",
+        )
+        .await;
         return;
     };
 
@@ -189,7 +194,15 @@ async fn compile_and_send(sender: &mut Sender, state: &AppState, sequence: &mut 
         .and_then(|s| s.to_str())
         .unwrap_or("main")
         .to_string();
-    compile_source_and_send(sender, state, sequence, &source, &name, Frontend::for_path(path)).await;
+    compile_source_and_send(
+        sender,
+        state,
+        sequence,
+        &source,
+        &name,
+        Frontend::for_path(path),
+    )
+    .await;
 }
 
 /// `compile_source` messages name their frontend; an absent one means
@@ -242,7 +255,7 @@ async fn compile_source_and_send(
         sender,
         &ServerMessage::PipelineReport {
             sequence: seq,
-            report,
+            report: Box::new(report),
         },
     )
     .await;
@@ -269,8 +282,12 @@ async fn compile_source_and_send(
 
     if let (Some(lowered), Some(backend)) = (&artifacts.lowered, &backend) {
         let lowering_config = oqci::lowering::LoweringConfig::default();
-        let lowering_replay =
-            replay::replay_lowering(&artifacts.optimized, backend.profile(), &lowering_config, lowered);
+        let lowering_replay = replay::replay_lowering(
+            &artifacts.optimized,
+            backend.profile(),
+            &lowering_config,
+            lowered,
+        );
         send(
             sender,
             &ServerMessage::LoweringReplay {

@@ -121,7 +121,12 @@ pub fn translate(kernel: &Kernel, name: &str) -> Result<Circuit, FrontendError> 
 }
 
 impl Translator {
-    fn allocate(&mut self, name: &str, size: Option<&Expr>, line: u32) -> Result<(), FrontendError> {
+    fn allocate(
+        &mut self,
+        name: &str,
+        size: Option<&Expr>,
+        line: u32,
+    ) -> Result<(), FrontendError> {
         if self.registers.contains_key(name) || self.float_args.contains(name) {
             return Err(FrontendError::semantic(format!(
                 "`{name}` is already defined (line {line})"
@@ -304,7 +309,12 @@ impl Translator {
         self.gate(mnemonic, vec![], operands)
     }
 
-    fn gate(&mut self, name: &str, params: Vec<Param>, qubits: Vec<u32>) -> Result<(), FrontendError> {
+    fn gate(
+        &mut self,
+        name: &str,
+        params: Vec<Param>,
+        qubits: Vec<u32>,
+    ) -> Result<(), FrontendError> {
         let kind = map_gate(name, params)?;
         self.planned.push(Planned::Gate(kind, qubits));
         Ok(())
@@ -392,7 +402,9 @@ impl Translator {
 
     fn register(&self, name: &str, line: u32) -> Result<Register, FrontendError> {
         self.registers.get(name).copied().ok_or_else(|| {
-            FrontendError::semantic(format!("`{name}` is not an allocated qubit or register (line {line})"))
+            FrontendError::semantic(format!(
+                "`{name}` is not an allocated qubit or register (line {line})"
+            ))
         })
     }
 
@@ -404,12 +416,11 @@ impl Translator {
                 "expected an angle, found a list (line {line})"
             )));
         };
-        if let Expr::Path(path) = expr {
-            if let [name] = path.as_slice() {
-                if self.float_args.contains(name) {
-                    return Ok(Param::symbol(name.clone()));
-                }
-            }
+        if let Expr::Path(path) = expr
+            && let [name] = path.as_slice()
+            && self.float_args.contains(name)
+        {
+            return Ok(Param::symbol(name.clone()));
         }
         Ok(Param::concrete(self.constant(expr, line)?))
     }
@@ -420,7 +431,12 @@ impl Translator {
     fn constant(&self, expr: &Expr, line: u32) -> Result<f64, FrontendError> {
         Ok(match expr {
             Expr::Number(value) => *value,
-            Expr::Path(path) => match path.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+            Expr::Path(path) => match path
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                .as_slice()
+            {
                 ["math" | "numpy" | "np", "pi"] => PI,
                 [name] if self.float_args.contains(*name) => {
                     return Err(FrontendError::unsupported(format!(
@@ -463,7 +479,10 @@ mod tests {
 
     fn kernel(body: &str) -> String {
         let indented: Vec<String> = body.lines().map(|l| format!("    {l}")).collect();
-        format!("import cudaq\n\n@cudaq.kernel\ndef k():\n{}\n", indented.join("\n"))
+        format!(
+            "import cudaq\n\n@cudaq.kernel\ndef k():\n{}\n",
+            indented.join("\n")
+        )
     }
 
     fn gate(kind: GateKind, qubits: &[u32]) -> Instruction {
@@ -489,10 +508,7 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(c.num_clbits(), 3);
-        assert_eq!(
-            &c.instructions()[3..],
-            [measure(0), measure(1), measure(2)]
-        );
+        assert_eq!(&c.instructions()[3..], [measure(0), measure(1), measure(2)]);
     }
 
     #[test]
@@ -510,7 +526,10 @@ mod tests {
 
     #[test]
     fn registers_share_one_flat_qubit_space() {
-        let c = parse_cudaq(&kernel("a = cudaq.qvector(2)\nb = cudaq.qubit()\nx.ctrl(a[1], b)")).unwrap();
+        let c = parse_cudaq(&kernel(
+            "a = cudaq.qvector(2)\nb = cudaq.qubit()\nx.ctrl(a[1], b)",
+        ))
+        .unwrap();
         assert_eq!(c.num_qubits(), 3);
         assert_eq!(c.instructions(), [gate(GateKind::Cx, &[1, 2])]);
     }
@@ -556,11 +575,17 @@ mod tests {
         .unwrap();
         assert_eq!(
             c.instructions()[0],
-            gate(GateKind::P(Param::concrete(std::f64::consts::FRAC_PI_2)), &[0])
+            gate(
+                GateKind::P(Param::concrete(std::f64::consts::FRAC_PI_2)),
+                &[0]
+            )
         );
         assert!(matches!(
             c.instructions()[1],
-            Instruction::Gate { kind: GateKind::U { .. }, .. }
+            Instruction::Gate {
+                kind: GateKind::U { .. },
+                ..
+            }
         ));
     }
 
@@ -590,11 +615,12 @@ mod tests {
 
     #[test]
     fn indexing_by_a_parameter_is_refused() {
-        let error = parse_cudaq(
-            "@cudaq.kernel\ndef k(i: float):\n    q = cudaq.qvector(2)\n    h(q[i])\n",
-        )
-        .unwrap_err();
-        assert!(matches!(error, FrontendError::Unsupported(m) if m.contains("compile-time constant")));
+        let error =
+            parse_cudaq("@cudaq.kernel\ndef k(i: float):\n    q = cudaq.qvector(2)\n    h(q[i])\n")
+                .unwrap_err();
+        assert!(
+            matches!(error, FrontendError::Unsupported(m) if m.contains("compile-time constant"))
+        );
     }
 
     #[test]
@@ -612,7 +638,10 @@ mod tests {
     #[test]
     fn a_non_finite_angle_is_rejected_by_the_ir() {
         let error = parse_cudaq(&kernel("q = cudaq.qubit()\nrz(1 / 0, q)")).unwrap_err();
-        assert!(matches!(error, FrontendError::Ir(IrError::NonFiniteAngle { .. })), "{error:?}");
+        assert!(
+            matches!(error, FrontendError::Ir(IrError::NonFiniteAngle { .. })),
+            "{error:?}"
+        );
     }
 
     #[test]
@@ -649,7 +678,10 @@ mod tests {
 
     #[test]
     fn a_register_as_a_control_is_refused() {
-        let error = parse_cudaq(&kernel("q = cudaq.qvector(2)\nt = cudaq.qubit()\nx.ctrl(q, t)")).unwrap_err();
+        let error = parse_cudaq(&kernel(
+            "q = cudaq.qvector(2)\nt = cudaq.qubit()\nx.ctrl(q, t)",
+        ))
+        .unwrap_err();
         assert!(matches!(error, FrontendError::Unsupported(m) if m.contains("single qubit")));
     }
 }

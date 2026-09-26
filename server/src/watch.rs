@@ -88,10 +88,10 @@ fn is_relevant(
     ) {
         return false;
     }
-    event.paths.iter().any(|changed| {
-        match (changed.canonicalize().ok(), canonical_target) {
+    event.paths.iter().any(
+        |changed| match (changed.canonicalize().ok(), canonical_target) {
             (Some(a), Some(b)) if a == b => true,
             _ => changed.file_name() == path.file_name(),
-        }
-    })
+        },
+    )
 }
