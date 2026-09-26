@@ -10,6 +10,53 @@ mirrored in `Cargo.toml`; bump both with `scripts/bump-version.{sh,bat}`.
 While the major version is `0`, the public API and IR contracts are unstable
 and may change without a major bump (per SemVer §4).
 
+## [Unreleased]
+
+### Added
+
+- **CUDA-Q frontend** (`src/frontend/cudaq/`, §5.5): reads the
+  `@cudaq.kernel` function in a Python file into the same QC-IR as every
+  other frontend, via the shared gate table and `CircuitBuilder`. The subset
+  is limited to operations NVIDIA's CUDA-Q documentation shows in Python
+  syntax; everything else is refused by name with its line. Specified in
+  `docs/cudaq_frontend.md`.
+- `compile::Frontend::CudaQ`, with `id`, `from_id`, `for_path` and `parse`.
+  The CLI and the visualization server choose a frontend by file extension
+  (`.py` → CUDA-Q), and `PipelineReport.frontend` reports the one that ran
+  instead of always saying `openqasm3`.
+- `compile::compile_circuit`: the pipeline after parsing, for a frontend
+  whose input is not text.
+- Python: `oqci.compile` accepts a Qiskit `QuantumCircuit` (full pipeline,
+  not only QIR), CUDA-Q text (`frontend="cudaq"`), and `passes=`/`disable=`
+  for ablations. Its dict gains `frontend`, `unbound_parameters` and the
+  source/optimized/lowered circuits. `oqci.cudaq_to_qir`, and native
+  `compile_source` / `compile_qiskit`.
+- `examples/ghz3_cudaq.py`; `tests/cudaq_frontend.rs` (QIR equivalence with
+  OpenQASM); `python/tests/test_frontends.py` (Qiskit and CUDA-Q compiled by
+  OQCI and run on Aer).
+- `r1` as a spelling of the phase gate `P` in the shared gate table.
+
+### Changed
+
+- The Python dict's `passes` and `lowering` entries are now the CLI's
+  `PassRecordView` / `LoweringView`. Both are strict supersets of the old
+  keys, adding pass metrics, `steps`, `violations` and `backend`.
+- `compile_qasm3` is kept as a thin wrapper over `compile_source`.
+- `every_example_compiles` discovers `examples/` rather than listing three
+  files, making `examples/README.md`'s "picked up automatically" true.
+
+### Fixed
+
+- The `cudaq-adapter/` prototype's defects, by replacing its frontend. Each
+  per-qubit `mz` now yields its own measurement; before, all but the last
+  were silently dropped. Non-finite angles are now rejected at the IR instead
+  of generating unexecutable source.
+
+### Removed
+
+- Committed `__pycache__`/`.pytest_cache` files and duplicate examples from
+  `cudaq-adapter/`.
+
 ## [0.4.0] - 2026-09-25
 
 A companion, not a new compiler: `server/` and `frontend/` add a live,

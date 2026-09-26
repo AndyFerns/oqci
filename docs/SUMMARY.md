@@ -14,6 +14,7 @@
 
 - [Gate Mapping](gate_mapping.md)
 - [OpenQASM 3 Frontend](openqasm_frontend.md)
+- [CUDA-Q Frontend](cudaq_frontend.md)
 - [Qiskit Adapter](qiskit_adapter.md)
 
 # Optimization

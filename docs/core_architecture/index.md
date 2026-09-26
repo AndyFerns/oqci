@@ -92,7 +92,14 @@ At the verified `master` state:
 - an OpenQASM 3 frontend exists over a documented subset
   (`docs/openqasm_frontend.md`);
 - a Qiskit adapter exists, split into a pure-Rust translation core and a PyO3
-  boundary (`docs/qiskit_adapter.md`);
+  boundary (`docs/qiskit_adapter.md`), and — through
+  `compile::compile_circuit` — a Qiskit circuit reaches the whole pipeline,
+  not only QIR;
+- a CUDA-Q frontend exists over a documented subset verified against
+  NVIDIA's documentation (`docs/cudaq_frontend.md`), mapping into the same
+  QC-IR as §5.5 requires and selected by `compile::Frontend::CudaQ` (or a
+  `.py` extension). It replaces the private IR of the `cudaq-adapter/`
+  prototype, whose execution half is not yet reimplemented;
 - a pass manager and four target-independent passes exist, and `Pass::run`
   now receives a `PassContext` carrying the selected target, which closes
   Stage E exit criterion 3 (`docs/pass_manager.md`);
@@ -131,7 +138,8 @@ At the verified `master` state:
 - per-operation cost and error/noise metadata on profiles (Stage D §2) remain
   absent, deliberately: both built-in profiles are synthetic, and a profile
   asserting error rates nobody measured would be a fabricated record;
-- Cirq and CUDA-Q execution adapters (§15.2) are not implemented;
+- Cirq and CUDA-Q execution adapters (§15.2) are not implemented, and there
+  is no Cirq frontend (§5.4);
 - `benchmarks/` is not yet a populated benchmark suite;
 - `mlir_compat.rs` exists as the future MLIR boundary but the full MLIR integration is not implemented;
 - **a live visualization companion exists** (`server/`, `frontend/`) — a

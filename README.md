@@ -32,8 +32,9 @@ It's Rust-native at its core (fast, and the invariants are enforced by the type 
 | QC-IR / QCO-IR core | ✅ Implemented | Validated construction, deterministic QC-IR → QCO-IR conversion, QIR (LLVM-compatible) lowering. See [`docs/ir_spec.md`](docs/ir_spec.md). |
 | Symbolic parameters | ✅ Implemented | Gate angles can be concrete or symbolic (`Rz(theta)`), with explicit binding before lowering - for VQE-style parameterized circuits. |
 | OpenQASM 3 frontend | ✅ Implemented | A documented, intentionally partial subset - see [`docs/openqasm_frontend.md`](docs/openqasm_frontend.md) for exactly what's in and what's refused. |
-| Qiskit frontend | ✅ Implemented | Pure-Rust translation core plus a PyO3 boundary exposed to Python. See [`python/README.md`](python/README.md). |
-| Cirq / CUDA-Q frontends | ⛔ Not started | Reserved in the design; no code yet. |
+| Qiskit frontend | ✅ Implemented | Pure-Rust translation core plus a PyO3 boundary exposed to Python. A `QuantumCircuit` now reaches the whole pipeline — lowering, an executable, provenance — through `oqci.compile`, not just QIR. See [`docs/qiskit_adapter.md`](docs/qiskit_adapter.md). |
+| CUDA-Q frontend | ✅ Implemented (documented subset) | Reads the `@cudaq.kernel` function in a `.py` file into the same QC-IR, and reaches the CLI, the SDK and the visualizer. Subset verified against NVIDIA's docs; loops, conditionals and kernel calls are refused by name. See [`docs/cudaq_frontend.md`](docs/cudaq_frontend.md). Running circuits *on* CUDA-Q is not implemented. |
+| Cirq frontend | ⛔ Not started | Reserved in the design; no code yet. |
 | Pass manager | ✅ Implemented | Explicit registration/ordering, enable/disable per pass, deterministic execution, ablation support. See [`docs/pass_manager.md`](docs/pass_manager.md). |
 | Optimization passes | ✅ Implemented (target-independent only) | Canonicalization, gate cancellation, rotation merging, and scheduling-as-analysis - all verified against an independent state-vector simulator, not just unit-tested. Passes can now consult the selected target, though none of the shipped ones needs to. |
 | Target model | ✅ Implemented | Basis profiles, **directed** connectivity, legality checking, and a cost model the *target* supplies rather than the optimizer assuming. See [`docs/target_model.md`](docs/target_model.md). |
@@ -86,7 +87,7 @@ See [`examples/README.md`](examples/README.md) for what each sample file demonst
 | Directory | What's there |
 |---|---|
 | [`src/ir/`](src/ir/) | QC-IR, QCO-IR, validation, QIR lowering - the foundation everything else builds on. |
-| [`src/frontend/`](src/frontend/) | OpenQASM 3 and the Qiskit adapter's translation core. |
+| [`src/frontend/`](src/frontend/) | OpenQASM 3, CUDA-Q, and the Qiskit adapter's translation core. |
 | [`src/pass/`](src/pass/) | The pass manager and the optimization passes. |
 | [`src/analysis/`](src/analysis/) | Gate counts, depth, circuit diffing - the numbers everything else reports. |
 | [`src/cli/`](src/cli/) | The `oqci` inspector CLI. |

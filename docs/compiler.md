@@ -5,7 +5,7 @@ Implemented by: `src/compile.rs`
 Verified by: the unit tests in `src/compile.rs`, the pipeline tests in
 `src/cli/pipeline.rs`, the backend cases in `tests/cli.rs`, and
 `python/tests/test_aer.py`
-Entry points: `compile`, `compile_named`, `CompilerConfig`, `Frontend`, `Stop`,
+Entry points: `compile`, `compile_named`, `compile_circuit`, `CompilerConfig`, `Frontend`, `Stop`,
 `CompilationArtifacts`, `CompileError`, `available_backends`
 
 Every other document in this set describes one layer: the IR, a frontend, the
@@ -29,7 +29,7 @@ and then lists nine things it must do. Each maps onto a specific part of
 | §6 requirement | Where it happens |
 |---|---|
 | accept an explicit configuration | `CompilerConfig`, passed by reference; nothing is read from the environment, a global, or a config file. |
-| select frontend | `match config.frontend` — one arm today, and the `match` is what makes adding a second a local change. |
+| select frontend | `Frontend::parse` — a `match` with one arm per text frontend (OpenQASM 3, CUDA-Q). Adding CUDA-Q was the local change this row predicted: one variant, one arm. A frontend whose input is not text (Qiskit) builds its own `Circuit` and enters at [`compile_circuit`](#compile_circuit-a-frontend-that-is-not-text). |
 | validate | The frontend validates its own source; `CircuitBuilder::build` enforces the IR invariants; `target::check` validates against the device. Three checks at three layers, none of which the orchestrator re-implements. |
 | construct IR | `frontend::parse_openqasm3_named`, which returns a built `Circuit`. |
 | run passes in explicit order | `PassManager::default_pipeline().run(...)` — registered order, filtered by `PassSelection`. |
@@ -83,7 +83,7 @@ pub struct CompilerConfig {
 
 | Field | Default | Meaning |
 |---|---|---|
-| `frontend` | `Frontend::OpenQasm3` | Which frontend reads the source. The enum is `#[non_exhaustive]` and has one variant. |
+| `frontend` | `Frontend::OpenQasm3` | Which frontend reads the source text: `OpenQasm3` or `CudaQ`. The enum is `#[non_exhaustive]`. `Frontend::for_path` picks one from a file extension (`.py` → CUDA-Q), which is how the CLI and the visualization server choose; `Frontend::from_id` resolves the ids `"openqasm3"`/`"cudaq"` the Python SDK uses. Ignored by `compile_circuit`. |
 | `bindings` | empty | Values for symbolic parameters, applied **before** optimization. OQCI never invents one: an unbound parameter is refused, not guessed. |
 | `passes` | `PassSelection::All` | Which optimization passes to run. `Only(..)` and `AllExcept(..)` are the two shapes an ablation study takes. |
 | `backend` | `None` | Which backend to compile for. `None` means target-independent compilation, which stops after optimization **whatever `stop` says** — there is nothing to lower to. |
@@ -285,14 +285,28 @@ provenance record makes.
 §19 states the rule for the CLI: it "must not duplicate compiler logic that
 belongs in the Rust library — it should invoke the same public compiler APIs."
 The reason is not tidiness. Two implementations of the pipeline would eventually
-disagree, and the one a user could see would be the wrong one. So all three
-consumers call `compile_named` and do nothing but present what comes back.
+disagree, and the one a user could see would be the wrong one. So every
+consumer calls `compile_named` — or, for a circuit that is not text,
+`compile_circuit`, which is the same function minus its first line — and does
+nothing but present what comes back.
 
 | Consumer | Path | Adds |
 |---|---|---|
 | CLI | `src/cli/pipeline.rs` → `compile::compile_named` | Rendering (text and JSON), file I/O, `watch`. |
-| Python SDK | `oqci.compile` → `oqci_native.compile_qasm3` → `compile::compile_named` | A dict view, and the Aer execution adapter. |
-| Rust library | `oqci::compile::compile` / `compile_named` | Nothing. |
+| Python SDK, text | `oqci.compile(str)` → `oqci_native.compile_source` → `compile::compile_named` | A dict view, and the Aer execution adapter. |
+| Python SDK, Qiskit | `oqci.compile(QuantumCircuit)` → `oqci_native.compile_qiskit` → `frontend::qiskit::translate` → `compile::compile_circuit` | The same. |
+| Visualization server | `server/src/compile.rs` → `compile::compile_named` | The live report and its replay; see [`visualization.md`](visualization.md). |
+| Rust library | `oqci::compile::compile` / `compile_named` / `compile_circuit` | Nothing. |
+
+### `compile_circuit`: a frontend that is not text
+
+`compile_named` is two lines: `config.frontend.parse(source, name)`, then
+`compile_circuit(parsed, config)`. Splitting it that way is what lets the Qiskit
+adapter, whose input is a live `QuantumCircuit` rather than text, reach
+lowering, an executable and provenance. Before the split, a Qiskit circuit
+could only reach QIR, because nothing but source text could enter the
+pipeline. `compile_circuit_is_exactly_the_second_half_of_compile_named` pins
+the equivalence.
 
 ### The CLI
 
@@ -328,16 +342,25 @@ configuration, backend selection, analysis and result access, over the stable
 contracts the `oqci._native` extension exposes. Its rule is the CLI's rule, for
 the CLI's reason — **no compilation decision is made in Python**.
 
-`oqci.compile(source, backend=…, bindings=…, name=…, shots=…, seed=…,
-layout=…)` builds a `CompilerConfig` on the Rust side and calls `compile_named`.
-The result is a plain dict:
+`oqci.compile(program, frontend=…, backend=…, bindings=…, name=…, shots=…,
+seed=…, layout=…, passes=…, disable=…)` builds a `CompilerConfig` on the Rust
+side. `program` is OpenQASM 3 text, CUDA-Q kernel text (`frontend="cudaq"`),
+or a Qiskit `QuantumCircuit`. `passes`/`disable` are the CLI's `--passes` and
+`--disable`, with the same rules: unknown ids and the two together are
+refused. The result is a plain dict. Every entry that the CLI's `--json`
+report also carries is built from the same `oqci::cli::snapshot` view type,
+so the two cannot drift:
 
 | Key | Present when | From |
 |---|---|---|
+| `frontend` | always | `"openqasm3"`, `"cudaq"` or `"qiskit"` |
 | `backend` | always (may be `None`) | `artifacts.backend_id` |
+| `unbound_parameters` | always | free symbols left in the final circuit |
 | `source_metrics`, `optimized_metrics` | always | the two `ResourceReport`s |
-| `passes` | always | `pass_records`, as `{id, enabled, changed, notes}` |
-| `lowering` | a backend was selected | profile, layouts, SWAP count, orientations repaired, rules applied, legality |
+| `source_circuit`, `optimized_circuit` | always | `InstructionView` lists, as the CLI's `stages[].instructions` |
+| `passes` | always | `PassRecordView`, as the CLI's `passes` |
+| `lowering` | a backend was selected | `LoweringView`, as the CLI's `lowering` (including `steps` and `violations`) |
+| `lowered_circuit` | as `lowering` | `InstructionView` list |
 | `cost` | as `lowering` | the target's `Cost`, serialized whole |
 | `executable` | preparation ran | the `Executable`, serialized whole |
 
@@ -358,36 +381,23 @@ Per `final-deliverables-spec.md`'s Critical Rule — a feature is not implemente
 merely because a module, type, parameter or document names it — the following
 are **absent**:
 
-- **Any frontend but OpenQASM 3.** `Frontend` has one variant. A Qiskit adapter
-  exists (`frontend::qiskit::translate`, §5.3) and is reachable from Python
-  through `qiskit_to_qir`, but it does **not** go through the orchestrator:
-  `compile` and `compile_named` take `&str` source text, so a
-  `QuantumCircuit` cannot be handed to the pipeline at all. A Qiskit circuit can
-  therefore reach QIR but cannot reach a backend, a `Lowered`, an `Executable`
-  or a provenance record. §5.4 (Cirq) and §5.5 (CUDA-Q) do not exist in any
-  form.
-- **Optimization configuration from Python.** §17 lists it among what the SDK
-  should expose. `compile_qasm3` has no `passes` or `disable` parameter, so
-  `CompilerConfig::passes` is always `PassSelection::All` on that path. The
-  ablation shape the CLI supports (`--passes`, `--disable`) has no Python
-  equivalent; `PassSelection` is reachable only from Rust.
+- **A Cirq frontend** (§5.4). OpenQASM 3, CUDA-Q (a documented subset, see
+  [`cudaq_frontend.md`](cudaq_frontend.md)) and Qiskit all reach the whole
+  pipeline; Cirq does not exist in any form.
+- **Execution on CUDA-Q** (§15.2). The CUDA-Q *frontend* exists; an execution
+  adapter that runs an `Executable` on CUDA-Q, alongside `oqci.backends.aer`,
+  does not.
 - **Circuit *construction* from Python.** §17 says "circuit
-  construction/import". Import exists (OpenQASM 3 text, and Qiskit for the QIR
-  path); there is no builder API — nothing in the SDK creates a circuit
-  programmatically.
-- **The circuits themselves in the Python dict.** `artifacts_to_dict` exposes
-  metrics, pass records, lowering summary, cost and the executable. Neither
-  `source_circuit` nor `optimized` is serialized, so a Python caller can see
-  *that* a pass changed something and by how much, but cannot see the
-  instruction list it produced. The CLI's `--emit` does expose it.
-- **A shared schema between the SDK dict and the CLI's `--json`.** These are two
-  different shapes over the same artifacts: the CLI emits a `PipelineReport`
-  (`source_path`, `frontend`, `circuit_name`, `unbound_parameters`, `stages`,
-  `passes`, `diff`, `target`, `lowering`, `executable`), while the SDK emits the
-  table above. `executable` and `cost` are serialized from the same Rust types
-  in both and so cannot drift; `lowering` is assembled separately on each side
-  and already differs (the CLI's carries `backend`, `steps` and `violations`;
-  the SDK's does not).
+  construction/import". Import exists (OpenQASM 3 or CUDA-Q text, and a Qiskit
+  `QuantumCircuit`); there is no builder API. Nothing in the SDK creates a
+  circuit programmatically, though building one in Qiskit and passing it in now
+  reaches the full pipeline.
+- **One top-level schema for the SDK dict and the CLI's `--json`.** Every
+  *section* the two share is built from the same view type, so the contents
+  cannot drift. The top-level *layout* still differs on purpose: the CLI's
+  `PipelineReport` is organised by pipeline stage for reading, the SDK dict by
+  what a program wants to use. `diff`, `target` and QIR text appear only in the
+  CLI report.
 - **Pass ordering as configuration.** `PassManager::default_pipeline()` is fixed.
   `PassSelection` can disable a pass or restrict to a subset, but nothing
   reorders the pipeline, inserts a pass, or registers one from outside the crate

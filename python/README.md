@@ -64,6 +64,26 @@ With no `backend`, compilation is target-independent and stops after
 optimization. That is a complete result rather than a degraded one: there is
 nothing to lower *to*, so `lowering` and `executable` are simply absent.
 
+`oqci.compile` takes any of the three frontends, and every one reaches the
+whole pipeline:
+
+```python
+oqci.compile(qasm_text, backend="simulator-nisq")                       # OpenQASM 3
+oqci.compile(kernel_text, frontend="cudaq", backend="simulator-nisq")   # CUDA-Q source
+oqci.compile(quantum_circuit, backend="simulator-nisq")                 # Qiskit QuantumCircuit
+```
+
+CUDA-Q is read as *source text*, so `cudaq` itself need not be installed. See
+[`../docs/cudaq_frontend.md`](../docs/cudaq_frontend.md) for the subset.
+
+Ablations take the CLI's shape: `passes=[...]` runs only those passes, and
+`disable=[...]` runs every pass except those. Unknown ids, or both together,
+are refused rather than silently running a different pipeline.
+
+The dict's `passes`, `lowering` and circuit entries (`source_circuit`,
+`optimized_circuit`, `lowered_circuit`) use the same schema as the CLI's
+`--json` report; see [`../docs/compiler.md`](../docs/compiler.md#the-python-sdk).
+
 `oqci.compile` never invents a parameter value. A circuit with a free
 parameter and no binding is refused, with advice:
 
@@ -81,6 +101,7 @@ Other entry points:
 | `oqci.available_backends()` | `(id, description)` for every backend this build can compile for. |
 | `oqci.decomposition_rules()` | The rule library, with each rule's source, steps and declared exactness. |
 | `oqci.qasm3_to_qir(source)` | QIR text. A *lowering artifact*, not an execution guarantee — Stage C §5 is explicit that emitted QIR does not by itself mean a circuit will run. |
+| `oqci.cudaq_to_qir(source)` | The same, from CUDA-Q kernel source. |
 | `oqci.qiskit_to_qir(circuit)` | The same, from a live `QuantumCircuit`. |
 | `oqci.qiskit_parameters(circuit)` | A circuit's free parameters as OQCI sees them. A useful cross-check: a name Qiskit reports and this does not means the parameter reached OQCI inside a compound expression, which is not representable. |
 
@@ -142,6 +163,7 @@ checked to exist on the pinned Qiskit rather than recalled from memory.
 | `tests/test_adapter.py` | The PyO3 boundary against a live Qiskit: instruction order, flat bit indices, bound floats vs. unbound `Parameter`s. |
 | `tests/test_rules.py` | Every decomposition rule re-checked against `qiskit.quantum_info.Operator`, with each rule's exactness **derived from Qiskit's verdict** rather than trusted. The rule table is read out of the compiler, so it cannot drift from a hand-copied list. |
 | `tests/test_aer.py` | Compile-and-execute, checking measured distributions. |
+| `tests/test_frontends.py` | Qiskit and CUDA-Q through the full pipeline (including runs on Aer), ablations from Python, and the shared schema with the CLI. |
 
 `test_rules.py` is why the rule library can claim two independent oracles: the
 Rust suite checks it against OQCI's own state-vector harness, and this checks
@@ -157,15 +179,14 @@ between the qubits the program asked for.
 
 ## Scope
 
-Covered: the frontend → QC-IR → QIR path, compiler invocation with backend
-selection and layout configuration, the rule library, and simulator execution.
+Covered: all three frontends (OpenQASM 3, CUDA-Q, Qiskit) through the whole
+pipeline, backend selection, layout and pass configuration, the rule library,
+and simulator execution.
 
 Not covered yet, and worth knowing before you reach for them:
 
-- **Optimization configuration.** `oqci.compile` has no `passes`/`disable`
-  parameter, so the pass pipeline is always the full default on this path.
-  Ablation runs are a CLI or Rust-library thing for now.
-- **The Qiskit frontend into the orchestrator.** `oqci.compile` takes source
-  text, so a `QuantumCircuit` can reach QIR but not a backend, an executable
-  or a provenance record.
+- **Circuit construction.** There is no builder API; build a circuit in Qiskit
+  and pass it in, or write OpenQASM / CUDA-Q text.
+- **Execution on CUDA-Q.** Only the CUDA-Q *frontend* exists. Executables run
+  on Aer.
 - **Hardware execution**, per above.
