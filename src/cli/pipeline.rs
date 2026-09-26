@@ -6,7 +6,8 @@
 //! touches the compiler, and they do nothing but call library functions and
 //! record what came back:
 //!
-//! - [`crate::frontend::parse_openqasm3_named`] — source to QC-IR
+//! - [`crate::compile::Frontend`] — source to QC-IR, the frontend chosen by
+//!   file extension (`.py` is a CUDA-Q kernel, anything else OpenQASM 3)
 //! - [`crate::ir::bind_parameters`] — symbolic to concrete
 //! - [`crate::ir::qc_to_qco`] — QC-IR to QCO-IR
 //! - [`crate::pass::PassManager`] — the optimization pipeline
@@ -28,7 +29,7 @@ use crate::cli::snapshot::{
     PassRecordView, PipelineReport, StageSnapshot, diff_view, executable_view, graph_of,
     instructions_of, lowering_view, target_report,
 };
-use crate::compile::{CompilationArtifacts, CompilerConfig, Stop};
+use crate::compile::{CompilationArtifacts, CompilerConfig, Frontend, Stop};
 use crate::ir::{Circuit, emit_qir, qc_to_qco};
 use crate::lowering::LoweringConfig;
 use crate::pass::PassSelection;
@@ -103,6 +104,7 @@ fn orchestrate(
 ) -> Result<CompilationArtifacts, CliError> {
     let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("main");
     let config = CompilerConfig {
+        frontend: Frontend::for_path(path),
         bindings: bindings.clone(),
         passes: passes.clone(),
         stop: Stop::Optimized,
@@ -243,6 +245,7 @@ pub fn run_lower(
 
     let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("main");
     let config = CompilerConfig {
+        frontend: Frontend::for_path(path),
         bindings: request.bindings.clone(),
         backend: Some(backend.to_string()),
         lowering: request.lowering.clone(),
@@ -320,7 +323,7 @@ pub fn run_lower(
 fn new_report(path: &Path, circuit: &Circuit) -> PipelineReport {
     PipelineReport {
         source_path: path.display().to_string(),
-        frontend: "openqasm3".into(),
+        frontend: Frontend::for_path(path).id().into(),
         circuit_name: circuit.name().to_string(),
         unbound_parameters: circuit.parameters(),
         stages: Vec::new(),
@@ -484,6 +487,17 @@ mod tests {
                 .unwrap()
                 .contains("__quantum__qis__rz__body")
         );
+    }
+
+    #[test]
+    fn a_py_file_is_read_as_a_cudaq_kernel() {
+        let source = "import cudaq\n\n@cudaq.kernel\ndef bell():\n    q = cudaq.qvector(2)\n    h(q[0])\n    x.ctrl(q[0], q[1])\n    mz(q)\n";
+        let report =
+            run_compile(Path::new("bell.py"), source, &HashMap::new(), &Stage::all(), None).unwrap();
+        assert_eq!(report.frontend, "cudaq");
+        assert_eq!(report.circuit_name, "bell");
+        let qc = report.stages.iter().find(|s| s.stage == "qc-ir").unwrap();
+        assert_eq!(qc.instructions.as_ref().unwrap().len(), 4);
     }
 
     #[test]

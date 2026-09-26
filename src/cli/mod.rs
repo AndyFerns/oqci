@@ -120,7 +120,7 @@ enum Command {
 /// Options shared by every command that reads a program.
 #[derive(Debug, clap::Args)]
 struct InputArgs {
-    /// OpenQASM 3 source file.
+    /// Source file: OpenQASM 3, or a CUDA-Q kernel if it ends in `.py`.
     input: PathBuf,
     /// Bind a symbolic parameter, e.g. `--bind theta=1.57`. Repeatable.
     #[arg(long = "bind", value_name = "NAME=VALUE")]
