@@ -27,7 +27,7 @@ actually runs.
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, Sequence
 
 from . import _native as oqci_native
 from . import backends  # noqa: F401  (re-exported for `oqci.backends.aer`)
@@ -37,12 +37,18 @@ __version__ = oqci_native.__version__
 #: Raised for every compiler-side failure, with the message OQCI wrote.
 OqciError = oqci_native.OqciError
 
+#: Text frontends ``compile`` accepts via ``frontend=``. A Qiskit
+#: ``QuantumCircuit`` needs no ``frontend``: it is recognised by not being text.
+FRONTENDS = ("openqasm3", "cudaq")
+
 __all__ = [
+    "FRONTENDS",
     "OqciError",
     "__version__",
     "available_backends",
     "backends",
     "compile",
+    "cudaq_to_qir",
     "decomposition_rules",
     "qasm3_to_qir",
     "qiskit_parameters",
@@ -51,42 +57,78 @@ __all__ = [
 
 
 def compile(  # noqa: A001  — mirrors the Rust entry point's name deliberately
-    source: str,
+    program: Any,
     *,
+    frontend: Optional[str] = None,
     backend: Optional[str] = None,
-    bindings: Optional[Mapping[str, float]] = None,
-    name: str = "main",
+    bindings: Optional[Mapping[Any, float]] = None,
+    name: Optional[str] = None,
     shots: int = 1024,
     seed: Optional[int] = None,
     layout: str = "trivial",
+    passes: Optional[Sequence[str]] = None,
+    disable: Optional[Sequence[str]] = None,
 ) -> dict[str, Any]:
-    """Compile OpenQASM 3 source, optionally for a specific backend.
+    """Compile a program through the whole pipeline, optionally for a backend.
+
+    ``program`` is either source text — OpenQASM 3 by default, or a CUDA-Q
+    kernel with ``frontend="cudaq"`` — or a Qiskit ``QuantumCircuit``. All
+    three reach the same pipeline: a Qiskit circuit is no longer limited to
+    QIR, and gets lowering, an executable and provenance like any other.
 
     With no ``backend``, compilation is target-independent and stops after
     optimization — a complete result, not a degraded one, since there is
     nothing to lower *to*.
 
     With one, the result also carries ``lowering`` (layouts, SWAP count, the
-    rules that fired, and whether the output is legal), ``cost`` as the
-    *target* assigns it, and ``executable``: the artifact an execution adapter
-    replays.
+    rules that fired, the step-by-step schedule and any violations),
+    ``lowered_circuit``, ``cost`` as the *target* assigns it, and
+    ``executable``: the artifact an execution adapter replays. The
+    ``passes``, ``lowering`` and circuit entries use the same schema as the
+    CLI's ``--json`` report.
 
+    :param frontend: ``"openqasm3"`` (default) or ``"cudaq"`` for text. Must
+        be omitted (or ``"qiskit"``) for a ``QuantumCircuit``.
     :param bindings: values for symbolic parameters. OQCI never invents one —
         a circuit with a free parameter and no binding is refused rather than
-        run with a guess.
+        run with a guess. For a Qiskit circuit, keys may be ``Parameter``
+        objects.
+    :param name: circuit name for provenance. Defaults to ``"main"`` for
+        text and to the circuit's own ``name`` for a ``QuantumCircuit``.
     :param layout: ``"trivial"`` or ``"dense"``. Layout affects how many SWAPs
         routing needs and nothing else; it cannot make a circuit incorrect.
+    :param passes: run only these optimization passes.
+    :param disable: run every pass except these — the shape of an ablation.
+        Mutually exclusive with ``passes``; unknown ids are refused.
     :param seed: recorded in the provenance, never chosen here.
     :raises OqciError: if any stage refuses, with the compiler's own message.
     """
-    return oqci_native.compile_qasm3(
-        source,
-        backend,
-        dict(bindings) if bindings else None,
-        name,
-        shots,
-        seed,
-        layout,
+    bound = dict(bindings) if bindings else None
+    passes = list(passes) if passes is not None else None
+    disable = list(disable) if disable is not None else None
+
+    if isinstance(program, str):
+        return oqci_native.compile_source(
+            program,
+            frontend or "openqasm3",
+            backend,
+            bound,
+            name or "main",
+            shots,
+            seed,
+            layout,
+            passes,
+            disable,
+        )
+
+    if frontend not in (None, "qiskit"):
+        raise OqciError(
+            f"frontend {frontend!r} reads source text, but a {type(program).__name__} "
+            "was given; pass the source as a string, or omit `frontend` for a "
+            "Qiskit QuantumCircuit"
+        )
+    return oqci_native.compile_qiskit(
+        program, backend, bound, name, shots, seed, layout, passes, disable
     )
 
 
@@ -116,6 +158,17 @@ def qasm3_to_qir(source: str, bindings: Optional[Mapping[str, float]] = None) ->
     hardware. Use :func:`compile` with a backend for something executable.
     """
     return oqci_native.qasm3_to_qir(source, dict(bindings) if bindings else None)
+
+
+def cudaq_to_qir(source: str, bindings: Optional[Mapping[str, float]] = None) -> str:
+    """Compile a CUDA-Q kernel's source text to textual QIR.
+
+    Reads the ``@cudaq.kernel`` function out of Python *source* — CUDA-Q
+    itself need not be installed. The supported subset is in
+    ``docs/cudaq_frontend.md``. See :func:`qasm3_to_qir` on what QIR does and
+    does not promise.
+    """
+    return oqci_native.cudaq_to_qir(source, dict(bindings) if bindings else None)
 
 
 def qiskit_parameters(circuit: Any) -> list[str]:
