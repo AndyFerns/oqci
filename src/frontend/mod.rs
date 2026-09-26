@@ -20,18 +20,21 @@
 //!   the rule set out in `docs/architecture_decision_no_frontend.md` and
 //!   Stage A §3.2.
 //!
-//! Both current frontends resolve gate names through one shared table
+//! Every frontend resolves gate names through one shared table
 //! ([`map_gate`]), so they agree on what `rz` or `u2` means by construction.
 //!
 //! - [`openqasm`] — parses OpenQASM 3 source text.
+//! - [`cudaq`] — parses the `@cudaq.kernel` function in CUDA-Q Python source.
 //! - [`qiskit`] — translates a Qiskit `QuantumCircuit`, via the vendor-neutral
 //!   [`qiskit::QiskitCircuitIr`] handoff struct.
 
+pub mod cudaq;
 pub mod error;
 pub mod gate_map;
 pub mod openqasm;
 pub mod qiskit;
 
+pub use cudaq::{parse_cudaq, parse_cudaq_named};
 pub use error::FrontendError;
 pub use gate_map::map_gate;
 pub use openqasm::{parse_openqasm3, parse_openqasm3_named};
