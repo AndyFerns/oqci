@@ -6,8 +6,9 @@ to Python, and the pure-Python package that wraps it into the SDK
 invocation, configuration, backend selection, analysis and result access.
 
 It is also where circuits actually **run**. The Rust compiler prepares
-executables and stops there; `oqci.backends.aer` is what hands one to Qiskit
-Aer. That split is deliberate, and explained under [Execution](#execution).
+executables and stops there. `oqci.backends.aer` hands one to Qiskit Aer, and
+`oqci.backends.cudaq` hands one to CUDA-Q. That split is deliberate, and
+explained under [Execution](#execution).
 
 ## Layout
 
@@ -15,7 +16,9 @@ Aer. That split is deliberate, and explained under [Execution](#execution).
 |---|---|
 | `src/lib.rs` | The PyO3 boundary. Reads a Qiskit `QuantumCircuit` into the vendor-neutral `QiskitCircuitIr` struct and hands it to `oqci::frontend::qiskit::translate`, which holds all the translation logic and is tested from Rust without a Python interpreter. Compiler entry points delegate to `oqci::compile`. |
 | `oqci/` | The pure-Python package. Delegates; makes no compilation decision of its own. |
+| `oqci/backends/_common.py` | What every execution adapter shares: `RunResult`, `UnsupportedOperation`, and the counts-key convention (clbit 0 rightmost). |
 | `oqci/backends/aer.py` | Execution on Qiskit Aer. |
+| `oqci/backends/cudaq.py` | Execution on CUDA-Q, which replaces the old root-level `cudaq-adapter/` package. See [`../docs/adapters.md`](../docs/adapters.md). |
 | `oqci_native.py` | A compatibility shim, see below. |
 
 The compiled module is `oqci._native`, nested inside the package because
@@ -133,6 +136,27 @@ Noise policy belongs to the benchmarking protocol, which is not locked, and a
 built-in model with plausible-looking parameters would be fabricated
 experimental data wearing a library's name.
 
+### On CUDA-Q
+
+```python
+import oqci.backends.cudaq as cudaq_backend
+
+print(cudaq_backend.to_cudaq_source(artifacts["executable"]))  # needs no CUDA-Q
+result = cudaq_backend.run(artifacts["executable"], seed=7)     # needs `pip install oqci[cudaq]`
+result.counts   # same keys as Aer's: clbit 0 rightmost
+```
+
+The same run from a shell, on an artifact written by `oqci prepare`:
+`python -m oqci.backends.cudaq emit exe.json` or
+`python -m oqci.backends.cudaq run exe.json --seed 7 [--target <name>]`.
+
+The generated kernel uses only operations NVIDIA's CUDA-Q docs show in
+Python. Anything the adapter cannot map exactly (`reset`, a gate after a
+measurement, two measurements into one bit) raises `UnsupportedOperation`.
+CUDA-Q's bit order is converted to Aer's, so the two runtimes' counts compare
+key by key. **Not yet verified against a real CUDA-Q install**; see
+[`../docs/adapters.md`](../docs/adapters.md#verification-status).
+
 ### Why execution is here and not in Rust
 
 Every Rust `Backend::execute` returns a typed *not available in this process*
@@ -164,6 +188,7 @@ checked to exist on the pinned Qiskit rather than recalled from memory.
 | `tests/test_rules.py` | Every decomposition rule re-checked against `qiskit.quantum_info.Operator`, with each rule's exactness **derived from Qiskit's verdict** rather than trusted. The rule table is read out of the compiler, so it cannot drift from a hand-copied list. |
 | `tests/test_aer.py` | Compile-and-execute, checking measured distributions. |
 | `tests/test_frontends.py` | Qiskit and CUDA-Q through the full pipeline (including runs on Aer), ablations from Python, and the shared schema with the CLI. |
+| `tests/test_backend_cudaq.py` | The CUDA-Q execution adapter, without CUDA-Q. The generated kernel is compiled back through OQCI's CUDA-Q frontend and must match the executable's unitary (`Operator.equiv`). Also covered: every refusal, the bit-order conversion checked against Aer's counts, and `run` against a stand-in `cudaq` module. |
 
 `test_rules.py` is why the rule library can claim two independent oracles: the
 Rust suite checks it against OQCI's own state-vector harness, and this checks
@@ -181,12 +206,13 @@ between the qubits the program asked for.
 
 Covered: all three frontends (OpenQASM 3, CUDA-Q, Qiskit) through the whole
 pipeline, backend selection, layout and pass configuration, the rule library,
-and simulator execution.
+and simulator execution on Aer (and on CUDA-Q, unverified).
 
 Not covered yet, and worth knowing before you reach for them:
 
 - **Circuit construction.** There is no builder API; build a circuit in Qiskit
   and pass it in, or write OpenQASM / CUDA-Q text.
-- **Execution on CUDA-Q.** Only the CUDA-Q *frontend* exists. Executables run
-  on Aer.
+- **Verified execution on CUDA-Q.** `oqci.backends.cudaq` exists and is
+  tested up to the runtime call, but it has never run against a real CUDA-Q.
+  Compare it against Aer on the same executable before trusting its counts.
 - **Hardware execution**, per above.

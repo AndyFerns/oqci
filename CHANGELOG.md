@@ -35,8 +35,25 @@ and may change without a major bump (per SemVer §4).
   OpenQASM); `python/tests/test_frontends.py` (Qiskit and CUDA-Q compiled by
   OQCI and run on Aer).
 - `r1` as a spelling of the phase gate `P` in the shared gate table.
+- **CUDA-Q execution adapter** (`python/oqci/backends/cudaq.py`, §15.2):
+  `to_cudaq_source(executable)` writes a `@cudaq.kernel` in the documented
+  subset. `run(executable, *, shots, seed, target)` samples it, with counts
+  re-keyed to Aer's convention. `python -m oqci.backends.cudaq {emit,run}`
+  works on `oqci prepare` output. **Not yet run against a real CUDA-Q
+  install.** A `cudaq` extra (unpinned) is added to `python/pyproject.toml`.
+- `python/oqci/backends/_common.py`: `RunResult` and `UnsupportedOperation`,
+  shared by every execution adapter, plus one counts-key convention.
+- `docs/adapters.md`: the layout every language/runtime adapter follows.
+  Frontends live in `src/frontend/<language>/`, execution adapters in
+  `python/oqci/backends/<runtime>.py`.
+- `examples/bell_cudaq.py`, moved from the prototype;
+  `python/tests/test_backend_cudaq.py`.
 
 ### Changed
+
+- `oqci.backends.aer.AerResult` is now a subclass of the shared `RunResult`.
+  Its fields, and `aer.UnsupportedOperation`, are unchanged (the latter is
+  now the shared class, re-exported).
 
 - The Python dict's `passes` and `lowering` entries are now the CLI's
   `PassRecordView` / `LoweringView`. Both are strict supersets of the old
@@ -52,8 +69,20 @@ and may change without a major bump (per SemVer §4).
   were silently dropped. Non-finite angles are now rejected at the IR instead
   of generating unexecutable source.
 
+- The prototype's execution half, by rewriting it as `oqci.backends.cudaq`.
+  Six defects are fixed: undocumented `sdg`/`tdg` were emitted; clbit
+  destinations were ignored; CUDA-Q's bit order was never converted; kernels
+  were `exec`'d from a string the kernel decorator cannot read source from;
+  the target was hard-coded to `qpp-cpu`; and a silent
+  `{"result": str(result)}` fallback applied when counts could not be read.
+
 ### Removed
 
+- **The root-level `cudaq-adapter/` package**, whose every part was relocated
+  or replaced (`docs/adapters.md` maps each file to its new home). Its
+  frontend and private IR are replaced by `src/frontend/cudaq/`, and its
+  backend and CLI by `oqci.backends.cudaq`. Its example is now
+  `examples/bell_cudaq.py`.
 - Committed `__pycache__`/`.pytest_cache` files and duplicate examples from
   `cudaq-adapter/`.
 

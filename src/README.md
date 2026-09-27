@@ -69,12 +69,13 @@ What is missing is on the other side of that boundary:
   executable preparation and provenance; it does not submit. That needs an SDK
   this project does not depend on and credentials it does not have. **No claim
   of IBM hardware executability is made.**
-- **Cirq and CUDA-Q adapters.** The contract is SDK-agnostic, so these are
-  adapter work rather than compiler work.
+- **A Cirq adapter.** The contract is SDK-agnostic, so this is adapter work
+  rather than compiler work; see [`../docs/adapters.md`](../docs/adapters.md).
 - **Benchmark infrastructure**, which waits on the Stage G protocol.
 
-Execution itself is not missing so much as elsewhere: `../python/oqci/backends/aer.py`
-runs a prepared executable on Qiskit Aer. It lives there because the project's
+Execution itself is not missing so much as elsewhere: `../python/oqci/backends/`
+runs a prepared executable on Qiskit Aer (`aer.py`) or CUDA-Q (`cudaq.py`,
+not yet verified against a real install). It lives there because the project's
 non-goals rule out writing a simulator into this crate.
 
 See [`../docs/core_architecture/index.md`](../docs/core_architecture/index.md)

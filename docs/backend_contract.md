@@ -479,7 +479,19 @@ product feature by accident.
 
 ### Where execution actually happens
 
-`python/oqci/backends/aer.py` is the one place a prepared artifact runs. It:
+A prepared artifact runs in one of two execution adapters. Both share
+`python/oqci/backends/_common.py`: the `RunResult` fields, the
+`UnsupportedOperation` refusal, and one counts-key convention (clbit 0
+rightmost). The layout is fixed in [`adapters.md`](adapters.md).
+
+- `python/oqci/backends/aer.py` runs it on Qiskit Aer. This is the adapter
+  checked end to end against a real runtime (the table below).
+- `python/oqci/backends/cudaq.py` runs it on CUDA-Q. Its translation,
+  refusals and bit-order conversion are tested. Its run against a real
+  CUDA-Q is **not yet verified**, because none was installed; see
+  [`adapters.md`](adapters.md#verification-status).
+
+The Aer adapter:
 
 - rebuilds the executable as a `QuantumCircuit` (`to_qiskit`), one method call
   per operation, against a mnemonic→method table verified by introspection;
@@ -533,7 +545,7 @@ Stage C §10 lists seven. Assessed honestly:
 | 4 | IBM target lowering is a distinct, testable component. | **Met, with a caveat worth stating** | `src/backend/ibm.rs` is a separate module with its own tests, including `a_one_way_link_forces_orientation_repair` and `a_target_whose_rules_cannot_reach_its_basis_is_refused_at_construction`. The caveat: what is IBM-specific is the *profile data*, and the only IBM profile shipped is synthetic. The component is distinct and tested; the target it is tested against is invented. |
 | 5 | IBM target validity is checked before submission. | **Met in substance; partly vacuous** | `IbmBackend::prepare` calls `validated` before `Executable::from_lowered`, so no artifact exists for a circuit the target rejects — `preparing_an_illegal_circuit_is_refused` and `preparing_refuses_a_circuit_lowered_for_a_different_device` both exercise a circuit lowered for one device and offered to another. The vacuity: there is no submission step for the check to precede. What the criterion can mean here, it means. |
 | 6 | QIR generation and hardware execution are explicitly separated. | **Met** | `src/backend/` contains no reference to QIR of any kind. `Executable` is constructible only from a validated `Lowered`; there is no path from QIR text into a backend. The SDK's `qasm3_to_qir` docstring states in as many words that QIR is not an execution guarantee. |
-| 7 | Backend results preserve sufficient provenance for later benchmarking. | **Partially met** | `Provenance` carries all of Stage C §9's compilation-side list plus Stage E §9's cost-model identity and configuration, and it travels inside the artifact and out through Aer's result (`test_results_carry_the_provenance_of_what_produced_them`). What is missing: §9's "raw backend result" and "derived metrics" live on `ExecutionResult`, which **nothing in this build ever constructs** outside its own tests; the executing path returns a Python `AerResult` instead, and nothing persists either into a benchmark record. The provenance a result needs is computed and carried. The result type it was designed to sit inside is not yet produced. |
+| 7 | Backend results preserve sufficient provenance for later benchmarking. | **Partially met** | `Provenance` carries all of Stage C §9's compilation-side list plus Stage E §9's cost-model identity and configuration, and it travels inside the artifact and out through Aer's result (`test_results_carry_the_provenance_of_what_produced_them`). What is missing: §9's "raw backend result" and "derived metrics" live on `ExecutionResult`, which **nothing in this build ever constructs** outside its own tests; the executing paths return a Python `RunResult` (`AerResult`, `CudaQResult`) instead, and nothing persists either into a benchmark record. The provenance a result needs is computed and carried. The result type it was designed to sit inside is not yet produced. |
 
 Summary: four met, one met with a caveat, two partially met. None of the seven
 is unmet, and no claim above depends on execution that does not happen.
@@ -574,21 +586,26 @@ are **absent**, not partly there:
   serialized and unit-tested, and **nothing constructs one** outside
   `src/backend/result.rs`'s own tests. The Rust side has no code path that
   produces a result object, because no Rust code path executes.
-- **A Rust-side path back from Aer.** `python/oqci/backends/aer.py` returns an
-  `AerResult` dataclass; nothing converts it into an `ExecutionResult`, and the
-  two shapes are not interchangeable as they stand. `AerResult` has no
+- **A Rust-side path back from the execution adapters.** `aer.py` and
+  `cudaq.py` return `RunResult` subclasses (`AerResult`, `CudaQResult`);
+  nothing converts either into an `ExecutionResult`, and the
+  two shapes are not interchangeable as they stand. `RunResult` has no
   `compilation_duration_ms` or `submission_duration_ms`, and serde requires
   both to be present even though they are `Option` (neither carries
-  `#[serde(default)]`); `AerResult.backend_metadata` also holds non-string
+  `#[serde(default)]`); `RunResult.backend_metadata` also holds non-string
   values such as Aer's `time_taken`, where `ExecutionResult::backend_metadata`
   is a `BTreeMap<String, String>`. So the two types agree in spirit and not yet
   in schema, and `a_result_round_trips_through_json` demonstrates Rust→Rust
   only.
-- **Cirq and CUDA-Q adapters.** Stage C §7 and §15.2 name both. Neither exists
-  in any form — no backend, no profile, no adapter, no import. The
-  representation is deliberately SDK-neutral (a structured operation list, not
-  any one vendor's format), so nothing *blocks* one; that is not the same as
-  one existing.
+- **A Cirq adapter, and a verified CUDA-Q run.** Stage C §7 and §15.2 name
+  both SDKs. CUDA-Q now has a frontend (`src/frontend/cudaq/`) and an
+  execution adapter (`oqci.backends.cudaq`). That adapter has never run
+  against a real CUDA-Q install, so its results are unverified until it is
+  checked against Aer on the same executable. Neither CUDA-Q half adds a Rust
+  backend or profile: CUDA-Q's simulators take any executable
+  `simulator`/`simulator-nisq` produce. Cirq exists in no form (no frontend, no
+  adapter, no import), and [`adapters.md`](adapters.md) lists the steps to add
+  it.
 - **Calibration and error metadata on profiles.** Stage C §4 lists
   "backend error/cost information" among what IBM lowering may need, and
   Stage D §2 lists per-operation costs and optional error/noise metadata.

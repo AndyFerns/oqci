@@ -39,7 +39,8 @@ program, or `oqci watch <file>` to keep seeing them as you edit — see
 | Document | What it covers |
 |----------|----------------|
 | [`ir_spec.md`](ir_spec.md) | **Normative IR reference.** Value types, parameters (`Param`) and binding, QC-IR + QCO-IR ops and invariants (I1–I8), operational semantics, and the semantics-preservation proof for QC-IR → QCO-IR. |
-| [`gate_mapping.md`](gate_mapping.md) | **The shared source-name → `GateKind` table** used by both frontends, and the rule that unknown names become `Opaque` rather than new enum variants. |
+| [`adapters.md`](adapters.md) | **Where every language/runtime adapter lives and what shape it has**: frontends in Rust (`src/frontend/<language>/`), execution adapters in Python (`python/oqci/backends/<runtime>.py`), the shared result and bit-order convention, the CUDA-Q execution adapter, and what became of `cudaq-adapter/`. |
+| [`gate_mapping.md`](gate_mapping.md) | **The shared source-name → `GateKind` table** used by every frontend, and the rule that unknown names become `Opaque` rather than new enum variants. |
 | [`openqasm_frontend.md`](openqasm_frontend.md) | **The OpenQASM 3 supported subset**, precisely: what is accepted, what is refused and why, broadcast rules, and diagnostics. |
 | [`cudaq_frontend.md`](cudaq_frontend.md) | **The CUDA-Q supported subset**: which `@cudaq.kernel` constructs are accepted, what is refused and why, how measurements are given destinations, and the NVIDIA documentation the subset was verified against. |
 | [`qiskit_adapter.md`](qiskit_adapter.md) | **The Qiskit adapter.** The vendor-neutral `QiskitCircuitIr` handoff, the PyO3 boundary, the verified Qiskit version, and known limitations. |
@@ -83,6 +84,7 @@ program, or `oqci watch <file>` to keep seeing them as you edit — see
 | OpenQASM 3 frontend (lexer/parser/AST/translate) | `src/frontend/openqasm/` |
 | Qiskit adapter core (no Python) | `src/frontend/qiskit/mod.rs` |
 | Qiskit PyO3 boundary | `python/src/lib.rs` |
+| Execution adapters (Aer, CUDA-Q) and their shared result type | `python/oqci/backends/` |
 | End-to-end + error-path tests | `tests/*.rs` — see [`../tests/README.md`](../tests/README.md) |
 
 ## Verifying the build
