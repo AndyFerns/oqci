@@ -16,6 +16,9 @@ dynamic = ["version"]
 [project.optional-dependencies]
 qiskit = ["qiskit>=1.0"]
 aer = ["qiskit>=1.0", "qiskit-aer>=0.14"]
+# Unpinned: no CUDA-Q release has yet been run against `oqci.backends.cudaq`
+# (see docs/adapters.md). Pin one once it has.
+cudaq = ["cudaq"]
 
 [tool.maturin]
 module-name = "oqci._native"
