@@ -1,5 +1,19 @@
 # OQCI CUDA-Q Frontend + Backend Adapters
 
+> **Status: prototype, partly superseded.** The CUDA-Q → IR half of this
+> package (`frontend.py`, `ir.py`) is replaced by OQCI's own CUDA-Q frontend,
+> `src/frontend/cudaq/`. That frontend maps into the real QC-IR, so a kernel
+> reaches the pass manager, lowering, the CLI and the visualizer; see
+> [`../docs/cudaq_frontend.md`](../docs/cudaq_frontend.md). It also fixes two
+> defects found here in review: several per-qubit `mz` calls kept only the
+> last, and non-finite angles were accepted.
+>
+> The execution half (`backend.py`) has not been reimplemented yet. It is
+> meant to become an execution adapter consuming an OQCI `Executable`,
+> alongside `oqci.backends.aer`, verified against a pinned CUDA-Q release.
+> Until then, prefer `oqci.compile(source, frontend="cudaq", ...)` for
+> compiling. This package's tests are not run by `scripts/build.sh` or CI.
+
 This repository implements a small, modular CUDA-Q integration for the OQCI
 project described in the supplied OQCI presentation.
 

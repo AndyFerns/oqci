@@ -26,24 +26,76 @@
 //! computed.
 
 use std::collections::HashMap;
+use std::path::Path;
 
 use crate::analysis::{ResourceReport, analyze};
 use crate::backend::{
     BackendError, Executable, ExecutionSettings, Provenance, simulator::provenance_for,
 };
-use crate::frontend::{FrontendError, parse_openqasm3_named};
+use crate::frontend::{FrontendError, parse_cudaq_named, parse_openqasm3_named};
 use crate::ir::{Circuit, IrError, bind_parameters};
 use crate::lowering::{Lowered, LoweringConfig};
 use crate::pass::{PassContext, PassError, PassManager, PassRecord, PassSelection};
 use crate::target::Cost;
 
-/// Which frontend to read the source with.
+/// Which frontend to read source text with.
+///
+/// Only text frontends appear here. A Qiskit `QuantumCircuit` is not text:
+/// its adapter builds a [`Circuit`] directly and enters the pipeline through
+/// [`compile_circuit`], one step later than [`compile_named`] does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum Frontend {
     /// The documented OpenQASM 3 subset.
     #[default]
     OpenQasm3,
+    /// The documented CUDA-Q kernel subset — the `@cudaq.kernel` function in
+    /// a Python file. See `docs/cudaq_frontend.md`.
+    CudaQ,
+}
+
+impl Frontend {
+    /// Every text frontend, for listing and for resolving an id.
+    pub const ALL: [Frontend; 2] = [Frontend::OpenQasm3, Frontend::CudaQ];
+
+    /// A stable identifier, used on the command line, in reports and by the
+    /// Python SDK.
+    #[must_use]
+    pub fn id(self) -> &'static str {
+        match self {
+            Frontend::OpenQasm3 => "openqasm3",
+            Frontend::CudaQ => "cudaq",
+        }
+    }
+
+    /// Resolves an [`id`](Frontend::id), or `None` for an unknown one.
+    #[must_use]
+    pub fn from_id(id: &str) -> Option<Frontend> {
+        Frontend::ALL.into_iter().find(|f| f.id() == id)
+    }
+
+    /// The frontend a file's extension implies: `.py` is a CUDA-Q kernel,
+    /// anything else is read as OpenQASM 3, the project's default source
+    /// language.
+    #[must_use]
+    pub fn for_path(path: &Path) -> Frontend {
+        match path.extension().and_then(|e| e.to_str()) {
+            Some(ext) if ext.eq_ignore_ascii_case("py") => Frontend::CudaQ,
+            _ => Frontend::OpenQasm3,
+        }
+    }
+
+    /// Reads `source` into a validated circuit named `name`.
+    ///
+    /// # Errors
+    ///
+    /// Whatever the selected frontend reports.
+    pub fn parse(self, source: &str, name: &str) -> Result<Circuit, FrontendError> {
+        match self {
+            Frontend::OpenQasm3 => parse_openqasm3_named(source, name),
+            Frontend::CudaQ => parse_cudaq_named(source, name),
+        }
+    }
 }
 
 /// How far through the pipeline to go.
@@ -192,11 +244,26 @@ pub fn compile_named(
     name: &str,
     config: &CompilerConfig,
 ) -> Result<CompilationArtifacts, CompileError> {
-    // --- Frontend ---
-    let parsed = match config.frontend {
-        Frontend::OpenQasm3 => parse_openqasm3_named(source, name)?,
-    };
+    let parsed = config.frontend.parse(source, name)?;
+    compile_circuit(parsed, config)
+}
 
+/// Runs the pipeline on a circuit a frontend has already built.
+///
+/// Everything [`compile_named`] does after parsing, and nothing else — it is
+/// literally the second half of that function. It exists for frontends whose
+/// input is not text: the Qiskit adapter translates a live `QuantumCircuit`
+/// into a [`Circuit`] and enters here, which is what lets a Qiskit circuit
+/// reach lowering, an [`Executable`] and a provenance record rather than
+/// stopping at QIR. `config.frontend` is not consulted.
+///
+/// # Errors
+///
+/// As [`compile`], minus [`CompileError::Frontend`].
+pub fn compile_circuit(
+    parsed: Circuit,
+    config: &CompilerConfig,
+) -> Result<CompilationArtifacts, CompileError> {
     // --- Parameter binding, before optimization ---
     // Binding first means the passes see concrete angles and can actually
     // fire: `Rz(theta); Rz(-theta)` cancels only once both are numbers.
@@ -483,6 +550,58 @@ mod tests {
             twice.lowered.as_ref().unwrap().circuit
         );
         assert_eq!(once.executable, twice.executable);
+    }
+
+    const BELL_CUDAQ: &str = "import cudaq\n\n@cudaq.kernel\ndef bell():\n    q = cudaq.qvector(2)\n    h(q[0])\n    x.ctrl(q[0], q[1])\n    mz(q[0])\n    mz(q[1])\n";
+
+    #[test]
+    fn a_cudaq_kernel_reaches_an_executable() {
+        let config = CompilerConfig {
+            frontend: Frontend::CudaQ,
+            ..config(Some("simulator-nisq"))
+        };
+        let artifacts = compile(BELL_CUDAQ, &config).unwrap();
+        assert!(artifacts.lowered.as_ref().unwrap().legality.is_legal());
+        assert!(artifacts.executable.as_ref().unwrap().has_measurement());
+    }
+
+    #[test]
+    fn a_cudaq_kernel_and_its_openqasm_twin_compile_identically() {
+        let from_cudaq = compile(
+            BELL_CUDAQ,
+            &CompilerConfig {
+                frontend: Frontend::CudaQ,
+                ..config(Some("simulator-nisq"))
+            },
+        )
+        .unwrap();
+        let from_qasm = compile(BELL, &config(Some("simulator-nisq"))).unwrap();
+        assert_eq!(from_cudaq.source_circuit, from_qasm.source_circuit);
+        assert_eq!(from_cudaq.executable, from_qasm.executable);
+    }
+
+    #[test]
+    fn compile_circuit_is_exactly_the_second_half_of_compile_named() {
+        let config = config(Some("simulator-nisq"));
+        let parsed = crate::frontend::parse_openqasm3_named(BELL, "main").unwrap();
+        let via_circuit = compile_circuit(parsed, &config).unwrap();
+        let via_text = compile(BELL, &config).unwrap();
+        assert_eq!(via_circuit.optimized, via_text.optimized);
+        assert_eq!(via_circuit.executable, via_text.executable);
+    }
+
+    #[test]
+    fn frontend_ids_round_trip_and_extensions_select_a_frontend() {
+        for frontend in Frontend::ALL {
+            assert_eq!(Frontend::from_id(frontend.id()), Some(frontend));
+        }
+        assert_eq!(Frontend::from_id("cirq"), None);
+        assert_eq!(Frontend::for_path(Path::new("bell.py")), Frontend::CudaQ);
+        assert_eq!(
+            Frontend::for_path(Path::new("bell.qasm")),
+            Frontend::OpenQasm3
+        );
+        assert_eq!(Frontend::for_path(Path::new("bell")), Frontend::OpenQasm3);
     }
 
     #[test]

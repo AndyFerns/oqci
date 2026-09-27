@@ -41,6 +41,7 @@ program, or `oqci watch <file>` to keep seeing them as you edit — see
 | [`ir_spec.md`](ir_spec.md) | **Normative IR reference.** Value types, parameters (`Param`) and binding, QC-IR + QCO-IR ops and invariants (I1–I8), operational semantics, and the semantics-preservation proof for QC-IR → QCO-IR. |
 | [`gate_mapping.md`](gate_mapping.md) | **The shared source-name → `GateKind` table** used by both frontends, and the rule that unknown names become `Opaque` rather than new enum variants. |
 | [`openqasm_frontend.md`](openqasm_frontend.md) | **The OpenQASM 3 supported subset**, precisely: what is accepted, what is refused and why, broadcast rules, and diagnostics. |
+| [`cudaq_frontend.md`](cudaq_frontend.md) | **The CUDA-Q supported subset**: which `@cudaq.kernel` constructs are accepted, what is refused and why, how measurements are given destinations, and the NVIDIA documentation the subset was verified against. |
 | [`qiskit_adapter.md`](qiskit_adapter.md) | **The Qiskit adapter.** The vendor-neutral `QiskitCircuitIr` handoff, the PyO3 boundary, the verified Qiskit version, and known limitations. |
 | [`pass_manager.md`](pass_manager.md) | **The pass manager and optimization passes.** The `Pass` contract, the default pipeline and why it is ordered that way, each pass's exact rewrite rules and exclusions, and how correctness is verified. |
 | [`target_model.md`](target_model.md) | **Basis profiles, topology and cost.** How a backend describes what it accepts and what it finds expensive, how a circuit is checked against it, and what target-aware work is still absent. |
@@ -77,6 +78,7 @@ program, or `oqci watch <file>` to keep seeing them as you edit — see
 | Visualization server (ground truth + self-validating replay) | `server/src/` |
 | Visualization frontend | `frontend/src/` |
 | Frontend contract (`FrontendError`) | `src/frontend/error.rs` |
+| CUDA-Q frontend (kernel extraction/lexer/parser/translate) | `src/frontend/cudaq/` |
 | Shared gate-name table | `src/frontend/gate_map.rs` |
 | OpenQASM 3 frontend (lexer/parser/AST/translate) | `src/frontend/openqasm/` |
 | Qiskit adapter core (no Python) | `src/frontend/qiskit/mod.rs` |

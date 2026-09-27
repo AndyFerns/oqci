@@ -58,9 +58,12 @@ oqci targets
 oqci backends
 ```
 
-Input is OpenQASM 3 (see [`openqasm_frontend.md`](openqasm_frontend.md)). The
-Qiskit adapter needs a live Python interpreter and stays reachable through
-`oqci_native` from Python — see [`qiskit_adapter.md`](qiskit_adapter.md).
+Input is OpenQASM 3 (see [`openqasm_frontend.md`](openqasm_frontend.md)), or a
+CUDA-Q kernel when the file ends in `.py` (see
+[`cudaq_frontend.md`](cudaq_frontend.md)); the report's `frontend` field says
+which one read it. The Qiskit adapter needs a live Python interpreter and is
+reachable from Python through `oqci.compile` — see
+[`qiskit_adapter.md`](qiskit_adapter.md).
 
 `--emit` takes any comma-separated subset of `qc-ir`, `qco-ir`, `qir`; the
 default is all three. The circuit is named after the file stem, so the QIR

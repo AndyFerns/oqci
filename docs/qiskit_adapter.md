@@ -2,11 +2,19 @@
 
 Status: normative
 Implemented by: `src/frontend/qiskit/` (translation core) and `python/src/lib.rs` (PyO3 boundary)
-Verified against: **Qiskit 2.5.2** (see [Version sensitivity](#version-sensitivity))
+Verified against: **Qiskit 2.5.2**, and most recently re-run against
+**Qiskit 2.5.1** with Qiskit Aer 0.17.2 (see [Version sensitivity](#version-sensitivity))
 
 `final-deliverables-spec.md` §5.3 requires translation from a Qiskit
 `QuantumCircuit` into QC-IR, with the adapter living "at the integration
 boundary rather than contaminating QC-IR with Qiskit types".
+
+A Qiskit circuit reaches the **whole** pipeline, just as OpenQASM text does:
+optimization, target lowering, an executable, and a provenance record. Until
+`oqci::compile::compile_circuit` existed it could only reach QIR, because the
+orchestrator accepted nothing but source text. The adapter now enters the
+orchestrator one step after where a text frontend does. See
+[Python API](#python-api).
 
 ## Architecture: where the decisions live
 
@@ -62,24 +70,31 @@ an ordered list.
 
 ## Python API
 
-Built with `maturin`; the extension module is `oqci_native`.
+Built with `maturin`. The SDK entry point for a Qiskit circuit is the same one
+used for text: `oqci.compile`.
 
 ```python
-import oqci_native
+import oqci
 from qiskit import QuantumCircuit
-from qiskit.circuit import Parameter
 
 qc = QuantumCircuit(2, 2, name="bell")
 qc.h(0); qc.cx(0, 1); qc.measure([0, 1], [0, 1])
 
-qir = oqci_native.qiskit_to_qir(qc)
+artifacts = oqci.compile(qc, backend="simulator-nisq", disable=["gate-cancellation"])
+result = oqci.backends.aer.run(artifacts["executable"])
+qir = oqci.qiskit_to_qir(qc)
 ```
 
 | Function | Purpose |
 |---|---|
-| `qiskit_to_qir(circuit, bindings=None)` | Compile a `QuantumCircuit` to QIR text. `bindings` keys may be parameter names or `Parameter` objects. |
+| `oqci.compile(circuit, backend=…, bindings=…, passes=…, disable=…, …)` | The whole pipeline, returning the same dict an OpenQASM program gets, with `"frontend": "qiskit"`. `name` defaults to the circuit's own `name`. Native: `compile_qiskit`. |
+| `qiskit_to_qir(circuit, bindings=None)` | Compile a `QuantumCircuit` straight to QIR text, with no optimization or lowering. `bindings` keys may be parameter names or `Parameter` objects. |
 | `qiskit_parameters(circuit)` | The circuit's free parameters *as OQCI sees them*. A name Qiskit reports but this omits reached OQCI inside a compound expression. |
 | `qasm3_to_qir(source, bindings=None)` | The OpenQASM 3 path, through the same IR and the same gate table. |
+
+`python/tests/test_frontends.py` checks that a Qiskit circuit compiles to the
+same executable as its OpenQASM twin, and that the result runs correctly on
+Aer.
 
 Errors raise `oqci_native.OqciError` (a `ValueError` subclass) carrying the
 underlying diagnostic. A circuit with unbound parameters and no bindings is an

@@ -177,84 +177,252 @@ fn qasm3_to_qir(source: &str, bindings: Option<&Bound<'_, PyDict>>) -> PyResult<
     finish(circuit, bindings)
 }
 
-/// Compiles OpenQASM 3 source for a backend, returning the artifacts as a
-/// plain dict.
+/// Compiles a CUDA-Q kernel's source text to QIR. Reads source text, not a
+/// live kernel object, so CUDA-Q itself need not be installed.
 ///
-/// The whole pipeline: frontend, optimization, target lowering and execution
-/// preparation. Everything comes from `oqci::compile`, the same entry point
-/// the CLI uses, so the Python SDK cannot disagree with the compiler about
-/// what happened.
+/// The supported subset is documented in `docs/cudaq_frontend.md`.
+#[pyfunction]
+#[pyo3(signature = (source, bindings = None))]
+fn cudaq_to_qir(source: &str, bindings: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
+    let circuit: Circuit =
+        oqci::frontend::parse_cudaq(source).map_err(|e: FrontendError| to_py_err(&e))?;
+    finish(circuit, bindings)
+}
+
+/// Options every `compile_*` entry point shares, read from Python once.
+struct CompileOptions<'py> {
+    backend: Option<&'py str>,
+    bindings: Option<&'py Bound<'py, PyDict>>,
+    shots: u32,
+    seed: Option<u64>,
+    layout: &'py str,
+    passes: Option<Vec<String>>,
+    disable: Option<Vec<String>>,
+}
+
+impl CompileOptions<'_> {
+    fn config(&self) -> PyResult<oqci::compile::CompilerConfig> {
+        use oqci::compile::CompilerConfig;
+        use oqci::lowering::{LayoutChoice, LoweringConfig};
+
+        let layout = match self.layout {
+            "trivial" => LayoutChoice::Trivial,
+            "dense" => LayoutChoice::Dense,
+            other => {
+                return Err(OqciError::new_err(format!(
+                    "unknown layout `{other}`; expected `trivial` or `dense`"
+                )));
+            }
+        };
+
+        Ok(CompilerConfig {
+            bindings: read_bindings(self.bindings)?,
+            passes: pass_selection(self.passes.as_deref(), self.disable.as_deref())?,
+            backend: self.backend.map(str::to_string),
+            lowering: LoweringConfig {
+                layout,
+                ..LoweringConfig::default()
+            },
+            settings: oqci::backend::ExecutionSettings {
+                shots: self.shots,
+                seed: self.seed,
+                memory: false,
+            },
+            ..CompilerConfig::default()
+        })
+    }
+}
+
+/// Builds a pass selection from `passes=` / `disable=`, refusing unknown ids
+/// and the two together — the same rules as the CLI's `--passes`/`--disable`,
+/// so an ablation cannot silently run a different pipeline than asked for.
+fn pass_selection(
+    only: Option<&[String]>,
+    except: Option<&[String]>,
+) -> PyResult<oqci::pass::PassSelection> {
+    use oqci::pass::{PassManager, PassSelection};
+
+    let known = PassManager::default_pipeline().pass_ids();
+    let check = |ids: &[String]| -> PyResult<()> {
+        for id in ids {
+            if !known.contains(&id.as_str()) {
+                return Err(OqciError::new_err(format!(
+                    "unknown pass `{id}`; available: {}",
+                    known.join(", ")
+                )));
+            }
+        }
+        Ok(())
+    };
+    match (only, except) {
+        (None, None) => Ok(PassSelection::All),
+        (Some(ids), None) => {
+            check(ids)?;
+            Ok(PassSelection::only(ids.iter().cloned()))
+        }
+        (None, Some(ids)) => {
+            check(ids)?;
+            Ok(PassSelection::all_except(ids.iter().cloned()))
+        }
+        (Some(_), Some(_)) => Err(OqciError::new_err(
+            "`passes` and `disable` cannot be combined; use one or the other",
+        )),
+    }
+}
+
+/// Compiles source text through the whole pipeline, returning the artifacts
+/// as a plain dict.
 ///
-/// `backend` names one of `oqci_native.backends()`. Omitting it means
+/// `frontend` is `"openqasm3"` or `"cudaq"` (the `@cudaq.kernel` function in
+/// Python source). Everything comes from `oqci::compile`, the same entry
+/// point the CLI uses, so the SDK cannot disagree with the compiler about
+/// what happened. `backend` names one of `backends()`; omitting it means
 /// target-independent compilation, which stops after optimization.
 #[pyfunction]
-#[pyo3(signature = (source, backend = None, bindings = None, name = "main", shots = 1024, seed = None, layout = "trivial"))]
+#[pyo3(signature = (source, frontend = "openqasm3", backend = None, bindings = None, name = "main", shots = 1024, seed = None, layout = "trivial", passes = None, disable = None))]
 #[allow(clippy::too_many_arguments)]
-fn compile_qasm3(
-    py: Python<'_>,
+fn compile_source<'py>(
+    py: Python<'py>,
     source: &str,
-    backend: Option<&str>,
-    bindings: Option<&Bound<'_, PyDict>>,
+    frontend: &str,
+    backend: Option<&'py str>,
+    bindings: Option<&'py Bound<'py, PyDict>>,
     name: &str,
     shots: u32,
     seed: Option<u64>,
-    layout: &str,
+    layout: &'py str,
+    passes: Option<Vec<String>>,
+    disable: Option<Vec<String>>,
 ) -> PyResult<PyObject> {
-    use oqci::compile::{CompilerConfig, compile_named};
-    use oqci::lowering::{LayoutChoice, LoweringConfig};
+    use oqci::compile::{Frontend, compile_named};
 
-    let layout = match layout {
-        "trivial" => LayoutChoice::Trivial,
-        "dense" => LayoutChoice::Dense,
-        other => {
-            return Err(OqciError::new_err(format!(
-                "unknown layout `{other}`; expected `trivial` or `dense`"
-            )));
-        }
+    let selected = Frontend::from_id(frontend).ok_or_else(|| {
+        let known: Vec<&str> = Frontend::ALL.iter().map(|f| f.id()).collect();
+        OqciError::new_err(format!(
+            "unknown frontend `{frontend}`; available: {}",
+            known.join(", ")
+        ))
+    })?;
+    let options = CompileOptions {
+        backend,
+        bindings,
+        shots,
+        seed,
+        layout,
+        passes,
+        disable,
     };
-
-    let config = CompilerConfig {
-        bindings: read_bindings(bindings)?,
-        backend: backend.map(str::to_string),
-        lowering: LoweringConfig {
-            layout,
-            ..LoweringConfig::default()
-        },
-        settings: oqci::backend::ExecutionSettings {
-            shots,
-            seed,
-            memory: false,
-        },
-        ..CompilerConfig::default()
+    let config = oqci::compile::CompilerConfig {
+        frontend: selected,
+        ..options.config()?
     };
-
     let artifacts = compile_named(source, name, &config).map_err(|e| to_py_err(&e))?;
-    artifacts_to_dict(py, &artifacts)
+    artifacts_to_dict(py, selected.id(), &artifacts)
+}
+
+/// Compiles OpenQASM 3 source. Kept for callers of the original API; it is
+/// [`compile_source`] with `frontend="openqasm3"`.
+#[pyfunction]
+#[pyo3(signature = (source, backend = None, bindings = None, name = "main", shots = 1024, seed = None, layout = "trivial", passes = None, disable = None))]
+#[allow(clippy::too_many_arguments)]
+fn compile_qasm3<'py>(
+    py: Python<'py>,
+    source: &str,
+    backend: Option<&'py str>,
+    bindings: Option<&'py Bound<'py, PyDict>>,
+    name: &str,
+    shots: u32,
+    seed: Option<u64>,
+    layout: &'py str,
+    passes: Option<Vec<String>>,
+    disable: Option<Vec<String>>,
+) -> PyResult<PyObject> {
+    compile_source(
+        py,
+        source,
+        "openqasm3",
+        backend,
+        bindings,
+        name,
+        shots,
+        seed,
+        layout,
+        passes,
+        disable,
+    )
+}
+
+/// Compiles a Qiskit `QuantumCircuit` through the whole pipeline.
+///
+/// Until this existed a Qiskit circuit could reach QIR but not a backend:
+/// `compile` only accepted text. The adapter now enters the orchestrator at
+/// `oqci::compile::compile_circuit`, one step after where a text frontend
+/// would, so a Qiskit circuit gets optimization, lowering, an executable and
+/// a provenance record exactly like an OpenQASM program. `name` defaults to
+/// the circuit's own `name`.
+#[pyfunction]
+#[pyo3(signature = (circuit, backend = None, bindings = None, name = None, shots = 1024, seed = None, layout = "trivial", passes = None, disable = None))]
+#[allow(clippy::too_many_arguments)]
+fn compile_qiskit<'py>(
+    py: Python<'py>,
+    circuit: &Bound<'py, PyAny>,
+    backend: Option<&'py str>,
+    bindings: Option<&'py Bound<'py, PyDict>>,
+    name: Option<String>,
+    shots: u32,
+    seed: Option<u64>,
+    layout: &'py str,
+    passes: Option<Vec<String>>,
+    disable: Option<Vec<String>>,
+) -> PyResult<PyObject> {
+    let mut ir = read_circuit(circuit)?;
+    if let Some(name) = name {
+        ir.name = name;
+    }
+    let translated = oqci::frontend::qiskit::translate(&ir).map_err(|e| to_py_err(&e))?;
+    let options = CompileOptions {
+        backend,
+        bindings,
+        shots,
+        seed,
+        layout,
+        passes,
+        disable,
+    };
+    let artifacts = oqci::compile::compile_circuit(translated, &options.config()?)
+        .map_err(|e| to_py_err(&e))?;
+    artifacts_to_dict(py, "qiskit", &artifacts)
 }
 
 /// Turns compilation artifacts into a dict.
 ///
-/// This is the SDK's own view, and it is **not** the same shape as the CLI's
-/// `--json` report: that one is built for reading a pipeline stage by stage,
-/// this one for using the result programmatically. What they do share is the
-/// parts that matter to a consumer — `executable` and `cost` are the same
-/// serde types on both paths, so an artifact produced here and one printed by
-/// `oqci prepare` are byte-identical.
-///
-/// The rest is assembled here because a Python caller wants different things
-/// from a terminal reader; where that assembly duplicates a field the CLI
-/// also renders, the duplication is in the presentation, not in the numbers.
+/// Every section is built from the same serde types the CLI's `--json`
+/// report uses — `ResourceReport`, `PassRecordView`, `LoweringView`,
+/// `InstructionView`, `Cost`, `Executable` — through the same
+/// `oqci::cli::snapshot` builders, so a field present in both means the same
+/// thing in both. (It used to assemble its own `passes` and `lowering`
+/// objects, which had already drifted from the CLI's: no `steps`, no
+/// `violations`, no pass metrics.) The top-level layout stays the SDK's own,
+/// keyed by what a program wants rather than by pipeline stage.
 fn artifacts_to_dict(
     py: Python<'_>,
+    frontend: &str,
     artifacts: &oqci::compile::CompilationArtifacts,
 ) -> PyResult<PyObject> {
+    use oqci::cli::snapshot::{PassRecordView, instructions_of, lowering_view};
+
     let mut body = serde_json::Map::new();
+    body.insert("frontend".to_string(), serde_json::Value::from(frontend));
     body.insert(
         "backend".to_string(),
         match &artifacts.backend_id {
             Some(id) => serde_json::Value::String(id.clone()),
             None => serde_json::Value::Null,
         },
+    );
+    body.insert(
+        "unbound_parameters".to_string(),
+        serde_json::to_value(artifacts.final_circuit().parameters()).map_err(json_err)?,
     );
     body.insert(
         "source_metrics".to_string(),
@@ -265,34 +433,33 @@ fn artifacts_to_dict(
         serde_json::to_value(&artifacts.optimized_metrics).map_err(json_err)?,
     );
     body.insert(
+        "source_circuit".to_string(),
+        serde_json::to_value(instructions_of(&artifacts.source_circuit)).map_err(json_err)?,
+    );
+    body.insert(
+        "optimized_circuit".to_string(),
+        serde_json::to_value(instructions_of(&artifacts.optimized)).map_err(json_err)?,
+    );
+    body.insert(
         "passes".to_string(),
-        serde_json::Value::Array(
+        serde_json::to_value(
             artifacts
                 .pass_records
                 .iter()
-                .map(|record| {
-                    serde_json::json!({
-                        "id": record.id,
-                        "enabled": record.enabled,
-                        "changed": record.changed,
-                        "notes": record.notes,
-                    })
-                })
-                .collect(),
-        ),
+                .map(PassRecordView::new)
+                .collect::<Vec<_>>(),
+        )
+        .map_err(json_err)?,
     );
     if let Some(lowered) = &artifacts.lowered {
+        let backend = artifacts.backend_id.as_deref().unwrap_or_default();
         body.insert(
             "lowering".to_string(),
-            serde_json::json!({
-                "profile": lowered.profile_id,
-                "initial_layout": lowered.initial_layout.permutation(),
-                "final_layout": lowered.final_layout.permutation(),
-                "swaps_inserted": lowered.swaps_inserted,
-                "orientations_repaired": lowered.orientations_repaired,
-                "rules_applied": lowered.rules_applied,
-                "legal": lowered.legality.is_legal(),
-            }),
+            serde_json::to_value(lowering_view(backend, lowered)).map_err(json_err)?,
+        );
+        body.insert(
+            "lowered_circuit".to_string(),
+            serde_json::to_value(instructions_of(&lowered.circuit)).map_err(json_err)?,
         );
     }
     if let Some(cost) = &artifacts.cost {
@@ -415,7 +582,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(qiskit_to_qir, module)?)?;
     module.add_function(wrap_pyfunction!(qiskit_parameters, module)?)?;
     module.add_function(wrap_pyfunction!(qasm3_to_qir, module)?)?;
+    module.add_function(wrap_pyfunction!(cudaq_to_qir, module)?)?;
+    module.add_function(wrap_pyfunction!(compile_source, module)?)?;
     module.add_function(wrap_pyfunction!(compile_qasm3, module)?)?;
+    module.add_function(wrap_pyfunction!(compile_qiskit, module)?)?;
     module.add_function(wrap_pyfunction!(backends, module)?)?;
     module.add_function(wrap_pyfunction!(decomposition_rules, module)?)?;
     Ok(())

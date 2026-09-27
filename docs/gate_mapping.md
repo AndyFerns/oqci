@@ -29,7 +29,7 @@ Matching is **case-insensitive**: OpenQASM spells the built-in controlled-X as
 | `rx` | `Rx(θ)` | 1 | 1 |
 | `ry` | `Ry(θ)` | 1 | 1 |
 | `rz` | `Rz(θ)` | 1 | 1 |
-| `p`, `u1`, `phase` | `P(λ)` | 1 | 1 |
+| `p`, `u1`, `phase`, `r1` | `P(λ)` | 1 | 1 |
 | `u`, `u3` | `U { θ, φ, λ }` | 3 | 1 |
 | `u2` | `U { π/2, φ, λ }` | 2 | 1 |
 | `cx`, `cnot` | `Cx` | 0 | 2 |
@@ -42,6 +42,9 @@ Three mappings deserve their justification recorded:
 
 - **`u1(λ) → P(λ)`.** The legacy `u1` gate is `diag(1, e^{iλ})`, which is
   exactly the phase gate. They are the same operator, not an approximation.
+- **`r1(λ) → P(λ)`.** CUDA-Q's name for the same `diag(1, e^{iλ})`. Used by
+  the CUDA-Q frontend ([`cudaq_frontend.md`](cudaq_frontend.md)), which resolves
+  every gate through this table too.
 - **`u2(φ, λ) → U(π/2, φ, λ)`.** This is `u2`'s definition, so the frontend
   supplies the fixed θ rather than inventing a separate variant.
 - **`sx`/`sxdg` → `SX`/`SXdg`.** These names previously matched nothing in the

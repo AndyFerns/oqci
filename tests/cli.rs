@@ -424,14 +424,60 @@ fn compile_output_is_stable_across_runs() {
 
 #[test]
 fn every_example_compiles() {
-    for name in ["bell.qasm", "ghz3.qasm", "parameterized.qasm"] {
-        let output = run(&["compile", example(name).to_str().unwrap()]);
+    // Discovered rather than listed, so `examples/README.md`'s promise that a
+    // new file is picked up automatically is actually true.
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples");
+    let mut compiled = 0;
+    for entry in std::fs::read_dir(&dir).expect("examples/ is readable") {
+        let path = entry.expect("directory entry").path();
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "qasm" && ext != "py" {
+            continue;
+        }
+        let output = run(&["compile", path.to_str().unwrap()]);
         assert!(
             output.status.success(),
-            "{name} failed: {}",
+            "{} failed: {}",
+            path.display(),
             String::from_utf8_lossy(&output.stderr)
         );
+        compiled += 1;
     }
+    assert!(
+        compiled >= 4,
+        "expected the checked-in examples, found {compiled}"
+    );
+}
+
+#[test]
+fn a_cudaq_kernel_compiles_and_lowers_from_a_py_file() {
+    let path = example("ghz3_cudaq.py");
+    let report = json_of(&[
+        "lower",
+        path.to_str().unwrap(),
+        "--backend",
+        "simulator-nisq",
+        "--json",
+    ]);
+    assert_eq!(report["frontend"], "cudaq");
+    assert_eq!(report["circuit_name"], "ghz3_cudaq");
+    assert_eq!(report["lowering"]["legal"], true);
+
+    // Three separate measurements survive into the lowered circuit — the
+    // per-qubit `mz` pattern the standalone adapter used to collapse to one.
+    let lowered = report["stages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["stage"] == "lowered")
+        .expect("a lowered stage");
+    let measures = lowered["instructions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|i| i["op"] == "measure")
+        .count();
+    assert_eq!(measures, 3);
 }
 
 // --- lowering and backends --------------------------------------------------

@@ -72,15 +72,16 @@ pub fn map_gate(name: &str, params: Vec<Param>) -> Result<GateKind, FrontendErro
 
     // Registered gates taking parameters.
     match lowered.as_str() {
-        "rx" | "ry" | "rz" | "p" | "u1" | "phase" => {
+        "rx" | "ry" | "rz" | "p" | "u1" | "phase" | "r1" => {
             check_arity(&lowered, 1, &params)?;
             let angle = params.into_iter().next().expect("arity checked");
             Ok(match lowered.as_str() {
                 "rx" => GateKind::Rx(angle),
                 "ry" => GateKind::Ry(angle),
                 "rz" => GateKind::Rz(angle),
-                // `u1(λ)` and `phase(λ)` are spellings of the phase gate
-                // `diag(1, e^{iλ})`, which is exactly `GateKind::P`.
+                // `u1(λ)`, `phase(λ)` and CUDA-Q's `r1(λ)` are spellings of
+                // the phase gate `diag(1, e^{iλ})`, which is exactly
+                // `GateKind::P`.
                 _ => GateKind::P(angle),
             })
         }
@@ -169,7 +170,7 @@ mod tests {
     #[test]
     fn phase_spellings_all_map_to_p() {
         let p = Param::concrete(0.5);
-        for name in ["p", "u1", "phase"] {
+        for name in ["p", "u1", "phase", "r1"] {
             assert_eq!(
                 map_gate(name, vec![p.clone()]).unwrap(),
                 GateKind::P(p.clone()),

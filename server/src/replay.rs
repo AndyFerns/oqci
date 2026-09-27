@@ -19,11 +19,19 @@ use oqci::cli::snapshot::InstructionView;
 use oqci::ir::{Circuit, CircuitBuilder, Instruction};
 use oqci::lowering::layout::LayoutStrategy;
 use oqci::lowering::routing::{RoutingOutput, RoutingStrategy};
-use oqci::lowering::{DenseLayout, Layout, Lowered, LoweringConfig, RuleSet, Scope, ShortestPathRouter, TrivialLayout, decompose, routing};
-use oqci::pass::{Canonicalize, GateCancellation, Pass, PassContext, PassManager, PassRecord, PassSelection, RotationMerge, Schedule};
+use oqci::lowering::{
+    DenseLayout, Layout, Lowered, LoweringConfig, RuleSet, Scope, ShortestPathRouter,
+    TrivialLayout, decompose, routing,
+};
+use oqci::pass::{
+    Canonicalize, GateCancellation, Pass, PassContext, PassManager, PassRecord, PassSelection,
+    RotationMerge, Schedule,
+};
 use oqci::target::{BasisProfile, PhysicalQubit};
 
-use crate::events::{LoweringReplay, LoweringStepReplay, PassReplay, PassStepEvent, RuleFiringEvent, SwapEvent};
+use crate::events::{
+    LoweringReplay, LoweringStepReplay, PassReplay, PassStepEvent, RuleFiringEvent, SwapEvent,
+};
 
 // --- Pass-by-pass replay ----------------------------------------------------
 
@@ -230,7 +238,8 @@ fn decompose_with_events(
     scope_label: &str,
     sequence: &mut usize,
 ) -> Result<(Vec<Instruction>, Vec<RuleFiringEvent>), String> {
-    let whole = decompose::decompose(instructions, profile, rules, scope).map_err(|e| e.to_string())?;
+    let whole =
+        decompose::decompose(instructions, profile, rules, scope).map_err(|e| e.to_string())?;
 
     let mut firings = Vec::new();
     let mut concatenated = Vec::new();
@@ -311,7 +320,9 @@ fn swap_events_from_diff(
         return Err("routing replay did not account for every original instruction".into());
     }
     if layout.permutation() != routed.final_layout.permutation() {
-        return Err("replayed layout trajectory does not match the router's own final layout".into());
+        return Err(
+            "replayed layout trajectory does not match the router's own final layout".into(),
+        );
     }
     Ok(events)
 }
@@ -389,7 +400,12 @@ fn try_replay_lowering(
     let can_reverse = profile.supports_operation("h") || rules.rule_for("h").is_some();
     let (routed_instructions, swap_events, final_layout) = if config.route {
         let output = ShortestPathRouter
-            .route(&reduced_circuit, initial_layout.clone(), profile, can_reverse)
+            .route(
+                &reduced_circuit,
+                initial_layout.clone(),
+                profile,
+                can_reverse,
+            )
             .map_err(|e| e.to_string())?;
         let events = swap_events_from_diff(&reduced_circuit, &output, &mut sequence)?;
         (output.instructions, events, output.final_layout)
@@ -433,7 +449,8 @@ fn try_replay_lowering(
         current = expanded;
 
         // --- O: orientation repair, one sweep ---
-        let (repaired, count) = routing::repair_orientation(&current, profile).map_err(|e| e.to_string())?;
+        let (repaired, count) =
+            routing::repair_orientation(&current, profile).map_err(|e| e.to_string())?;
         steps.push(LoweringStepReplay {
             id: "orientation-repair".into(),
             op_count: repaired.len(),
@@ -519,7 +536,10 @@ mod tests {
 
     const BELL: &str = "qubit[2] q; bit[2] c; h q[0]; cx q[0], q[1]; c = measure q;";
 
-    fn compile(source: &str, backend: &str) -> Result<oqci::compile::CompilationArtifacts, CompileError> {
+    fn compile(
+        source: &str,
+        backend: &str,
+    ) -> Result<oqci::compile::CompilationArtifacts, CompileError> {
         let config = CompilerConfig {
             backend: Some(backend.to_string()),
             stop: Stop::Prepared,
@@ -575,7 +595,9 @@ mod tests {
                     .find(|s| s.id == "gate-cancellation")
                     .unwrap();
                 assert!(cancellation.changed);
-                assert!(cancellation.instructions_after.len() < cancellation.instructions_before.len());
+                assert!(
+                    cancellation.instructions_after.len() < cancellation.instructions_before.len()
+                );
             }
         }
     }
@@ -597,7 +619,11 @@ mod tests {
             assert!(!replay.degraded, "degraded: {:?}", replay.degraded_reason);
             assert_eq!(replay.steps.len(), 7, "the seven-step schedule");
             assert_eq!(
-                replay.steps.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(),
+                replay
+                    .steps
+                    .iter()
+                    .map(|s| s.id.as_str())
+                    .collect::<Vec<_>>(),
                 vec![
                     "arity-reduction",
                     "layout",

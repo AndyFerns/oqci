@@ -111,23 +111,36 @@ pub struct LoweringReplay {
     pub degraded_reason: Option<String>,
 }
 
-/// A subscribe request from the frontend. `CompileSource` is defined now,
-/// for wire-contract stability, but returns `Unimplemented` until the
-/// hosted-playground phase.
+/// A subscribe request from the browser.
+///
+/// `WatchFile` picks the compiler frontend from the file's extension (`.py`
+/// is a CUDA-Q kernel). `CompileSource` carries text with no filename, so it
+/// names its frontend explicitly, defaulting to OpenQASM 3 when omitted —
+/// which keeps messages written before CUDA-Q existed valid.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ClientMessage {
-    WatchFile { path: String },
-    CompileSource { source: String, name: String },
+    WatchFile {
+        path: String,
+    },
+    CompileSource {
+        source: String,
+        name: String,
+        #[serde(default)]
+        frontend: Option<String>,
+    },
 }
 
 /// Everything the server ever pushes over the WebSocket.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ServerMessage {
+    // Boxed: a report is far larger than the other variants
+    // (clippy::large_enum_variant). Serde serializes a `Box` transparently,
+    // so the JSON on the wire is unchanged.
     PipelineReport {
         sequence: u64,
-        report: PipelineReport,
+        report: Box<PipelineReport>,
     },
     PassReplay {
         sequence: u64,

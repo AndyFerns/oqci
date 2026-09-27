@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use oqci::analysis::diff_circuits;
 use oqci::cli::snapshot::{self, PassRecordView, PipelineReport, StageSnapshot};
-use oqci::compile::{CompilationArtifacts, CompilerConfig, Stop};
+use oqci::compile::{CompilationArtifacts, CompilerConfig, Frontend, Stop};
 use oqci::ir::{emit_qir, qc_to_qco};
 
 use crate::error::ServerError;
@@ -20,6 +20,7 @@ use crate::error::ServerError;
 pub struct CompileRequest {
     pub source: String,
     pub name: String,
+    pub frontend: Frontend,
     pub backend: Option<String>,
     pub bindings: HashMap<String, f64>,
 }
@@ -32,21 +33,26 @@ pub struct CompileResult {
 /// Runs the real compiler once and builds the JSON report from its result.
 pub fn compile(request: &CompileRequest) -> Result<CompileResult, ServerError> {
     let config = CompilerConfig {
+        frontend: request.frontend,
         bindings: request.bindings.clone(),
         backend: request.backend.clone(),
         stop: Stop::Prepared,
         ..CompilerConfig::default()
     };
     let artifacts = oqci::compile::compile_named(&request.source, &request.name, &config)?;
-    let report = build_report(&request.name, &artifacts)?;
+    let report = build_report(&request.name, request.frontend, &artifacts)?;
     Ok(CompileResult { report, artifacts })
 }
 
-fn build_report(name: &str, artifacts: &CompilationArtifacts) -> Result<PipelineReport, ServerError> {
+fn build_report(
+    name: &str,
+    frontend: Frontend,
+    artifacts: &CompilationArtifacts,
+) -> Result<PipelineReport, ServerError> {
     let circuit = artifacts.final_circuit();
     let mut report = PipelineReport {
         source_path: name.to_string(),
-        frontend: "openqasm3".into(),
+        frontend: frontend.id().into(),
         circuit_name: circuit.name().to_string(),
         unbound_parameters: circuit.parameters(),
         stages: Vec::new(),
@@ -142,4 +148,47 @@ fn build_report(name: &str, artifacts: &CompilationArtifacts) -> Result<Pipeline
     report.executable = artifacts.executable.as_ref().map(snapshot::executable_view);
 
     Ok(report)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use oqci::pass::{PassContext, PassSelection};
+
+    const GHZ_CUDAQ: &str = "import cudaq\n\n@cudaq.kernel\ndef ghz():\n    q = cudaq.qvector(3)\n    h(q[0])\n    x.ctrl(q[0], q[1])\n    x.ctrl(q[1], q[2])\n    mz(q[0])\n    mz(q[1])\n    mz(q[2])\n";
+
+    #[test]
+    fn a_cudaq_kernel_is_reported_and_replayed_without_degrading() {
+        let result = compile(&CompileRequest {
+            source: GHZ_CUDAQ.into(),
+            name: "ghz".into(),
+            frontend: Frontend::CudaQ,
+            backend: Some("simulator-nisq".into()),
+            bindings: HashMap::new(),
+        })
+        .unwrap();
+        assert_eq!(result.report.frontend, "cudaq");
+
+        // The replay is frontend-agnostic — it starts from the circuit the
+        // frontend built — so a CUDA-Q circuit must cross-validate exactly
+        // as an OpenQASM one does.
+        let backend = oqci::backend::by_id("simulator-nisq").unwrap();
+        let context =
+            PassContext::with_profile(backend.profile()).and_cost_model(backend.cost_model());
+        let passes = crate::replay::replay_passes(
+            &result.artifacts.source_circuit,
+            &PassSelection::All,
+            &context,
+            &result.artifacts.pass_records,
+        );
+        assert!(!passes.degraded, "{:?}", passes.degraded_reason);
+
+        let lowering = crate::replay::replay_lowering(
+            &result.artifacts.optimized,
+            backend.profile(),
+            &oqci::lowering::LoweringConfig::default(),
+            result.artifacts.lowered.as_ref().unwrap(),
+        );
+        assert!(!lowering.degraded, "{:?}", lowering.degraded_reason);
+    }
 }

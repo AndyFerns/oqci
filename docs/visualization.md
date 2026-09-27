@@ -113,10 +113,15 @@ proving this check can actually fail, not just always pass.
 ```json
 { "kind": "watch_file", "path": "examples/bell.qasm" }
 { "kind": "compile_source", "source": "OPENQASM 3.0; ...", "name": "inline" }
+{ "kind": "compile_source", "source": "@cudaq.kernel ...", "name": "inline", "frontend": "cudaq" }
 ```
 
 `watch_file` resolves `path` relative to (and confined within) the server's
-`--root`, starts a filesystem watcher, and recompiles on every save.
+`--root`, starts a filesystem watcher, and recompiles on every save. The
+frontend comes from the extension: a `.py` file is read as a CUDA-Q kernel
+([`cudaq_frontend.md`](cudaq_frontend.md)), anything else as OpenQASM 3.
+`compile_source` has no filename, so it takes an optional `frontend`
+(`"openqasm3"`, the default, or `"cudaq"`).
 `compile_source` compiles once immediately and again each time the client
 sends another `compile_source` message on the same connection — the shape a
 future hosted, no-filesystem playground would use; it needed no

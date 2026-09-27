@@ -18,6 +18,7 @@ use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
+use oqci::compile::Frontend;
 use oqci::pass::{PassContext, PassSelection};
 
 use crate::compile::{CompileRequest, CompileResult};
@@ -43,7 +44,12 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         return;
     };
     let Ok(first) = serde_json::from_str::<ClientMessage>(&first) else {
-        send_error(&mut sender, &mut sequence, "could not parse subscribe message").await;
+        send_error(
+            &mut sender,
+            &mut sequence,
+            "could not parse subscribe message",
+        )
+        .await;
         return;
     };
 
@@ -51,8 +57,19 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         ClientMessage::WatchFile { path } => {
             watch_loop(&mut sender, &mut receiver, &state, &mut sequence, path).await;
         }
-        ClientMessage::CompileSource { source, name } => {
-            source_loop(&mut sender, &mut receiver, &state, &mut sequence, source, name).await;
+        ClientMessage::CompileSource {
+            source,
+            name,
+            frontend,
+        } => {
+            source_loop(
+                &mut sender,
+                &mut receiver,
+                &state,
+                &mut sequence,
+                (source, name, frontend),
+            )
+            .await;
         }
     }
 }
@@ -106,17 +123,27 @@ async fn source_loop(
     receiver: &mut Receiver,
     state: &AppState,
     sequence: &mut u64,
-    mut source: String,
-    mut name: String,
+    first: (String, String, Option<String>),
 ) {
+    let (mut source, mut name, mut frontend) = first;
     loop {
-        compile_source_and_send(sender, state, sequence, &source, &name).await;
+        match resolve_frontend(frontend.as_deref()) {
+            Ok(selected) => {
+                compile_source_and_send(sender, state, sequence, &source, &name, selected).await;
+            }
+            Err(message) => send_error(sender, sequence, &message).await,
+        }
 
         match receiver.next().await {
             Some(Ok(Message::Text(text))) => match serde_json::from_str::<ClientMessage>(&text) {
-                Ok(ClientMessage::CompileSource { source: s, name: n }) => {
+                Ok(ClientMessage::CompileSource {
+                    source: s,
+                    name: n,
+                    frontend: f,
+                }) => {
                     source = s;
                     name = n;
+                    frontend = f;
                 }
                 Ok(ClientMessage::WatchFile { .. }) => {
                     send_error(
@@ -167,7 +194,27 @@ async fn compile_and_send(sender: &mut Sender, state: &AppState, sequence: &mut 
         .and_then(|s| s.to_str())
         .unwrap_or("main")
         .to_string();
-    compile_source_and_send(sender, state, sequence, &source, &name).await;
+    compile_source_and_send(
+        sender,
+        state,
+        sequence,
+        &source,
+        &name,
+        Frontend::for_path(path),
+    )
+    .await;
+}
+
+/// `compile_source` messages name their frontend; an absent one means
+/// OpenQASM 3, the project default.
+fn resolve_frontend(requested: Option<&str>) -> Result<Frontend, String> {
+    match requested {
+        None => Ok(Frontend::default()),
+        Some(id) => Frontend::from_id(id).ok_or_else(|| {
+            let known: Vec<&str> = Frontend::ALL.iter().map(|f| f.id()).collect();
+            format!("unknown frontend `{id}`; available: {}", known.join(", "))
+        }),
+    }
 }
 
 async fn compile_source_and_send(
@@ -176,6 +223,7 @@ async fn compile_source_and_send(
     sequence: &mut u64,
     source: &str,
     name: &str,
+    frontend: Frontend,
 ) {
     let seq = *sequence;
     *sequence += 1;
@@ -183,6 +231,7 @@ async fn compile_source_and_send(
     let request = CompileRequest {
         source: source.to_string(),
         name: name.to_string(),
+        frontend,
         backend: Some(state.default_backend.clone()),
         bindings: Default::default(),
     };
@@ -206,7 +255,7 @@ async fn compile_source_and_send(
         sender,
         &ServerMessage::PipelineReport {
             sequence: seq,
-            report,
+            report: Box::new(report),
         },
     )
     .await;
@@ -233,8 +282,12 @@ async fn compile_source_and_send(
 
     if let (Some(lowered), Some(backend)) = (&artifacts.lowered, &backend) {
         let lowering_config = oqci::lowering::LoweringConfig::default();
-        let lowering_replay =
-            replay::replay_lowering(&artifacts.optimized, backend.profile(), &lowering_config, lowered);
+        let lowering_replay = replay::replay_lowering(
+            &artifacts.optimized,
+            backend.profile(),
+            &lowering_config,
+            lowered,
+        );
         send(
             sender,
             &ServerMessage::LoweringReplay {
