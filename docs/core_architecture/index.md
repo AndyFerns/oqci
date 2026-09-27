@@ -98,8 +98,9 @@ At the verified `master` state:
 - a CUDA-Q frontend exists over a documented subset verified against
   NVIDIA's documentation (`docs/cudaq_frontend.md`), mapping into the same
   QC-IR as §5.5 requires and selected by `compile::Frontend::CudaQ` (or a
-  `.py` extension). It replaces the private IR of the `cudaq-adapter/`
-  prototype, whose execution half is not yet reimplemented;
+  `.py` extension). With the `oqci.backends.cudaq` execution adapter it
+  replaces the root-level `cudaq-adapter/` prototype, which has been removed.
+  Every adapter now follows one layout (`docs/adapters.md`);
 - a pass manager and four target-independent passes exist, and `Pass::run`
   now receives a `PassContext` carrying the selected target, which closes
   Stage E exit criterion 3 (`docs/pass_manager.md`);
@@ -138,8 +139,9 @@ At the verified `master` state:
 - per-operation cost and error/noise metadata on profiles (Stage D §2) remain
   absent, deliberately: both built-in profiles are synthetic, and a profile
   asserting error rates nobody measured would be a fabricated record;
-- Cirq and CUDA-Q execution adapters (§15.2) are not implemented, and there
-  is no Cirq frontend (§5.4);
+- a CUDA-Q execution adapter (§15.2) exists, but it has never run against a
+  real CUDA-Q install and its results are unverified until it is checked
+  against Aer; there is no Cirq frontend (§5.4) and no Cirq execution adapter;
 - `benchmarks/` is not yet a populated benchmark suite;
 - `mlir_compat.rs` exists as the future MLIR boundary but the full MLIR integration is not implemented;
 - **a live visualization companion exists** (`server/`, `frontend/`) — a

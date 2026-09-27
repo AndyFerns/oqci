@@ -33,7 +33,7 @@ It's Rust-native at its core (fast, and the invariants are enforced by the type 
 | Symbolic parameters | ✅ Implemented | Gate angles can be concrete or symbolic (`Rz(theta)`), with explicit binding before lowering - for VQE-style parameterized circuits. |
 | OpenQASM 3 frontend | ✅ Implemented | A documented, intentionally partial subset - see [`docs/openqasm_frontend.md`](docs/openqasm_frontend.md) for exactly what's in and what's refused. |
 | Qiskit frontend | ✅ Implemented | Pure-Rust translation core plus a PyO3 boundary exposed to Python. A `QuantumCircuit` now reaches the whole pipeline — lowering, an executable, provenance — through `oqci.compile`, not just QIR. See [`docs/qiskit_adapter.md`](docs/qiskit_adapter.md). |
-| CUDA-Q frontend | ✅ Implemented (documented subset) | Reads the `@cudaq.kernel` function in a `.py` file into the same QC-IR, and reaches the CLI, the SDK and the visualizer. Subset verified against NVIDIA's docs; loops, conditionals and kernel calls are refused by name. See [`docs/cudaq_frontend.md`](docs/cudaq_frontend.md). Running circuits *on* CUDA-Q is not implemented. |
+| CUDA-Q frontend | ✅ Implemented (documented subset) | Reads the `@cudaq.kernel` function in a `.py` file into the same QC-IR, and reaches the CLI, the SDK and the visualizer. Subset verified against NVIDIA's docs; loops, conditionals and kernel calls are refused by name. See [`docs/cudaq_frontend.md`](docs/cudaq_frontend.md). Running *on* CUDA-Q: see Simulator execution. |
 | Cirq frontend | ⛔ Not started | Reserved in the design; no code yet. |
 | Pass manager | ✅ Implemented | Explicit registration/ordering, enable/disable per pass, deterministic execution, ablation support. See [`docs/pass_manager.md`](docs/pass_manager.md). |
 | Optimization passes | ✅ Implemented (target-independent only) | Canonicalization, gate cancellation, rotation merging, and scheduling-as-analysis - all verified against an independent state-vector simulator, not just unit-tested. Passes can now consult the selected target, though none of the shipped ones needs to. |
@@ -43,7 +43,7 @@ It's Rust-native at its core (fast, and the invariants are enforced by the type 
 | Compiler orchestration | ✅ Implemented | One path from source to artifacts, taken by the CLI, the Python SDK and library callers alike. See [`docs/compiler.md`](docs/compiler.md). |
 | `oqci` CLI | ✅ Implemented | Inspect every pipeline stage for a real program — now including `lower` and `prepare` — plus a live `watch` mode. See [`docs/cli.md`](docs/cli.md). |
 | Live visualization | ✅ Implemented (local dev-companion) | `server/` + `frontend/`: a browser view of the same pipeline, live-updating on save, with a scrubbable pass-by-pass and swap/rule-by-rule replay that self-validates against the real compiler on every request. Read-only by construction — the only change to the `oqci` crate is one visibility flip. See [`docs/visualization.md`](docs/visualization.md). No hosted/multi-user mode. |
-| Simulator execution | ✅ Implemented | `oqci.backends.aer` runs a prepared circuit on Qiskit Aer, which is how the compiler's output is checked against something other than itself. |
+| Simulator execution | ✅ Implemented (Aer) · 🚧 CUDA-Q unverified | `oqci.backends.aer` runs a prepared circuit on Qiskit Aer, which is how the compiler's output is checked against something other than itself. `oqci.backends.cudaq` runs the same artifact on CUDA-Q, with counts keyed like Aer's. Its translation is tested, but it has never run against a real CUDA-Q install. Every adapter follows one layout; see [`docs/adapters.md`](docs/adapters.md). |
 | IBM hardware execution | 🚧 Prepared, not submitted | Lowering, validation, the executable artifact and its provenance all exist and are tested. **Submission does not.** That needs an SDK this project doesn't depend on and credentials it doesn't have — and untested code between a verified circuit and real hardware is worse than an honest gap. **No claim is made that anything here will run on an IBM device.** |
 | MLIR integration | ⛔ Not started (by design) | Rust owns the IR first; MLIR comes later, per the [locked architecture decisions](docs/core_architecture/index.md). |
 | Benchmark suite | ⛔ Not started | [`benchmarks/`](benchmarks/) is a placeholder; the experimental protocol isn't locked yet either. |
@@ -91,9 +91,9 @@ See [`examples/README.md`](examples/README.md) for what each sample file demonst
 | [`src/pass/`](src/pass/) | The pass manager and the optimization passes. |
 | [`src/analysis/`](src/analysis/) | Gate counts, depth, circuit diffing - the numbers everything else reports. |
 | [`src/cli/`](src/cli/) | The `oqci` inspector CLI. |
-| [`python/`](python/) | PyO3 bindings for the Qiskit-facing side. |
+| [`python/`](python/) | PyO3 bindings, the Python SDK, and the execution adapters (`oqci/backends/`: Aer, CUDA-Q). |
 | [`docs/`](docs/) | Normative specs for the IR, frontends, passes, and CLI - read these before the source if you're getting oriented. |
-| [`examples/`](examples/) | Small runnable `.qasm` programs. |
+| [`examples/`](examples/) | Small runnable programs: OpenQASM 3 (`.qasm`) and CUDA-Q kernels (`.py`). |
 
 Each directory also has its own `README.md` going into more depth.
 

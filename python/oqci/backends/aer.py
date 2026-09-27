@@ -35,8 +35,11 @@ fabricated experimental data wearing a library's name.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional
+
+from ._common import RunResult, UnsupportedOperation
+
+__all__ = ["AerResult", "UnsupportedOperation", "run", "to_qiskit"]
 
 #: Operations this adapter can replay, mapped to the ``QuantumCircuit`` method
 #: that implements each. Every entry was verified to exist by introspecting
@@ -72,49 +75,13 @@ _METHODS = {
 }
 
 
-class UnsupportedOperation(RuntimeError):
-    """An executable named an operation this adapter cannot replay.
+class AerResult(RunResult):
+    """What Aer returned, with the provenance of what produced it.
 
-    Raised rather than skipped. Dropping an operation would run a different
-    circuit from the one OQCI verified, and the counts would look perfectly
-    reasonable.
+    The fields are :class:`oqci.backends._common.RunResult`'s, shared with
+    every execution adapter. Aer's own counts already use the shared key
+    convention (clbit 0 rightmost), so they are returned unconverted.
     """
-
-
-@dataclass
-class AerResult:
-    """What Aer returned, with the provenance of what produced it."""
-
-    #: Measured bitstrings and how often each occurred.
-    counts: dict[str, int]
-    #: Per-shot outcomes, when requested.
-    memory: Optional[list[str]] = None
-    #: Aer's own metadata, verbatim.
-    backend_metadata: dict[str, Any] = field(default_factory=dict)
-    #: Wall-clock time inside :func:`run`, in milliseconds.
-    #:
-    #: Kept separate from any compilation timing. Stage C §8 forbids
-    #: conflating the two, and this number covers execution only — the
-    #: compiler had already finished before the executable reached here.
-    execution_duration_ms: Optional[float] = None
-    #: Everything needed to cite this result, carried from the executable.
-    provenance: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def observed_shots(self) -> int:
-        """Shots actually observed, summed from the counts.
-
-        Derived from the data rather than echoed from the request, so a run
-        that returned fewer shots than were asked for is visible.
-        """
-        return sum(self.counts.values())
-
-    def probabilities(self) -> dict[str, float]:
-        """The counts as frequencies."""
-        total = self.observed_shots
-        if total == 0:
-            return {}
-        return {bits: count / total for bits, count in self.counts.items()}
 
 
 def to_qiskit(executable: Mapping[str, Any]):

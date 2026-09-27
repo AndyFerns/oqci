@@ -384,9 +384,10 @@ are **absent**:
 - **A Cirq frontend** (§5.4). OpenQASM 3, CUDA-Q (a documented subset, see
   [`cudaq_frontend.md`](cudaq_frontend.md)) and Qiskit all reach the whole
   pipeline; Cirq does not exist in any form.
-- **Execution on CUDA-Q** (§15.2). The CUDA-Q *frontend* exists; an execution
-  adapter that runs an `Executable` on CUDA-Q, alongside `oqci.backends.aer`,
-  does not.
+- **Verified execution on CUDA-Q** (§15.2). `oqci.backends.cudaq` runs an
+  `Executable` on CUDA-Q alongside `oqci.backends.aer`, but it has not yet run
+  against a real CUDA-Q install; see
+  [`adapters.md`](adapters.md#verification-status).
 - **Circuit *construction* from Python.** §17 says "circuit
   construction/import". Import exists (OpenQASM 3 or CUDA-Q text, and a Qiskit
   `QuantumCircuit`); there is no builder API. Nothing in the SDK creates a

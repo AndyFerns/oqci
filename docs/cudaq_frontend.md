@@ -177,16 +177,17 @@ constructs and semantic errors name the construct and end with its line:
 error: unsupported construct: loops (`for`) are outside the supported subset — unroll them; OQCI compiles static circuits only (line 5)
 ```
 
-## Relationship to `cudaq-adapter/`
+## Running on CUDA-Q, and the old `cudaq-adapter/`
 
-The standalone `cudaq-adapter/` package merged earlier defined its own
-private IR and its own JSON. That IR could not be optimized by the pass
-manager, lowered, or visualized. Its frontend also dropped all but the last of
-several per-qubit `mz` calls, and it accepted non-finite angles. This frontend
-replaces that package's CUDA-Q → IR half.
+This frontend is the *reading* half of OQCI's CUDA-Q support. The *running*
+half is `oqci.backends.cudaq`, an execution adapter that turns a prepared
+`Executable` back into a kernel written in this same subset and samples it.
+Because it writes this subset, its output is tested by feeding it back
+through this frontend.
 
-Its *execution* half, running a circuit on CUDA-Q, is still pending. The spec
-places it as an execution adapter consuming an `Executable`, alongside
-`oqci.backends.aer` (§15.2). It needs a pinned CUDA-Q release to verify
-against, and no CUDA-Q installation was available in the environment this
-frontend was written in, so it has not been written yet.
+Both halves replace the root-level `cudaq-adapter/` prototype, which
+carried its own private IR. That IR could not be optimized, lowered or
+visualized. Its frontend also dropped all but the last of several per-qubit
+`mz` calls, and it accepted non-finite angles. See
+[`adapters.md`](adapters.md) for the execution adapter, the layout every
+adapter follows, and where each prototype file went.
