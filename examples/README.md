@@ -12,6 +12,7 @@ explicitly.
 | [`ghz3.qasm`](ghz3.qasm) | A three-qubit GHZ state with a deliberately redundant `x q[2]; h q[1]; x q[2];` sequence — the two `x` gates cancel despite the unrelated gate between them, because cancellation is a QCO-IR-adjacency question, not a textual one. Run `oqci optimize examples/ghz3.qasm --diff` to see it happen. |
 | [`parameterized.qasm`](parameterized.qasm) | A VQE-style circuit with two `input`-declared symbolic parameters and a pair of same-axis rotations for `rotation-merge` to fold. QIR emission is deliberately unavailable until you supply `--bind theta=… --bind phi=…`. |
 | [`ghz3_cudaq.py`](ghz3_cudaq.py) | The GHZ state as a CUDA-Q kernel, read by the CUDA-Q frontend (a `.py` extension selects it). Measures each qubit with its own `mz`, and keeps CUDA-Q host code around the kernel to show it is ignored. See [`../docs/cudaq_frontend.md`](../docs/cudaq_frontend.md). |
+| [`bell_cudaq.py`](bell_cudaq.py) | The Bell pair as a CUDA-Q kernel, measured with one broadcast `mz(q)`. Carried over from the old `cudaq-adapter/` prototype. Its header shows the whole round trip: compile it, `oqci prepare` it, then run the artifact on CUDA-Q with `python -m oqci.backends.cudaq` (see [`../docs/adapters.md`](../docs/adapters.md)). |
 
 ## Try it
 
