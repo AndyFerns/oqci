@@ -147,6 +147,25 @@ fn a_three_qubit_gate_is_reduced_before_anything_consults_the_coupling_map() {
     assert!(lowered.legality.is_legal());
 }
 
+#[test]
+fn a_three_qubit_gate_the_target_declares_survives_lowering() {
+    // The counterpart to the test above. D0 only reduces wide gates the
+    // profile does *not* declare, so verification must use the same predicate:
+    // `ideal-simulator` lists `ccx`, and refusing it here would reject a
+    // circuit for using an operation the target said it can run.
+    let mut b = CircuitBuilder::new("toffoli");
+    let q = b.alloc_qubits(3);
+    b.ccx(q[0], q[1], q[2]);
+    let circuit = b.build().unwrap();
+
+    let profile = builtin::ideal_simulator();
+    let lowered = lower(&circuit, &profile, &LoweringConfig::default()).unwrap();
+
+    assert!(lowered.legality.is_legal());
+    assert!(lowered.rules_applied.is_empty(), "nothing to decompose");
+    assert_eq!(lowered.circuit, circuit);
+}
+
 // --- Orientation ------------------------------------------------------------
 
 #[test]

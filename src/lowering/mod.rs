@@ -10,7 +10,7 @@
 //! # The schedule
 //!
 //! ```text
-//! D0  arity reduction     every gate -> at most two qubits
+//! D0  arity reduction     every wide gate outside the basis -> at most two
 //! L   layout              logical -> physical, injective
 //! R   routing             insert Swaps; program order; insertion-only
 //! D1  basis decomposition rewrite everything outside the basis
@@ -28,6 +28,11 @@
 //! complete path from a valid input to a "verified" output no device can run.
 //! Reducing arity first closes it, and gives layout a real two-qubit
 //! interaction graph to work with.
+//!
+//! The one wide gate D0 leaves standing is one the profile itself declares:
+//! `ideal-simulator` lists `ccx`, and a target that says it runs Toffolis
+//! directly should not be handed six CNOTs instead. Verification uses the same
+//! predicate, so the two phases agree on exactly which wide gates are legal.
 //!
 //! **O is separate from D1 and D2, and there is no outer loop.** Putting
 //! orientation repair inside decomposition creates an apparent cycle:
@@ -49,7 +54,8 @@
 //!
 //! What makes the output legal, rather than merely finished:
 //!
-//! - **I1**, after D0: every gate has arity at most two.
+//! - **I1**, after D0: every gate has arity at most two, or is a wide gate the
+//!   profile declares.
 //! - **I2**, after R: every two-qubit gate sits on a coupled pair.
 //! - **I3**, always: a decomposition rule may only permute the operands it
 //!   was given, never name a new qubit. Enforced when the rule set is built.
@@ -533,8 +539,11 @@ fn verify(
             continue;
         };
         // `check` skips connectivity for anything that is not exactly two
-        // qubits, so a surviving wide gate would be reported legal.
-        if qubits.len() > 2 && config.decompose {
+        // qubits, so a wide gate outside the basis would be reported legal.
+        // A wide gate the profile *declares* is a different matter: D0 leaves
+        // it alone on purpose, and refusing it here would reject the circuit
+        // for using an operation the target said it can run.
+        if qubits.len() > 2 && config.decompose && !profile.supports_operation(kind.mnemonic()) {
             return Err(LoweringError::VerificationFailed {
                 violations: vec![Violation::UnsupportedOperation {
                     index,

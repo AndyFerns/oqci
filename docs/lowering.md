@@ -786,7 +786,7 @@ composition.
 `lower()` is a **sequence of seven steps, not a loop to a fixed point**:
 
 ```text
-D0  arity reduction     every gate -> at most two qubits
+D0  arity reduction     every wide gate outside the basis -> at most two
 L   layout              logical -> physical, injective
 R   routing             insert Swaps; program order; insertion-only
 D1  basis decomposition rewrite everything outside the basis
@@ -828,6 +828,16 @@ agrees and the circuit is still wrong.
 
 Reducing arity first closes it, and gives layout a real two-qubit interaction
 graph to count over rather than a graph with a three-way clique in it.
+
+The scope is "wide **and not native**", per the table above, and V uses the
+same predicate rather than refusing every wide gate. `ideal-simulator` declares
+`ccx`, so a Toffoli compiled for it stays a Toffoli — handing that target six
+CNOTs would be worse output, and refusing the circuit outright would reject it
+for using an operation the target said it can run. The hazard above is about a
+wide gate *outside* the basis surviving, which is exactly what D0 removes and
+what V still refuses. `a_three_qubit_gate_the_target_declares_survives_lowering`
+holds the other half of the contract, and `test_a_toffoli_compiles_for_a_target_that_declares_it`
+runs the result on Aer.
 
 `a_three_qubit_gate_is_reduced_before_anything_consults_the_coupling_map`
 demonstrates the hazard before demonstrating the fix: it first asserts that
@@ -876,7 +886,7 @@ established by one phase and preserved by the rest.
 
 | # | Statement | Established by | Preserved because |
 |---|---|---|---|
-| **I1** | Every gate has arity at most two. | D0 | No rule may increase a one-qubit source's arity (check 5), and routing inserts only two-qubit `Swap`s. Re-asserted at V. |
+| **I1** | Every gate has arity at most two, or is a wide gate the profile declares. | D0 | No rule may increase a one-qubit source's arity (check 5), and routing inserts only two-qubit `Swap`s. Re-asserted at V. |
 | **I2** | Every two-qubit gate sits on a coupled pair. | R | See I3. |
 | **I3** | A decomposition rule may only permute the operands it was given, never name a new qubit. | `RuleSet::new`, check 2 | Enforced when the rule set is built, so it holds for every circuit before any circuit is seen. |
 | **I4** | Every two-qubit gate is natively oriented, and every mnemonic is in the basis. | O and D2 | O emits in the declared operand order; D2 only rewrites one-qubit gates. |
@@ -1108,7 +1118,7 @@ and is not.
 
 | Assertion | Why `check` cannot make it | Error |
 |---|---|---|
-| Every gate has arity ≤ 2 (when `decompose` is on) | `check` skips connectivity for anything that is not exactly two operands, so a surviving wide gate is reported legal. | `VerificationFailed`, carrying a synthesized `UnsupportedOperation { mnemonic: "ccx (arity 3)" }` |
+| Every gate has arity ≤ 2, unless the profile declares it (when `decompose` is on) | `check` skips connectivity for anything that is not exactly two operands, so a wide gate outside the basis is reported legal. The exemption matches D0's scope, so the two phases cannot disagree about which wide gates are acceptable. | `VerificationFailed`, carrying a synthesized `UnsupportedOperation { mnemonic: "ccx (arity 3)" }` |
 | No symbolic parameter survives on an operation whose lowering would have had to transform it | `check` reports `UnboundParameter` without distinguishing "awaiting binding" from "should have been bound before lowering", and says nothing about what to do. | `UnboundParameter`, whose message ends "bind parameters before lowering" |
 
 And it makes one deliberate **subtraction**: `Violation::UnboundParameter` is

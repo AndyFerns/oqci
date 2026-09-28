@@ -39,6 +39,8 @@ TOLERANCE = 0.04
 BELL_ADJACENT = "qubit[2] q; bit[2] c; h q[0]; cx q[0], q[1]; c = measure q;"
 BELL_DISTANT = "qubit[3] q; bit[3] c; h q[0]; cx q[0], q[2]; c = measure q;"
 GHZ3 = "qubit[3] q; bit[3] c; h q[0]; cx q[0], q[1]; cx q[1], q[2]; c = measure q;"
+#: A Toffoli with both controls set, so the target flips deterministically.
+TOFFOLI = "qubit[3] q; bit[3] c; x q[0]; x q[1]; ccx q[0], q[1], q[2]; c = measure q;"
 
 
 def run(source, backend, **kwargs):
@@ -82,6 +84,26 @@ def test_a_bell_pair_survives_lowering_to_a_restricted_basis():
     artifacts, result = run(BELL_ADJACENT, "simulator-nisq")
     assert "h-to-rz-sx" in artifacts["lowering"]["rules_applied"]
     assert_distribution(result, {"00": 0.5, "11": 0.5})
+
+
+def test_a_toffoli_compiles_for_a_target_that_declares_it():
+    """`simulator` lists `ccx`, so lowering must leave it alone, not refuse it.
+
+    Arity reduction only rewrites wide gates the target does *not* declare, and
+    verification once disagreed with it — rejecting every three-qubit gate
+    outright, so a Toffoli could not be compiled for the ideal simulator at all.
+    """
+    artifacts, result = run(TOFFOLI, "simulator")
+    used = {op["op"] for op in artifacts["executable"]["ops"]}
+    assert "ccx" in used, "the target runs Toffolis natively; it should get one"
+    assert_distribution(result, {"111": 1.0})
+
+
+def test_a_toffoli_reaches_the_same_answer_through_decomposition():
+    """The same program on a target that must decompose it into CNOTs."""
+    artifacts, result = run(TOFFOLI, "simulator-nisq")
+    assert "ccx-to-cx" in artifacts["lowering"]["rules_applied"]
+    assert_distribution(result, {"111": 1.0})
 
 
 def test_a_distant_bell_pair_survives_routing():

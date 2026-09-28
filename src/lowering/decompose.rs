@@ -27,7 +27,8 @@ use crate::target::BasisProfile;
 /// How much of the gate set a pass is trying to eliminate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
-    /// Rewrite only operations of arity three or more.
+    /// Rewrite only operations of arity three or more that the target does not
+    /// declare.
     ///
     /// Runs **before** layout and routing. A coupling map describes pairs, so
     /// a three-qubit gate has no meaning on one: routing cannot make three
@@ -36,6 +37,10 @@ pub enum Scope {
     /// it only checks connectivity for operations with exactly two operands.
     /// That is a complete path from a valid input to a "verified" output that
     /// no device can run, and reducing arity first is what closes it.
+    ///
+    /// A wide gate the profile *declares* — `ccx` on `ideal-simulator` — is
+    /// left alone: the target said it runs the operation, so there is nothing
+    /// to repair. Verification applies the same predicate.
     ArityOnly,
     /// Rewrite every operation the target does not support.
     Basis,
