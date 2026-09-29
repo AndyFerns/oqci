@@ -80,7 +80,7 @@ row, or `oqci watch <file>` to keep seeing them as you edit — see
 | QC-IR → QCO-IR conversion | `src/ir/convert.rs` |
 | QCO-IR → QIR emission | `src/ir/qir.rs` |
 | Error type (`IrError`) | `src/ir/error.rs` |
-| Phase 2 MLIR seam (empty by design) | `src/ir/mlir_compat.rs` |
+| MLIR seam (empty by design; MLIR is optional, Stage B) | `src/ir/mlir_compat.rs` |
 | Compiler orchestrator (`compile`, `compile_circuit`, `CompilerConfig`) | `src/compile.rs` |
 | Pass manager (`Pass`, `PassManager`) | `src/pass/mod.rs` |
 | Optimization passes | `src/pass/{canonicalize,cancellation,rotation_merge,schedule}.rs` |

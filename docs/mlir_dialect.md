@@ -2,8 +2,8 @@
 
 **Status:** written spec only. **No TableGen, C++, or FFI exists in the
 repository.** This document defines the dialect that OQCI's Rust IR types
-(`src/ir/`) mirror one-to-one, so that Phase 2 MLIR integration is a *mechanical
-translation, not a redesign*. The constraints that keep it mechanical are the
+(`src/ir/`) mirror one-to-one, so that MLIR integration, if it is ever
+undertaken (Stage B), is a *mechanical translation, not a redesign*. The constraints that keep it mechanical are the
 IR contract,
 [`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md);
 whether MLIR is adopted at all is
@@ -41,7 +41,7 @@ symbolic gate parameters (§2) and classical-bit wires (§6).
 **Type-constraint rationale.** In Rust the newtypes make `QubitId` and `ClbitId`
 non-interchangeable; in MLIR the same guarantee is a *type constraint* on op
 operands (a `quantum.gate` operand must be `!quantum.qubit`). The Rust newtype is
-the cheap stand-in for that constraint today, so the Phase 2 verifier rule is
+the cheap stand-in for that constraint today, so the MLIR verifier rule is
 already implied by the Rust type. Gate parameters in the Rust IR are `Param`
 values (`ir_spec.md` §1.1): either `Concrete(Angle)` or `Symbol(String)`. A
 concrete `Angle` maps to a `FloatAttr`. **How a `Param::Symbol` maps is not yet
@@ -100,7 +100,7 @@ mnemonic, `#operands == GateKind::arity()`, and operands are pairwise distinct
 
 Operand: one `!quantum.qubit`. Results: the post-measurement qubit value and one
 `!quantum.result`. The `target` `ClbitId` becomes the SSA identity of the
-`!quantum.result`. Non-unitary — a Phase 2 op trait `Collapsing` marks it so
+`!quantum.result`. Non-unitary — an op trait `Collapsing` marks it so
 passes can honor the control-dependency barrier.
 
 ### 4.3 `quantum.reset`  ⟵  `Instruction::Reset { qubit }`
@@ -170,10 +170,13 @@ it (`ir_spec.md` §4.1, §5). This dialect has no classical block arguments,
 fresh `!quantum.result` — so the example above drops `%r0`, and a classical bit
 written by two measurements has no representation.
 
-## 7. Phase 2 integration path
+## 7. Integration path, if MLIR is adopted
 
-What Phase 2 adds on top of this spec (see the ADR for the "why" and the
-non-negotiable constraints):
+What an MLIR integration would add on top of this spec (see
+[`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md)
+for the "why" and
+[`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md)
+for the non-negotiable constraints):
 
 1. **TableGen definitions** (§8) generating the C++ op classes.
 2. **A pass manager** hosting optimization passes over `quantum.circuit`

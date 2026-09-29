@@ -16,7 +16,7 @@
 //! - [`bind`] — [`bind_parameters`], the explicit symbolic → concrete step
 //!   that must precede lowering.
 //! - [`error`] — the [`IrError`] type returned by all fallible IR operations.
-//! - [`mlir_compat`] — the (currently empty) Phase 2 MLIR integration seam.
+//! - [`mlir_compat`] — the (empty) MLIR integration seam; MLIR is optional.
 //!
 //! The types obey the IR contract (C1–C8,
 //! `docs/architecture_decision_ir_contract.md`), which makes every `Circuit` a

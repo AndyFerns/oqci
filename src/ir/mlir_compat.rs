@@ -1,11 +1,11 @@
-//! MLIR compatibility boundary — **intentionally empty in Phase 0.**
+//! MLIR compatibility boundary — **intentionally empty.**
 //!
 //! This module exists so that the module boundary for MLIR integration is
-//! established *now*, before Phase 2, rather than bolted on later. It is the
-//! single seam through which the future MLIR port will flow, keeping the rest of
-//! the IR (`qc`, `qco`, `convert`, `qir`) free of any MLIR dependency today.
+//! established ahead of any integration rather than bolted on later. It is the
+//! single seam through which an MLIR port would flow, keeping the rest of the
+//! IR (`qc`, `qco`, `convert`, `qir`) free of any MLIR dependency.
 //!
-//! # Phase 2 role
+//! # Role, if MLIR is adopted
 //!
 //! If MLIR integration is ever added (see
 //! `docs/architecture_decision_mlir_phase2.md` and Stage B), this module will

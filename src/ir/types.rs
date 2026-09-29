@@ -3,7 +3,7 @@
 //! These types are deliberately *newtype-wrapped* rather than bare primitives.
 //! The wrapping is the cheap Rust equivalent of MLIR's typed SSA values and
 //! typed attributes: it makes the eventual MLIR mapping explicit and prevents a
-//! stringly-typed / integer-soup redesign in Phase 2. See
+//! stringly-typed / integer-soup redesign if MLIR is ever adopted. See
 //! [`crate::ir::mlir_compat`] and `docs/mlir_dialect.md` for the exact
 //! correspondence.
 
@@ -14,7 +14,8 @@ use crate::ir::param::Param;
 /// A reference to a qubit in a [`crate::ir::Circuit`].
 ///
 /// Newtype-wrapped (rather than a bare `u32`) so that qubit references map
-/// one-to-one onto typed MLIR SSA values of `!quantum.qubit` in Phase 2. Values
+/// one-to-one onto typed MLIR SSA values of `!quantum.qubit` in the dialect
+/// spec (`docs/mlir_dialect.md`). Values
 /// are dense indices into a circuit's qubit register: a circuit declaring `n`
 /// qubits owns exactly `QubitId(0)..QubitId(n)`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -36,7 +37,7 @@ impl fmt::Display for QubitId {
 
 /// A reference to a classical bit in a [`crate::ir::Circuit`].
 ///
-/// Classical bits are measurement targets. In Phase 0 they are write-only:
+/// Classical bits are measurement targets. They are write-only:
 /// gates never read them (there is no classical feed-forward yet — see
 /// `docs/architecture_decision_no_frontend.md` and the scope notes in
 /// `docs/ir_spec.md`). Maps onto a typed MLIR SSA value of `!quantum.result`.
@@ -59,8 +60,9 @@ impl fmt::Display for ClbitId {
 
 /// A rotation angle / gate parameter, in **radians**.
 ///
-/// A dedicated type (rather than a bare `f64`) so Phase 2 can swap the internal
-/// representation for MLIR's `FloatAttr` without touching a single call site.
+/// A dedicated type (rather than a bare `f64`) so an MLIR port could swap the
+/// internal representation for MLIR's `FloatAttr` without touching a single
+/// call site.
 /// The value is stored as `f64`; angles are **not** normalised modulo `2π`, so
 /// the IR preserves exactly what a frontend or builder supplied.
 ///

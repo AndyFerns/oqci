@@ -180,10 +180,10 @@ entry:
 attributes #0 = { "entry_point" "output_labeling_schema" "qir_profiles"="base_profile" "required_num_qubits"="2" "required_num_results"="2" }
 ```
 
-## 5. Phase 2 note
+## 5. If MLIR is adopted
 
-Under MLIR (Phase 2), this textual emitter is replaced by a dialect conversion
-from `quantum` to the QIR/LLVM dialect. The mapping table in §2 becomes the set
+MLIR is optional (Stage B). If it is adopted, this textual emitter could be
+replaced by a dialect conversion from `quantum` to the QIR/LLVM dialect. The mapping table in §2 becomes the set
 of rewrite patterns; the extended-intrinsic and deferred-measurement caveats
 become opt-in conversion/decomposition passes. Nothing in the table changes —
 only the mechanism that applies it. See
