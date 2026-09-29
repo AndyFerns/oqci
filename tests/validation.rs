@@ -205,6 +205,35 @@ fn angle_u_gate_negative_infinity_rejected() {
     assert!(matches!(err, IrError::NonFiniteAngle { .. }));
 }
 
+/// I8 variant a: a symbolic rotation parameter with an empty name is rejected.
+#[test]
+fn empty_parameter_symbol_rejected() {
+    let mut b = CircuitBuilder::new("i8-a");
+    let q0 = b.alloc_qubit();
+    b.rz(Param::symbol(""), q0);
+    let err = b.build().expect_err("empty symbol name must be rejected");
+    assert_eq!(err, IrError::EmptyParameterSymbol { gate: "rz".into() });
+}
+
+/// I8 variant b: an empty symbol is rejected even beside valid parameters.
+#[test]
+fn empty_parameter_symbol_inside_u_gate_rejected() {
+    let mut b = CircuitBuilder::new("i8-b");
+    let q0 = b.alloc_qubit();
+    b.gate(
+        GateKind::U {
+            theta: Param::symbol("theta"),
+            phi: Param::concrete(0.0),
+            lambda: Param::symbol(""),
+        },
+        [q0],
+    );
+    let err = b
+        .build()
+        .expect_err("an empty U-gate symbol must be rejected");
+    assert!(matches!(err, IrError::EmptyParameterSymbol { .. }));
+}
+
 /// I1 positive control: the maximum in-range qubit index is accepted.
 #[test]
 fn valid_boundary_max_qubit_index_accepted() {
@@ -224,4 +253,14 @@ fn valid_boundary_max_clbit_index_accepted() {
     b.measure(q0, cs[1]); // highest valid index
     let circuit = b.build().expect("max valid clbit index must build");
     assert_eq!(circuit.num_clbits(), 2);
+}
+
+/// I8 positive control: a one-character symbol name is accepted, unbound.
+#[test]
+fn valid_boundary_single_character_symbol_accepted() {
+    let mut b = CircuitBuilder::new("i8-ok");
+    let q0 = b.alloc_qubit();
+    b.rz(Param::symbol("t"), q0);
+    let circuit = b.build().expect("a non-empty symbol name must build");
+    assert_eq!(circuit.parameters(), vec!["t".to_string()]);
 }
