@@ -34,3 +34,6 @@ test_outputs/
 
 # Rendered mdBook site (generated from tracked Markdown under docs/).
 docs/book/
+
+# QIR corpus written by tests/qir_conformance.rs when OQCI_QIR_CORPUS_DIR is set.
+qir-corpus/

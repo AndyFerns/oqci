@@ -64,12 +64,14 @@ is the device's width.
 
 ### 1.2 Pointer style
 
-Opaque pointers (`ptr`) are the default: LLVM 17 and later, and PyQIR 0.12.5,
-read only those. Typed pointers — `%Qubit*`, `%Result*`, `i8*` labels passed
-through `getelementptr inbounds`, with `%Qubit` and `%Result` declared as
-opaque types — reproduce the specification's LLVM 13 examples, and are readable
-only by LLVM 16 and earlier. The choice changes spelling only, never
-structure (`ir::PointerStyle`).
+Opaque pointers (`ptr`) are the default: they are what LLVM 17 and later
+print and what PyQIR 0.12.5 emits. Typed pointers — `%Qubit*`, `%Result*`,
+`i8*` labels passed through `getelementptr inbounds`, with `%Qubit` and
+`%Result` declared as opaque types — reproduce the specification's LLVM 13
+examples, which is the spelling older LLVM releases (LLVM 14, for example)
+default to. The choice changes spelling only, never structure
+(`ir::PointerStyle`). Which tools accept which style is recorded in §4 from
+observed runs, not assumed.
 
 ### 1.3 Angle encoding and emission order
 
@@ -220,7 +222,32 @@ To get a Base-labeled module for a circuit that uses `sx`, `sxdg`, `id`, `p`,
 gates into the Base instruction set first. A circuit with mid-circuit
 measurement or reset can never be Base-labeled (§3.2).
 
-## 4. Worked example — Bell state
+## 4. Validation
+
+What has been checked, by what, and what each check does and does not prove.
+Every claim here names the tool and version; none is inferred.
+
+| Check | By | What it proves | Status |
+|---|---|---|---|
+| Base Profile structure (i64 entry point, the four blocks in order, `initialize` first, only unitaries in `body`, only `mz` in `measurements`, no reset, irreversible `mz` with `writeonly` result, non-null unique labels, attributes, the four module flags) on every example × every backend × both pointer styles | `tests/qir_conformance.rs` (OQCI's own test) | That OQCI's output matches OQCI's reading of `Base_Profile.md` at commit `e872897`. **Not independent evidence**: the same authors wrote the emitter and the check. | Runs in `cargo test`, on every CI platform. |
+| Parse + `Module.verify()`, and read back `qir_major_version` = 1, `qir_minor_version` = 0, `dynamic_*_management` = false, one entry point with readable `required_num_*` | PyQIR **0.12.5** (`scripts/validate_qir.py`) | The module is well-formed LLVM IR to PyQIR's LLVM, and its QIR metadata is readable with the intended values. Not Base Profile conformance. | **Observed passing** locally on 2026-09-30: 26/26 opaque and 26/26 typed modules (the corpus above plus one module of quoted `Opaque` names). As a negative control, the validator rejects a module lacking the QIR 1.0 module flags and entry-point attributes, as pre-0.5.0 output did. Also a CI job. |
+| `llvm-as` on every module | LLVM **18** (`llvm-as-18`, ubuntu-24.04), both pointer styles | The text is valid LLVM IR for that LLVM release. | CI job `qir-validate`. **Not yet observed**: no `llvm-as` is available on the development machine, and CI has not yet run this workflow. |
+| `llvm-as` on typed-pointer modules | LLVM **14** (`llvm-as-14`, ubuntu-22.04) | The typed spelling is valid IR for an LLVM that defaults to typed pointers, as the specification's examples do. | CI job `qir-typed-llvm14`. **Not yet observed**, for the same reason. |
+
+Interoperability evidence is consumer-side (`final-deliverables-spec.md`
+§14.3): a named tool at a pinned version accepted the artifact. No tool has yet
+*executed* an OQCI QIR module; that is Stage G territory.
+
+The corpus can be regenerated and checked locally:
+
+```bash
+OQCI_QIR_CORPUS_DIR=qir-corpus cargo test --test qir_conformance
+pip install -r python/requirements-qir.txt
+python scripts/validate_qir.py qir-corpus/opaque
+python scripts/validate_qir.py qir-corpus/typed
+```
+
+## 5. Worked example — Bell state
 
 QC-IR: `H q0 ; CX q0,q1 ; measure q0→c0 ; measure q1→c1`. Emitted QIR:
 
@@ -271,7 +298,7 @@ This is the `custom` form: the measurements stay in `body`. The same circuit
 emitted as `base_profile` (§3.3) has them in a `measurements` block between
 `body` and `output`.
 
-## 5. If MLIR is adopted
+## 6. If MLIR is adopted
 
 MLIR is optional (Stage B). If it is adopted, this textual emitter could be
 replaced by a dialect conversion from `quantum` to the QIR/LLVM dialect. The mapping table in §2 becomes the set

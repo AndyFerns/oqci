@@ -68,12 +68,13 @@ pub const OUTPUT_LABELING_SCHEMA: &str = "oqci_clbit";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PointerStyle {
-    /// LLVM opaque pointers, `ptr`. What LLVM 17 and later (and PyQIR 0.12.5)
-    /// read.
+    /// LLVM opaque pointers, `ptr`: what LLVM 17 and later print, and what
+    /// PyQIR 0.12.5 emits.
     #[default]
     Opaque,
     /// Typed pointers, `%Qubit*` / `%Result*` / `i8*`, as in the QIR 1.0
-    /// specification's LLVM 13 examples. Readable by LLVM 16 and earlier only.
+    /// specification's LLVM 13 examples. Older LLVM releases (LLVM 14, for
+    /// example) default to this spelling.
     Typed,
 }
 

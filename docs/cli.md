@@ -76,8 +76,9 @@ Every command that reads a program also takes the two QIR options (shown on
   `base_profile` when the circuit is legal for the `qir-base` target and
   `custom` otherwise, and the report says why. With `base`, a circuit that
   does not qualify is an error instead (exit code 1), naming the violations.
-- `--qir-pointers opaque|typed` (default `opaque`). `ptr` for LLVM 17+ and
-  PyQIR; `%Qubit*` for LLVM 16 and earlier.
+- `--qir-pointers opaque|typed` (default `opaque`). `ptr`, as LLVM 17+ and
+  PyQIR print it; or `%Qubit*`, as in the QIR 1.0 specification's examples
+  and older LLVM releases. See [`qir_lowering.md`](qir_lowering.md) §1.2.
 
 ### The `qir` stage
 
