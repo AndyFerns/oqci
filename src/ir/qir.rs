@@ -4,27 +4,29 @@
 //! following the classic typed-pointer form used by the QIR specification:
 //! opaque `%Qubit` / `%Result` types, `__quantum__qis__*` quantum intrinsics,
 //! `__quantum__rt__*` runtime calls, and a single `entry_point` function
-//! carrying Base-Profile module flags.
+//! carrying its attributes (no `!llvm.module.flags` are emitted).
 //!
 //! # Scope & profile
 //!
-//! There is no backend yet; QIR emission is the boundary. We emit a module
-//! targeting the **QIR Base Profile** shape (static qubit/result ids via
+//! QIR is an output artifact, not the execution path: backends consume
+//! [`crate::backend::Executable`], and nothing in the crate reads QIR back.
+//! We emit the **QIR Base Profile** *shape* (static qubit/result ids via
 //! `inttoptr`, no classical control flow). Operations are emitted in the
 //! deterministic topological order given by
 //! [`crate::ir::qco::QcoCircuit::topological_ops`].
 //!
-//! Two honesty caveats, both documented in `docs/qir_lowering.md`:
+//! Caveats, all documented in `docs/qir_lowering.md` §3:
 //!
 //! - **Extended intrinsics.** Gates outside the QIR standard instruction set
 //!   (`p`, `u`, `cy`, `swap`, `ccx`, `id`, `sx`, `sxdg`, and any
 //!   [`crate::ir::GateKind::Opaque`])
-//!   are emitted as declared `__quantum__qis__*` externs. They parse as valid
-//!   LLVM IR; a future decomposition pass (Phase 3) can lower them to the
-//!   standard set.
-//! - **Mid-circuit measurement.** Circuits with a measurement before later gates
-//!   are emitted in program order. Strict Base-Profile conformance
-//!   (measurements last) would need a deferred-measurement pass, also Phase 3.
+//!   are emitted as declared `__quantum__qis__*` externs. The emitter does not
+//!   decompose them; target lowering does, for a profile whose basis excludes
+//!   them. An `Opaque` name is used verbatim in the intrinsic name.
+//! - **Mid-circuit measurement and reset** are emitted in program order. No
+//!   deferred-measurement pass exists.
+//! - **Profile label.** `"qir_profiles"="base_profile"` is written for every
+//!   module, whatever it contains, and no emitted module has been validated.
 //!
 //! # Float encoding
 //!
@@ -166,8 +168,8 @@ fn intrinsic_name(kind: &GateKind) -> String {
         GateKind::Sdg => "__quantum__qis__s__adj".to_string(),
         GateKind::Tdg => "__quantum__qis__t__adj".to_string(),
         // Everything else uses `__quantum__qis__<mnemonic>__body`. For extended
-        // gates (id, p, u, cy, swap, ccx, opaque) the runtime must supply the
-        // intrinsic; see docs/qir_lowering.md.
+        // gates (id, sx, sxdg, p, u, cy, swap, ccx, opaque) the runtime must
+        // supply the intrinsic; see docs/qir_lowering.md.
         other => format!("__quantum__qis__{}__body", other.mnemonic()),
     }
 }
