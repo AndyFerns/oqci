@@ -69,13 +69,34 @@ def test_ghz3_preserves_instruction_order():
     assert all("cnot__body" in call for call in calls[1:])
 
 
-def test_mid_circuit_measurement_is_emitted_in_order():
+def test_a_measurement_last_on_its_qubit_moves_to_the_measurements_block():
+    # q0 is never touched after it is measured, so the circuit qualifies for
+    # the QIR Base Profile, whose structure puts every measurement after every
+    # unitary. The x on q1 therefore comes before the measurement of q0.
     qc = QuantumCircuit(2, 1)
     qc.h(0)
     qc.measure(0, 0)
     qc.x(1)
 
-    calls = body(oqci_native.qiskit_to_qir(qc))
+    qir = oqci_native.qiskit_to_qir(qc)
+    assert '"qir_profiles"="base_profile"' in qir
+    calls = body(qir)
+    assert "h__body" in calls[0]
+    assert "x__body" in calls[1]
+    assert "mz__body" in calls[2]
+
+
+def test_true_mid_circuit_measurement_is_custom_and_emitted_in_order():
+    # Here q0 is used after it is measured: not Base Profile, so the module is
+    # labeled `custom` and keeps program order.
+    qc = QuantumCircuit(1, 1)
+    qc.h(0)
+    qc.measure(0, 0)
+    qc.x(0)
+
+    qir = oqci_native.qiskit_to_qir(qc)
+    assert '"qir_profiles"="custom"' in qir
+    calls = body(qir)
     assert "h__body" in calls[0]
     assert "mz__body" in calls[1]
     assert "x__body" in calls[2]

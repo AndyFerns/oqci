@@ -103,7 +103,7 @@ Other entry points:
 |---|---|
 | `oqci.available_backends()` | `(id, description)` for every backend this build can compile for. |
 | `oqci.decomposition_rules()` | The rule library, with each rule's source, steps and declared exactness. |
-| `oqci.qasm3_to_qir(source)` | QIR text. A *lowering artifact*, not an execution guarantee — Stage C §5 is explicit that emitted QIR does not by itself mean a circuit will run. |
+| `oqci.qasm3_to_qir(source, *, backend=None, qir_profile="any", qir_pointers="opaque")` | QIR 1.0 text: the compilation's canonical module, from the optimized circuit (or the lowered one, with a `backend`), labeled `base_profile` only when the circuit qualifies. An *interoperability artifact*, not an execution guarantee — Stage C §5 is explicit that emitted QIR does not by itself mean a circuit will run. |
 | `oqci.cudaq_to_qir(source)` | The same, from CUDA-Q kernel source. |
 | `oqci.qiskit_to_qir(circuit)` | The same, from a live `QuantumCircuit`. |
 | `oqci.qiskit_parameters(circuit)` | A circuit's free parameters as OQCI sees them. A useful cross-check: a name Qiskit reports and this does not means the parameter reached OQCI inside a compound expression, which is not representable. |

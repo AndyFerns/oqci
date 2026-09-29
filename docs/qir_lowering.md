@@ -89,17 +89,21 @@ touches a qubit after measuring it (§3.3).
 
 The compiler orchestrator emits one canonical QIR artifact per compilation,
 from the most-lowered circuit available (`CompilationArtifacts::qir`, see
-[`compiler.md`](compiler.md#qirartifact)). The tools below are moving onto it;
-until each does, it calls `emit_qir` itself, on whichever circuit it holds:
+[`compiler.md`](compiler.md#qirartifact)): the lowered circuit when a backend
+was selected and lowering ran, the optimized circuit otherwise. Every tool
+shows that artifact; none emits QIR of its own:
 
-| Caller | Circuit emitted |
+| Caller | QIR shown |
 |---|---|
 | `oqci compile`, `optimize`, `lower`, `prepare`, `watch` (`src/cli/pipeline.rs`) | **the canonical artifact.** Shown with its label and source stage; see [`cli.md`](cli.md#the-qir-stage). |
 | visualization server (`server/src/compile.rs`) | **the canonical artifact**, with its label and source stage shown above the text. |
-| Python `qasm3_to_qir`, `qiskit_to_qir`, `cudaq_to_qir` (`python/src/lib.rs`) | the source circuit, after binding, with no optimization or lowering |
+| Python `oqci.compile` (the `qir` entry), `qasm3_to_qir`, `qiskit_to_qir`, `cudaq_to_qir` (`python/src/lib.rs`) | **the canonical artifact.** The `*_to_qir` helpers run the pipeline (optimization, and lowering when given a `backend`) and return its text. |
 
-Only the `oqci lower` path can remove extended intrinsics (§3.1), because only
-it has applied target lowering.
+Only a compilation with a backend can remove instructions outside the Base set
+(§3.1), because only it applies target lowering; `qir-base` is the backend that
+removes all of them. `ir::emit_qir` and `ir::emit_qir_with` remain public for
+library callers that hold a circuit and want QIR text directly; they always
+label the module `custom` (§3.3).
 
 ## 2. Op → QIR mapping table
 
