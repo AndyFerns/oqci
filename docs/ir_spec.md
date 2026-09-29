@@ -1,6 +1,6 @@
 # OQCI IR Specification — QC-IR and QCO-IR
 
-**Status:** Phase 0 (stable). **Scope:** the two IR levels and the conversion
+**Status:** normative. **Scope:** the two IR levels and the conversion
 between them. Backend/QIR emission is specified in
 [`qir_lowering.md`](qir_lowering.md); the MLIR dialect these types mirror is in
 [`mlir_dialect.md`](mlir_dialect.md).
@@ -112,12 +112,15 @@ fully open `Gate(String, …)` representation would make every pass stringly-typ
 and defeat exhaustive matching. A fully closed enum would reject any gate we
 did not foresee (custom pulse-level gates, vendor extensions). The registered
 enum + single `Opaque` variant gives exhaustiveness for the common path and an
-explicit, clearly-marked slow path for the rest — exactly MLIR's model, so the
-Phase 2 mapping is `registered → registered op`, `Opaque → UnregisteredOp`.
+explicit, clearly-marked slow path for the rest — the same split as MLIR's
+registered/unregistered distinction. In the dialect spec every gate is one
+`quantum.gate` op: a registered variant carries a registered `gate` mnemonic,
+and `Opaque` carries an unregistered one (`mlir_dialect.md` §4.1).
 
 ## 3. QC-IR — the imperative IR
 
-QC-IR (`src/ir/qc.rs`) is the direct lowering target for future frontends. A
+QC-IR (`src/ir/qc.rs`) is the direct lowering target of every frontend
+(OpenQASM 3, CUDA-Q, and the Qiskit adapter; see [`adapters.md`](adapters.md)). A
 **`Circuit`** is:
 
 - a name,
@@ -163,12 +166,32 @@ Each rule maps to exactly one error variant and one test.
 | I8 | every **symbolic** parameter has a non-empty name | `EmptyParameterSymbol` |
 
 A `Circuit` value is a *witness* that all eight hold; downstream stages
-(conversion, lowering) therefore never re-validate and never panic.
+therefore never re-check I1–I8 and never panic on them. Any stage that
+produces a *new* circuit — a pass, parameter binding, target lowering — builds
+it through `CircuitBuilder`, so the new circuit is validated again at its own
+construction. Target lowering's verification step checks something different:
+legality against a target profile ([`lowering.md`](lowering.md)), not I1–I8.
 
 Note what is deliberately **not** an invariant: a circuit may carry unbound
 symbolic parameters. That is a well-formed parameterized circuit (§1.1), not an
 error — the requirement for concrete values belongs to lowering, not to
 construction.
+
+### 3.4 Operational semantics
+
+A circuit denotes a map from an empty input to a classical outcome distribution:
+
+1. Allocate `num_qubits` qubits in state `|0…0⟩` and `num_clbits` classical bits
+   set to 0.
+2. Execute instructions in list order. `Gate{kind, qubits}` applies the unitary
+   `U_kind` to the named qubits (control/target as per §2). `Measure{q, c}`
+   samples `q` in the Z basis, collapses it, and stores the bit in `c`.
+   `Reset{q}` discards `q`'s state and sets it to `|0⟩`.
+3. The observable result is the joint distribution of the classical register.
+
+This is the standard operational semantics of a quantum circuit with mid-circuit
+measurement and no classical feed-forward (see §6 for the feed-forward scope
+decision).
 
 ### 3.5 Parameter binding
 
@@ -194,27 +217,13 @@ Binding is an explicit compiler step, never implicit: Stage F §8 requires that
 a backend never receive an ambiguous symbolic value where its execution API
 needs a concrete one.
 
-### 3.4 Operational semantics
-
-A circuit denotes a map from an empty input to a classical outcome distribution:
-
-1. Allocate `num_qubits` qubits in state `|0…0⟩` and `num_clbits` classical bits
-   set to 0.
-2. Execute instructions in list order. `Gate{kind, qubits}` applies the unitary
-   `U_kind` to the named qubits (control/target as per §2). `Measure{q, c}`
-   samples `q` in the Z basis, collapses it, and stores the bit in `c`.
-   `Reset{q}` discards `q`'s state and sets it to `|0⟩`.
-3. The observable result is the joint distribution of the classical register.
-
-This is the standard operational semantics of a quantum circuit with mid-circuit
-measurement and no classical feed-forward (see §6 for the feed-forward scope
-decision).
-
 ## 4. QCO-IR — the optimization IR
 
 QCO-IR (`src/ir/qco.rs`) is the same circuit as a **directed acyclic dependency
-graph** (DAG). It is the form Phase 3 passes will consume, because it makes
-explicit which operations may be reordered.
+graph** (DAG). It makes explicit which operations may be reordered. The
+optimization passes take and return QC-IR `Circuit`s and build QCO-IR
+internally to find wire-adjacent operations (`src/pass/adjacency.rs`) and ASAP
+layers (`src/pass/schedule.rs`); see [`pass_manager.md`](pass_manager.md).
 
 ### 4.1 Graph structure
 
@@ -342,9 +351,9 @@ The tests `linear_chain_linearizes_to_program_order`,
 `mid_circuit_measurement_full_pipeline`, and `ghz3_full_pipeline` exercise
 Claims 3–4 concretely (shared-wire ops stay ordered; disjoint ops need not).
 
-## 6. Scope decision — no classical feed-forward (Phase 0)
+## 6. Scope decision — no classical feed-forward
 
-Phase 0 supports measurement and reset but **not** classically-controlled
+The IR supports measurement and reset but **not** classically-controlled
 operations (`if (c == 1) X q`). Consequences that keep this document simple:
 
 - Classical bits are **write-only**: gates never read them, so there is no
@@ -356,7 +365,7 @@ operations (`if (c == 1) X q`). Consequences that keep this document simple:
 Rationale: feed-forward materially enlarges the DAG (classical read edges), the
 semantics (probabilistic branching), and the QIR profile (Adaptive rather than
 Base). Adding it before the unitary core is validated would entangle two hard
-problems. It is deferred to a later phase; the `Opaque` hatch and the
+problems. It remains out of scope (Stage F §5); the `Opaque` hatch and the
 `#[non_exhaustive]` error enum leave room to add it without a redesign.
 
 ## 7. MLIR correspondence (summary)

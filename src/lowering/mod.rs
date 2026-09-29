@@ -52,19 +52,21 @@
 //!
 //! # The invariant chain
 //!
-//! What makes the output legal, rather than merely finished:
+//! What makes the output legal, rather than merely finished. These are
+//! numbered L1–L4 to keep them apart from the IR invariants I1–I8
+//! (`docs/ir_spec.md` §3.3):
 //!
-//! - **I1**, after D0: every gate has arity at most two, or is a wide gate the
+//! - **L1**, after D0: every gate has arity at most two, or is a wide gate the
 //!   profile declares.
-//! - **I2**, after R: every two-qubit gate sits on a coupled pair.
-//! - **I3**, always: a decomposition rule may only permute the operands it
+//! - **L2**, after R: every two-qubit gate sits on a coupled pair.
+//! - **L3**, always: a decomposition rule may only permute the operands it
 //!   was given, never name a new qubit. Enforced when the rule set is built.
-//! - I2 and I3 together mean **I2 survives D1, O and D2**: no rewrite can
+//! - L2 and L3 together mean **L2 survives D1, O and D2**: no rewrite can
 //!   move a gate onto an uncoupled pair.
-//! - **I4**, after O and D2: every two-qubit gate is natively oriented and
+//! - **L4**, after O and D2: every two-qubit gate is natively oriented and
 //!   every mnemonic is in the basis.
 //!
-//! I3 also buys measurement terminality for free: since rules preserve
+//! L3 also buys measurement terminality for free: since rules preserve
 //! operand sets, "is this wire touched after instruction *n*" has the same
 //! answer before and after decomposition.
 //!

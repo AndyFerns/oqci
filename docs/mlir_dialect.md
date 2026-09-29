@@ -1,16 +1,17 @@
 # The `quantum` MLIR Dialect — Specification
 
-**Status:** Phase 0 (written spec only). **No TableGen, C++, or FFI is built in
-this phase.** This document defines the dialect that OQCI's Rust IR types
+**Status:** written spec only. **No TableGen, C++, or FFI exists in the
+repository.** This document defines the dialect that OQCI's Rust IR types
 (`src/ir/`) mirror one-to-one, so that Phase 2 MLIR integration is a *mechanical
 translation, not a redesign*. The binding constraints that keep it mechanical
 are recorded in
 [`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md).
 
-The correspondence is intentionally total: **every** QC-IR/QCO-IR op has a named
+The correspondence is intended to be total: **every** QC-IR/QCO-IR op has a named
 MLIR op counterpart here, **every** Rust type boundary that would become an MLIR
 type constraint is stated, and **every** field is classified as attribute vs.
-operand.
+operand. Two gaps are currently open and are marked where they occur:
+symbolic gate parameters (§2) and classical-bit wires (§6).
 
 ---
 
@@ -38,9 +39,12 @@ operand.
 non-interchangeable; in MLIR the same guarantee is a *type constraint* on op
 operands (a `quantum.gate` operand must be `!quantum.qubit`). The Rust newtype is
 the cheap stand-in for that constraint today, so the Phase 2 verifier rule is
-already implied by the Rust type. `Angle` maps to a `FloatAttr` (when a gate
-parameter) or an `f64` SSA value (never needed in Phase 0, since all parameters
-are compile-time constants → attributes).
+already implied by the Rust type. Gate parameters in the Rust IR are `Param`
+values (`ir_spec.md` §1.1): either `Concrete(Angle)` or `Symbol(String)`. A
+concrete `Angle` maps to a `FloatAttr`. **How a `Param::Symbol` maps is not yet
+specified**: the `params` attribute below is typed for concrete values only,
+so a circuit with an unbound symbol has no representation in this dialect as
+written.
 
 ## 3. Attributes vs. operands — the central mapping rule
 
@@ -75,7 +79,7 @@ are SSA operands and, under value semantics, are also results.
 | Slot | Contents | Rust source |
 |------|----------|-------------|
 | attr `gate` | gate mnemonic, e.g. `"h"`, `"cx"`, `"rz"`, `"sx"`, `"sxdg"` | `GateKind::mnemonic()` |
-| attr `params` | `array<f64>`, canonical param order | `GateKind::params()` |
+| attr `params` | `array<f64>`, canonical param order — concrete values only; see §2 | `GateKind::params()` |
 | operands | `variadic<!quantum.qubit>`, control(s) then target | `Instruction::qubits` |
 | results | one `!quantum.qubit` per operand (value semantics) | threaded in QCO-IR |
 
@@ -150,10 +154,18 @@ quantum.circuit @bell() {
 }
 ```
 
-The SSA use-def chains in this region are **isomorphic to the QCO-IR DAG**:
-data-dependency edges are value uses; the `Collapsing` trait on
-`quantum.measure`/`quantum.reset` marks the control-dependency barriers. This is
-why converting Rust QCO-IR to MLIR is graph relabeling, not re-analysis.
+On **qubit wires**, the SSA use-def chains in this region are **isomorphic to
+the QCO-IR DAG**: data-dependency edges are value uses; the `Collapsing` trait
+on `quantum.measure`/`quantum.reset` marks the control-dependency barriers. That
+is why converting Rust QCO-IR to MLIR is graph relabeling, not re-analysis, for
+the quantum part of a circuit.
+
+**Classical wires are not yet mapped.** QCO-IR also threads every classical bit
+from an `Input` node to an `Output` node through the measurements that write
+it (`ir_spec.md` §4.1, §5). This dialect has no classical block arguments,
+`quantum.return` carries only qubits (§8), and each `quantum.measure` produces a
+fresh `!quantum.result` — so the example above drops `%r0`, and a classical bit
+written by two measurements has no representation.
 
 ## 7. Phase 2 integration path
 
@@ -161,13 +173,14 @@ What Phase 2 adds on top of this spec (see the ADR for the "why" and the
 non-negotiable constraints):
 
 1. **TableGen definitions** (§8) generating the C++ op classes.
-2. **A pass manager** hosting Phase 3 optimization passes over `quantum.circuit`
-   regions.
+2. **A pass manager** hosting optimization passes over `quantum.circuit`
+   regions (today the passes run under the Rust `PassManager`,
+   [`pass_manager.md`](pass_manager.md)).
 3. **A conversion framework**: `quantum` → QIR/LLVM dialect lowering, replacing
    the textual emitter in `qir.rs` with a dialect conversion (the mnemonic →
    intrinsic table in [`qir_lowering.md`](qir_lowering.md) becomes the rewrite
    patterns).
-4. **Op verification** encoding Rust invariants I1–I7 as `verify()` methods.
+4. **Op verification** encoding Rust invariants I1–I8 as `verify()` methods.
 5. **The `src/ir/mlir_compat.rs` seam**: Rust↔MLIR marshalling lives here and
    nowhere else, so the rest of the crate stays MLIR-free.
 
@@ -190,7 +203,7 @@ def Quantum_ResultType : TypeDef<Quantum_Dialect, "Result"> { let mnemonic = "re
 // QuantumOps.td      —— from src/ir/qc.rs Instruction + qco.rs boundaries
 def Quantum_GateOp : Op<Quantum_Dialect, "gate", [Pure]> {
   let arguments = (ins StrAttr:$gate,                    // GateKind::mnemonic()
-                       F64ArrayAttr:$params,             // GateKind::params()
+                       F64ArrayAttr:$params,             // GateKind::params(); concrete only (§2)
                        Variadic<Quantum_QubitType>:$qubits);
   let results   = (outs Variadic<Quantum_QubitType>:$out);
   let hasVerifier = 1;                                   // encodes I3, I4

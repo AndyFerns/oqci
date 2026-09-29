@@ -226,7 +226,7 @@ fn build_circuit(
 ///
 /// The per-instruction calls are provably equivalent to the whole-list call:
 /// a decomposition rule may only permute the operands it was given and can
-/// never introduce a new one (the project's own documented and tested I3
+/// never introduce a new one (the project's own documented and tested L3
 /// invariant), so decomposition has no cross-instruction interaction for
 /// this split to get wrong — and the equivalence is cross-checked below
 /// rather than merely assumed.

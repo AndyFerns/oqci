@@ -61,6 +61,10 @@ The locked architecture refines this by making backend targeting explicit:
 
 # 2. Current-State Baseline
 
+*This section describes the repository at version `0.0.1` (verified
+2026-09-04). Much of the "does not yet provide" list below has since been
+implemented; the living baseline is [`index.md`](index.md).*
+
 The current repository is not a completed compiler.
 
 The verified `0.0.1` state already contains:
@@ -163,6 +167,12 @@ The implementation must converge toward the following conceptual structure.
                Simulators             IBM / future
                                       hardware
 ```
+
+*As implemented (0.4.1):* the simulator path runs through the right-hand
+branch — the Qiskit Aer adapter consumes the backend-specific `Executable`,
+not QIR. QIR is emitted separately and no backend consumes it
+([`../backend_contract.md`](../backend_contract.md),
+[`../qir_lowering.md`](../qir_lowering.md) §1.4).
 
 MLIR may appear within the IR/pass/lowering layers as an enabling infrastructure component, but it is not the sole definition of the OQCI architecture.
 

@@ -1,12 +1,13 @@
 # QCO-IR → QIR Lowering
 
-**Status:** Phase 0 (stable). **Boundary:** QIR emission is the end of Phase 0;
-QIR is not the execution path: a backend's executable representation is a
+**Status:** normative for what `src/ir/qir.rs` emits today. **Boundary:** QIR
+is an output artifact, not the execution path: a backend's executable
+representation is a
 separate artifact, built by a separate stage, because Stage C §5 forbids
 treating emitted QIR as a guarantee that anything will run
 (see [Backend Contract](backend_contract.md)). This document specifies the lowering implemented
-in `src/ir/qir.rs`: the target format, the op → QIR mapping table, and the two
-documented conformance caveats.
+in `src/ir/qir.rs`: the target format, where it is invoked, the op → QIR
+mapping table, and its conformance caveats.
 
 ---
 
@@ -19,9 +20,11 @@ by the QIR specification examples:
 - Quantum intrinsics `__quantum__qis__*` and runtime calls `__quantum__rt__*`,
   emitted as `declare`d externs (deduplicated, sorted for deterministic output).
 - A single entry-point function `define void @<name>() #0 { … ret void }`.
-- Base-Profile module flags on the entry attribute group:
-  `"entry_point" "qir_profiles"="base_profile" "required_num_qubits"="N"
-  "required_num_results"="M"`.
+- Attributes on the entry-point function (attribute group `#0`):
+  `"entry_point" "output_labeling_schema" "qir_profiles"="base_profile"
+  "required_num_qubits"="N" "required_num_results"="M"`. No LLVM module flags
+  (`!llvm.module.flags`) are emitted, and the `base_profile` label is applied
+  to every module regardless of content; see §3.3.
 
 ### 1.1 Static qubit/result addressing
 
@@ -44,6 +47,23 @@ Operations are emitted in the deterministic topological order from
 `QcoCircuit::topological_ops()` (`ir_spec.md` §4.3). Result-recording calls
 (`__quantum__rt__result_record_output`) are appended after the operation body,
 one per measured classical bit, in ascending result id.
+
+### 1.4 Where QIR is emitted
+
+`emit_qir` is not part of the compiler orchestrator: `compile::compile_circuit`
+never calls it, and `CompilationArtifacts` carries no QIR. It is called
+separately, on whichever circuit the caller holds:
+
+| Caller | Circuit emitted |
+|---|---|
+| `oqci compile` (`src/cli/pipeline.rs`) | the source circuit, before optimization |
+| `oqci optimize` | the optimized circuit |
+| `oqci lower` | the lowered (target-legal) circuit |
+| visualization server (`server/src/compile.rs`) | the optimized circuit |
+| Python `qasm3_to_qir`, `qiskit_to_qir`, `cudaq_to_qir` (`python/src/lib.rs`) | the source circuit, after binding, with no optimization or lowering |
+
+Only the `oqci lower` path can remove extended intrinsics (§3.1), because only
+it has applied target lowering.
 
 ## 2. Op → QIR mapping table
 
@@ -80,44 +100,57 @@ parameters (as `double`) first, then qubit operands. `quantum.measure` and
 | (per measured clbit) | `__quantum__rt__result_record_output` | result(c), `i8* null` | runtime |
 
 "standard" = part of the QIR specification's quantum instruction set; the
-irregular names `cnot`, `s__adj`, `t__adj` follow QIR conventions.
+irregular names `cnot`, `s__adj`, `t__adj` follow QIR conventions. Membership
+of the instruction set is not the same as being permitted by the Base Profile;
+which of these operations the Base Profile admits has not been checked against
+the specification.
 
 ## 3. Conformance caveats (intentional, documented)
 
-Two honesty caveats. Both are consequences of Phase 0's scope (no optimization
-or decomposition passes) and both are addressable by a Phase 3 pass without any
-change to this lowering's structure.
+Three caveats. The emitter itself performs no decomposition and no
+reordering; it lowers exactly the circuit it is given.
 
 ### 3.1 Extended intrinsics
 
 Gates with no member of the QIR *standard* instruction set (`id`, `p`, `u`,
 `cy`, `swap`, `ccx`, `sx`, `sxdg`, and every `Opaque`) are emitted as declared
-`__quantum__qis__*` externs. The emitted module is **valid LLVM IR** (every
-callee is declared) and structurally valid QIR; a runtime that does not provide
-these intrinsics would need a **decomposition pass** (Phase 3) to rewrite them
-into the standard set — e.g. `swap → 3× cnot`, `ccx → the standard T/H/CX
-decomposition`, `p(λ) → rz(λ)` up to an unobservable global phase.
+`__quantum__qis__*` externs. Every callee is declared, but no emitted module
+has been checked by an LLVM or QIR tool (no `llvm-as` or QIR validator is part
+of the build or of CI). One known defect: an `Opaque` gate's name is spliced
+into the intrinsic name unchanged (`__quantum__qis__<name>__body`), and
+validation only requires the name to be non-empty (I5), so a name containing,
+for example, `-` or a space yields an identifier LLVM would reject.
 
-**Rationale for not decomposing now.** Decomposition is a semantics-preserving
-*transformation* — precisely the kind of optimization/rewrite pass that Phase 0
-explicitly excludes. Baking it into the lowering would (a) smuggle a pass into a
-phase that is supposed to have none, and (b) hard-code one decomposition choice
-before the pass framework exists to make it configurable. Emitting a declared
-extended intrinsic keeps the lowering total and defers the choice cleanly.
+Removing extended intrinsics is target lowering's job, not the emitter's:
+lowering to a profile whose basis excludes them rewrites them with the
+profile's decomposition rules ([`lowering.md`](lowering.md)). `linear-nisq`'s
+basis is `{rz, sx, x, cx}`, so QIR emitted from a circuit lowered to it still
+contains the extended `sx`; `ideal-simulator` accepts every registered gate,
+so lowering to it removes none. The emitter does not decompose because doing so
+would hide a choice of decomposition inside an output format.
 
 ### 3.2 Mid-circuit measurement
 
 Strict QIR Base Profile expects all measurements at the end of the program. OQCI
 circuits may contain mid-circuit measurement (a `Measure` before later gates on
-the same or other qubits). We emit operations in program/topological order, so
-such a module is valid LLVM IR and runs correctly under a runtime that permits
-mid-circuit measurement, but a strict Base-Profile linter would flag it.
+the same or other qubits) and `Reset`. We emit operations in
+program/topological order and do not reorder them.
 
-**Rationale.** Making every circuit strictly Base-Profile-conformant requires a
-**deferred-measurement pass** (push measurements to the end, valid only without
-classical feed-forward — which Phase 0 guarantees). That is again a Phase 3
-transformation. We keep the emitter faithful to the input and label the profile
-honestly, rather than silently reordering.
+No deferred-measurement pass exists. Absence of classical feed-forward (which
+the IR guarantees, `ir_spec.md` §6) is necessary for deferring measurements but
+not sufficient: a measurement cannot simply be moved to the end if a later gate
+or reset acts on the measured qubit, or if the same classical bit is written
+again, without introducing ancilla qubits — which would change
+`required_num_qubits`. `linear-nisq` forbids mid-circuit measurement and reset,
+so a circuit lowered to it has only terminal measurements; circuits emitted
+from any other stage (§1.4) may not.
+
+### 3.3 Profile label
+
+Every module is labelled `"qir_profiles"="base_profile"` (`src/ir/qir.rs`),
+including modules that contain extended intrinsics, mid-circuit measurement or
+reset. The label is therefore a fixed string, not a conformance claim that has
+been checked, and no validator has been run against any emitted module.
 
 ## 4. Worked example — Bell state
 

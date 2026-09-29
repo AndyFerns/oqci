@@ -1,10 +1,10 @@
 # OQCI Source-of-Truth Documentation Index
 
 Status: Active planning baseline
-Last verified against repository: 2026-09-25
+Last verified against repository: 2026-09-30
 Repository: `https://github.com/AndyFerns/oqci`  
 Branch reviewed: `master`  
-Current repository version: `0.4.0`
+Current repository version: `0.4.1`
 
 ## Purpose
 
@@ -78,7 +78,7 @@ An implementation agent must not silently override a locked decision because ano
 
 At the verified `master` state:
 
-- the repository is at version `0.4.0`;
+- the repository is at version `0.4.1`;
 - the implemented core is the Phase 0 IR foundation, the frontend layer, the
   pass manager, the target model, target lowering, the backend contract and
   compiler orchestration;
@@ -95,7 +95,8 @@ At the verified `master` state:
   boundary (`docs/qiskit_adapter.md`), and — through
   `compile::compile_circuit` — a Qiskit circuit reaches the whole pipeline,
   not only QIR;
-- a CUDA-Q frontend exists over a documented subset verified against
+- a CUDA-Q frontend exists on `master` (listed under `[Unreleased]` in the
+  changelog) over a documented subset verified against
   NVIDIA's documentation (`docs/cudaq_frontend.md`), mapping into the same
   QC-IR as §5.5 requires and selected by `compile::Frontend::CudaQ` (or a
   `.py` extension). With the `oqci.backends.cudaq` execution adapter it
@@ -139,7 +140,8 @@ At the verified `master` state:
 - per-operation cost and error/noise metadata on profiles (Stage D §2) remain
   absent, deliberately: both built-in profiles are synthetic, and a profile
   asserting error rates nobody measured would be a fabricated record;
-- a CUDA-Q execution adapter (§15.2) exists, but it has never run against a
+- a CUDA-Q execution adapter (§15.2) exists on `master` (listed under
+  `[Unreleased]`), but it has never run against a
   real CUDA-Q install and its results are unverified until it is checked
   against Aer; there is no Cirq frontend (§5.4) and no Cirq execution adapter;
 - `benchmarks/` is not yet a populated benchmark suite;
@@ -159,8 +161,11 @@ The repository's changelog defines `0.0.1` as the Phase 0 IR core, `0.2.0`
 as the frontend layer, the Stage F parameter work, the pass manager with its
 target-independent passes and the CLI, `0.3.0` as the target model together
 with the backend: lowering, the backend contract, orchestration and a
-simulator execution path, and `0.4.0` as the live visualization companion
-described above — a new consumer of the compiler, not a change to it.
+simulator execution path, `0.4.0` as the live visualization companion
+described above — a new consumer of the compiler, not a change to it — and
+`0.4.1` as a single lowering fix (a wide gate the target declares, such as
+`ccx` on `ideal-simulator`, is no longer refused). The CUDA-Q frontend and
+execution adapter are on `master` but listed under `[Unreleased]`.
 
 What remains before the non-G definition of done is met is the hardware half
 of Stage C §8 — authentication, backend discovery, submission and result

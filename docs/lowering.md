@@ -882,31 +882,34 @@ overflowing the stack.
 ## The invariant chain
 
 What makes the output *legal*, rather than merely *finished*. Each link is
-established by one phase and preserved by the rest.
+established by one phase and preserved by the rest. They are numbered L1–L4
+to keep them apart from the IR well-formedness invariants I1–I8
+([`ir_spec.md`](ir_spec.md) §3.3), which every circuit satisfies before
+lowering begins.
 
 | # | Statement | Established by | Preserved because |
 |---|---|---|---|
-| **I1** | Every gate has arity at most two, or is a wide gate the profile declares. | D0 | No rule may increase a one-qubit source's arity (check 5), and routing inserts only two-qubit `Swap`s. Re-asserted at V. |
-| **I2** | Every two-qubit gate sits on a coupled pair. | R | See I3. |
-| **I3** | A decomposition rule may only permute the operands it was given, never name a new qubit. | `RuleSet::new`, check 2 | Enforced when the rule set is built, so it holds for every circuit before any circuit is seen. |
-| **I4** | Every two-qubit gate is natively oriented, and every mnemonic is in the basis. | O and D2 | O emits in the declared operand order; D2 only rewrites one-qubit gates. |
+| **L1** | Every gate has arity at most two, or is a wide gate the profile declares. | D0 | No rule may increase a one-qubit source's arity (check 5), and routing inserts only two-qubit `Swap`s. Re-asserted at V. |
+| **L2** | Every two-qubit gate sits on a coupled pair. | R | See L3. |
+| **L3** | A decomposition rule may only permute the operands it was given, never name a new qubit. | `RuleSet::new`, check 2 | Enforced when the rule set is built, so it holds for every circuit before any circuit is seen. |
+| **L4** | Every two-qubit gate is natively oriented, and every mnemonic is in the basis. | O and D2 | O emits in the declared operand order; D2 only rewrites one-qubit gates. |
 
-The load-bearing composition is **I2 ∧ I3 ⇒ I2 survives D1, O and D2**. Because
+The load-bearing composition is **L2 ∧ L3 ⇒ L2 survives D1, O and D2**. Because
 a rule can only permute the operands it was handed, no rewrite after routing can
-move a gate onto a pair routing did not make adjacent. Without I3 this would not
+move a gate onto a pair routing did not make adjacent. Without L3 this would not
 follow: a rule that introduced a fresh qubit could place a two-qubit gate on a
 non-adjacent pair and silently undo routing's work *after* routing had finished,
 with nothing between it and the output.
-`every_builtin_rule_only_permutes_the_operands_it_was_given` checks I3 on both
+`every_builtin_rule_only_permutes_the_operands_it_was_given` checks L3 on both
 the declaration and the expanded output.
 
-I3 also buys **measurement terminality for free**. Since rules preserve operand
+L3 also buys **measurement terminality for free**. Since rules preserve operand
 sets, the question "is this wire touched after instruction *n*?" has the same
 answer before and after decomposition — so a program that was terminal-measured
 on entry is still terminal-measured on exit, and D1 cannot turn a legal
 measurement into a mid-circuit one.
 
-`every_two_qubit_operation_ends_up_on_a_declared_coupling` asserts I2 and I4
+`every_two_qubit_operation_ends_up_on_a_declared_coupling` asserts L2 and L4
 together, directly against `Topology::couples(.., CouplingMode::Directed)`
 rather than through `check`, so the two are not checking each other.
 
@@ -1396,7 +1399,7 @@ section tracks what is and is not real. Everything below the first table is
 
 ### Now done
 
-Recorded because earlier revisions of this document listed all four as absent,
+Recorded because earlier revisions of this document listed these as absent,
 and a status table that only ever grows is not a useful one.
 
 | Spec | Status |
@@ -1405,6 +1408,7 @@ and a status table that only ever grows is not a useful one.
 | §8.7 Routing / SWAP insertion | **done.** `ShortestPathRouter` inserts `Swap`s, updates the layout as it goes, reports `swaps_inserted`, and refuses with a typed reason when no path exists. Quality caveat in [Known quality gap](#known-quality-gap-the-router-inserts-more-swaps-than-it-has-to). |
 | Stage D §7 orientation repair | **done**, with the scope caveat in [Where this diverges from §7](#where-this-diverges-from-7-honestly). `lower` derives the routing `CouplingMode` from the rule closure via `reaches(profile, rules, "h")`. |
 | §8.8 `lower()` entry point | **done.** Takes a `Circuit`, a `BasisProfile` and a `LoweringConfig`; returns a `Lowered` or a typed refusal. |
+| Stage D §6 final layout / reporting | **done.** Both layouts leave the process: `Provenance` carries `initial_layout` and `final_layout`, every prepared executable carries a `Provenance`, and `oqci lower`'s report (`LoweringView`) includes both. A consumer outside the process can tell which physical wire a measurement result came from. `Lowered` itself is still not `Serialize`, and no benchmark record exists yet to write a layout into. |
 
 ### Not started
 
@@ -1423,14 +1427,6 @@ and a status table that only ever grows is not a useful one.
   There is no `Approximate { epsilon }` variant and no rule with a bounded
   error, so the "approximate" half of §5 is representable only by adding a
   variant, which would invalidate nothing but has not been needed yet.
-- **Serialized layout reporting.** Stage D §6 lists "final layout/reporting" as
-  a required concept. `Lowered` now carries `initial_layout` and `final_layout`
-  in process, and `Layout` is `Serialize` — but `Lowered` itself is not, and
-  nothing writes a layout into a compilation report, a snapshot or a benchmark
-  record. Both layouts are now persisted: `Provenance` carries
-  `initial_layout` and `final_layout`, and every prepared executable carries a
-  `Provenance`. A consumer outside the process can therefore tell which
-  physical wire a measurement result came from, which it could not before.
 - ~~Any CLI surface for lowering.~~ **Now present.** `oqci lower` renders
   both layouts, the SWAP count, the rules that fired, each step of the
   schedule and the legality report, with `--layout trivial|dense`,

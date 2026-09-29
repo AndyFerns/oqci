@@ -6,7 +6,10 @@ change in the Rust design in order to keep the future MLIR port mechanical.
 
 ## Context
 
-OQCI's long-term middle layer is MLIR (see the README architecture). MLIR brings
+MLIR is the candidate middle-layer technology for OQCI's IR (Stage B,
+[`core_architecture/stage-b-modular-mlir-boundary.md`](core_architecture/stage-b-modular-mlir-boundary.md));
+none of it is implemented, and the root README lists MLIR integration as not
+started. MLIR brings
 a pass manager, a dialect conversion framework, and op verification — real
 leverage for Phase 3 optimization passes and multi-target lowering. But MLIR also
 brings a C++ build, TableGen, and an FFI boundary from Rust.
@@ -40,16 +43,24 @@ Rust op/type has a named dialect counterpart; the seam for MLIR marshalling
 
 ## What MLIR adds later (Phase 2)
 
-1. **Pass manager** — hosts Phase 3 passes (cancellation, fusion, scheduling,
-   routing) over `quantum.circuit` regions, with pass scheduling/analysis reuse.
+1. **Pass manager** — hosts optimization passes (cancellation, fusion,
+   scheduling, routing) over `quantum.circuit` regions, with pass
+   scheduling/analysis reuse.
 2. **Dialect conversion framework** — `quantum` → QIR/LLVM lowering as rewrite
    patterns, replacing the textual emitter in `qir.rs`. The mapping table in
    [`qir_lowering.md`](qir_lowering.md) §2 becomes the pattern set.
-3. **Op verification** — Rust invariants I1–I7 (`ir_spec.md` §3.3) become op
+3. **Op verification** — Rust invariants I1–I8 (`ir_spec.md` §3.3) become op
    `verify()` methods, checked by the framework at every stage boundary.
 4. **Traits/interfaces** — e.g. a `Collapsing` trait marking
    `quantum.measure`/`quantum.reset`, the MLIR encoding of QCO-IR's
    `DepKind::Control` barrier.
+
+*Status as of 0.4.1:* items 1 and 2 have Rust counterparts that exist without
+MLIR. The optimization passes run under a Rust `PassManager` (`src/pass/`,
+[`pass_manager.md`](pass_manager.md)), target lowering is Rust
+(`src/lowering/`), and the textual emitter in `qir.rs` is the only QIR path.
+The list above is what MLIR could provide; whether any of it replaces the Rust
+implementation is governed by Stage B.
 
 ## Binding constraints — what must NOT change
 
@@ -64,7 +75,7 @@ updating this ADR and [`mlir_dialect.md`](mlir_dialect.md).
 | C3 | **`QubitId`/`ClbitId` stay distinct newtypes.** | They become the distinct SSA types `!quantum.qubit` / `!quantum.result` and their operand type-constraints. Collapsing them to a shared integer erases a verifier rule. |
 | C4 | **`Angle` stays a dedicated parameter type.** | It becomes a `FloatAttr`. Reverting to bare `f64` at call sites would scatter the attribute mapping across the codebase. |
 | C5 | **All construction goes through `CircuitBuilder` (no public struct mutation).** | Mirrors `OpBuilder`; keeps a single validation point that becomes the op verifier. Ad-hoc mutation paths would have no verifier analogue. |
-| C6 | **Validation is centralized and total (invariants I1–I7, no panics).** | Each invariant becomes an op `verify()` rule. A panic-on-malformed path has no MLIR equivalent and would leak as a crash. |
+| C6 | **Validation is centralized and total (invariants I1–I8, no panics).** | Each invariant becomes an op `verify()` rule. A panic-on-malformed path has no MLIR equivalent and would leak as a crash. |
 | C7 | **QCO-IR keeps the wire-threaded, value-semantics DAG with explicit Input/Output boundaries and `Data`/`Control` edge kinds.** | The DAG is isomorphic to MLIR SSA use-def chains; boundaries are block args/terminator operands; `Control` edges are the `Collapsing` trait. A different graph model would require re-deriving dependencies in C++. |
 | C8 | **`src/ir/mlir_compat.rs` remains the sole MLIR seam; the rest of `ir/` stays MLIR-free.** | Confines the FFI/marshalling blast radius to one module, so Phase 2 does not thread MLIR types through `qc`/`qco`/`convert`/`qir`. |
 
@@ -82,7 +93,7 @@ updating this ADR and [`mlir_dialect.md`](mlir_dialect.md).
 
 - [`mlir_dialect.md`](mlir_dialect.md) — the dialect spec, correspondence table,
   and implied TableGen skeleton.
-- [`ir_spec.md`](ir_spec.md) — the invariants (I1–I7) and DAG model referenced
+- [`ir_spec.md`](ir_spec.md) — the invariants (I1–I8) and DAG model referenced
   by C6/C7.
 - [`architecture_decision_no_frontend.md`](architecture_decision_no_frontend.md)
   — the companion scope ADR.

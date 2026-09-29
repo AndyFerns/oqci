@@ -15,6 +15,9 @@ The current repository already implements the first version of this foundation. 
 
 ## 2. Current Verified Baseline
 
+*This section describes `master` at version `0.0.1`, when Stage A was written.
+The living baseline is [`index.md`](index.md).*
+
 The current `master` repository at version `0.0.1` implements:
 
 - `src/ir/qc.rs`

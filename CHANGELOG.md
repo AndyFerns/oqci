@@ -86,6 +86,24 @@ and may change without a major bump (per SemVer §4).
 - Committed `__pycache__`/`.pytest_cache` files and duplicate examples from
   `cudaq-adapter/`.
 
+## [0.4.1] - 2026-09-28
+
+A single lowering fix. Everything under `[Unreleased]` above is recorded
+there rather than here.
+
+### Fixed
+
+- **A Toffoli can be compiled for a target that declares `ccx`.** Arity
+  reduction (D0) now rewrites only wide gates *outside* the profile's basis,
+  and lowering's verification step (V) applies the same predicate. Before,
+  V refused every surviving three-qubit gate, so a `ccx` could not be
+  compiled for `ideal-simulator` at all, even though that profile lists it
+  (`src/lowering/mod.rs`, `src/lowering/decompose.rs`). Covered by
+  `a_three_qubit_gate_the_target_declares_survives_lowering`
+  (`tests/lowering.rs`) and by
+  `test_a_toffoli_compiles_for_a_target_that_declares_it`
+  (`python/tests/test_aer.py`), which runs the result on Aer.
+
 ## [0.4.0] - 2026-09-25
 
 A companion, not a new compiler: `server/` and `frontend/` add a live,
@@ -653,7 +671,8 @@ the first usable milestone; Phase 1 will bump the minor.
 - Backend execution (simulators, hardware) — beyond the QIR emission boundary.
 - Python bindings — only empty PyO3 placeholders exist under `python/`.
 
-[Unreleased]: https://github.com/AndyFerns/oqci/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/AndyFerns/oqci/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/AndyFerns/oqci/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/AndyFerns/oqci/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/AndyFerns/oqci/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AndyFerns/oqci/compare/v0.0.1...v0.2.0

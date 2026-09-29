@@ -409,9 +409,14 @@ are **absent**:
   [`backend_contract.md`](backend_contract.md#the-execution-boundary). Adding
   one would mean the orchestrator returning an artifact it cannot fill.
 - **Compilation timing.** `ExecutionResult::compilation_duration_ms` exists as a
-  field, and the orchestrator does not measure it. Nothing in `compile_named`
-  reads a clock. The field stays `None` rather than acquiring a number nobody
-  measured.
+  field, and the orchestrator does not measure it: `compile_named` takes no
+  end-to-end timing, so the field stays `None` rather than acquiring a number
+  nobody measured. The pipeline does read a clock in one place:
+  `PassManager::run` times each pass it executes (`PassRecord::duration`,
+  `src/pass/mod.rs`), and that per-pass wall-clock time is reported as
+  `duration_us` in the CLI's `--json` output, the Python SDK's `passes` entries
+  and the visualization server's events. It is a measurement, so it differs
+  between runs of the same compilation.
 - **Incremental or cached compilation.** Every call runs the whole pipeline from
   source text. There is no artifact cache, and `Lowered` is not serializable, so
   a lowered circuit cannot be persisted and re-offered to a backend later —

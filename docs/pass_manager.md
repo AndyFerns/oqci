@@ -170,8 +170,9 @@ maximum parallel width. It **never reorders anything**.
 
 §8.5 warns against reordering operations merely because they touch different
 qubits. Reordering only becomes meaningful once a target's constraints make
-one schedule better than another — Stage D/Phase 3 work. Until then, a
-reordering pass would be choosing between schedules on no evidence.
+one schedule better than another, which needs target-aware scheduling — and
+none exists (see "Not implemented" below). Until then, a reordering pass would
+be choosing between schedules on no evidence.
 
 ## Analysis
 
