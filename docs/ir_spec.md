@@ -375,5 +375,6 @@ the full table is in [`mlir_dialect.md`](mlir_dialect.md). In brief:
 `Instruction::Gate → quantum.gate`, `Measure → quantum.measure`,
 `Reset → quantum.reset`; `QubitId → !quantum.qubit` SSA value,
 `ClbitId → !quantum.result`; gate params → attributes; qubit operands → SSA
-operands. The binding constraints that keep the Phase 2 port mechanical are in
-[`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md).
+operands. The binding constraints that make every circuit a witness of I1–I8,
+and that keep an MLIR port mechanical, are in
+[`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md).

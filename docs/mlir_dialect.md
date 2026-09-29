@@ -3,9 +3,12 @@
 **Status:** written spec only. **No TableGen, C++, or FFI exists in the
 repository.** This document defines the dialect that OQCI's Rust IR types
 (`src/ir/`) mirror one-to-one, so that Phase 2 MLIR integration is a *mechanical
-translation, not a redesign*. The binding constraints that keep it mechanical
-are recorded in
-[`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md).
+translation, not a redesign*. The constraints that keep it mechanical are the
+IR contract,
+[`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md);
+whether MLIR is adopted at all is
+[`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md)
+and Stage B.
 
 The correspondence is intended to be total: **every** QC-IR/QCO-IR op has a named
 MLIR op counterpart here, **every** Rust type boundary that would become an MLIR

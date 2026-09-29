@@ -18,9 +18,11 @@
 //! - [`error`] — the [`IrError`] type returned by all fallible IR operations.
 //! - [`mlir_compat`] — the (currently empty) Phase 2 MLIR integration seam.
 //!
-//! The design mirrors the `quantum` MLIR dialect one-to-one so that Phase 2 is a
-//! mechanical translation; see `docs/mlir_dialect.md` and
-//! `docs/architecture_decision_mlir_phase2.md`.
+//! The types obey the IR contract (C1–C8,
+//! `docs/architecture_decision_ir_contract.md`), which makes every `Circuit` a
+//! witness of invariants I1–I8. They also mirror the `quantum` MLIR dialect
+//! one-to-one, so a future MLIR port would be a mechanical translation; see
+//! `docs/mlir_dialect.md`.
 
 pub mod bind;
 pub mod convert;
