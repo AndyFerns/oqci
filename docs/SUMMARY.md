@@ -47,6 +47,10 @@
 - [Command Line](cli.md)
 - [Live Visualization](visualization.md)
 
+# Positioning
+
+- [Related Work](related_work.md)
+
 # Architecture Decisions
 
 - [The IR Contract (C1–C8)](architecture_decision_ir_contract.md)

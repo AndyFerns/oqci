@@ -65,6 +65,7 @@ row, or `oqci watch <file>` to keep seeing them as you edit — see
 | [`mlir_dialect.md`](mlir_dialect.md) | **The `quantum` MLIR dialect spec** (written spec only; nothing is built). Types, ops, attribute-vs-operand rules, the op↔Rust correspondence table and its one open gap (classical wires), the Phase 2 integration path, and the implied TableGen skeleton. |
 | [`qir_lowering.md`](qir_lowering.md) | **QIR emission.** Target QIR format, where `emit_qir` is called and on which circuit, the op → QIR intrinsic mapping table, angle/qubit encoding, and the conformance caveats (extended intrinsics, mid-circuit measurement and reset, an unconditional and unvalidated `base_profile` label). |
 | [`architecture_decision_no_frontend.md`](architecture_decision_no_frontend.md) | **ADR.** Why no frontend is built before the IR is stable, and how to resist adding one early. |
+| [`related_work.md`](related_work.md) | **Positioning.** The QIR spec, PyQIR and MLIR-based quantum compilers, each claim checked against a dated primary source or marked to verify. |
 | [`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md) | **ADR (binding constraints).** The IR contract: constraints C1–C8, what each guarantees about I1–I8, and where each is enforced and tested. |
 | [`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md) | **ADR.** Why the IR is pure Rust, and what MLIR could add later under Stage B. Its constraint table now lives in the IR Contract ADR. |
 
