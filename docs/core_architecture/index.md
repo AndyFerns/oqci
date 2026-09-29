@@ -4,7 +4,7 @@ Status: Active planning baseline
 Last verified against repository: 2026-09-30
 Repository: `https://github.com/AndyFerns/oqci`  
 Branch reviewed: `master`  
-Current repository version: `0.4.1`
+Current repository version: `0.5.0`
 
 ## Purpose
 
@@ -84,7 +84,7 @@ An implementation agent must not silently override a locked decision because ano
 
 At the verified `master` state:
 
-- the repository is at version `0.4.1`;
+- the repository is at version `0.5.0`;
 - the implemented core is the Phase 0 IR foundation, the frontend layer, the
   pass manager, the target model, target lowering, the backend contract and
   compiler orchestration;
@@ -206,7 +206,7 @@ does, not by a phase number.
 | — | `0.4.0` | Live visualization companion. |
 | — | `0.4.1` | A lowering fix (declared wide gates). |
 | "Phase 2" (MLIR integration) | — | Not done; MLIR is optional (Stage B). |
-| — | `0.5.0` (planned) | QIR interoperability boundary: `final-deliverables-spec.md` §14. |
+| — | `0.5.0` | QIR interoperability boundary: `final-deliverables-spec.md` §14. |
 
 ## Critical Rule
 

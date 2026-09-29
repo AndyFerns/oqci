@@ -12,7 +12,47 @@ and may change without a major bump (per SemVer §4).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-30
+
+QIR becomes an honest, externally validated interoperability artifact
+(`final-deliverables-spec.md` §14). Also released here: the CUDA-Q frontend
+and execution adapter listed below, which were on `master` but unreleased.
+
+### Breaking
+
+- **QIR text format.** QIR 1.0 structure (qir-spec tag 1.0, `e872897`): `i64`
+  entry point, initialize/body/(measurements)/output blocks, irreversible
+  `mz` with `writeonly` result, labeled output recording, the four module
+  flags. Opaque pointers (`ptr`) by default.
+- **Profile label.** `base_profile` only when the circuit is legal for the new
+  `qir-base` profile; otherwise `custom`. `ir::emit_qir` always writes `custom`.
+- **Where QIR comes from.** One canonical artifact per compilation
+  (`CompilationArtifacts::qir`), from the lowered circuit when there is one,
+  else the optimized one. The CLI, server and Python SDK all show it; the
+  Python `*_to_qir` helpers now optimize (and lower, with `backend=`) first.
+- `required_num_qubits`/`required_num_results` count what the entry point uses.
+
 ### Added
+
+- `qir-base` target profile and backend (PyQIR 0.12.5 instruction set), with
+  rules `sx-to-rx`, `sxdg-to-rx`, `u-to-rz-ry`.
+- Strict mode: `--qir-profile base` / `qir_profile="base"` /
+  `QirProfileRequirement::Base`, failing with `CompileError::QirProfile`.
+- `--qir-pointers opaque|typed` and matching SDK/config options.
+- CI (`.github/workflows/ci.yml`): fmt, clippy, tests, rustdoc on ubuntu and
+  windows; Python tests; QIR validation with PyQIR 0.12.5 and llvm-as 18/14.
+- `tests/qir_conformance.rs`, `scripts/validate_qir.py`,
+  `rust-toolchain.toml` (1.96.0).
+
+### Fixed
+
+- `Opaque` gate names LLVM cannot spell unquoted are emitted as quoted globals.
+
+### Documentation
+
+- The pivot is recorded: framing and research-question record, IR Contract
+  ADR (C1–C8), amended Stage B, final spec §1/§3/§5.7/§9/§14/§31/§33/§34,
+  Stage G metric definitions, phase↔version table, related work.
 
 - **CUDA-Q frontend** (`src/frontend/cudaq/`, §5.5): reads the
   `@cudaq.kernel` function in a Python file into the same QC-IR as every
@@ -671,7 +711,8 @@ the first usable milestone; Phase 1 will bump the minor.
 - Backend execution (simulators, hardware) — beyond the QIR emission boundary.
 - Python bindings — only empty PyO3 placeholders exist under `python/`.
 
-[Unreleased]: https://github.com/AndyFerns/oqci/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/AndyFerns/oqci/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/AndyFerns/oqci/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/AndyFerns/oqci/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/AndyFerns/oqci/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/AndyFerns/oqci/compare/v0.2.0...v0.3.0
