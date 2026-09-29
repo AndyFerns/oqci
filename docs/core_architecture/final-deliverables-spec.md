@@ -23,7 +23,13 @@ Where this document says "deferred", do not implement the feature as part of the
 
 # 1. Project Definition
 
-OQCI is a modular, open-source, vendor-neutral quantum compiler infrastructure inspired by the decoupling principles of LLVM/Q-LLVM-style compiler ecosystems.
+*Amended 2026-09-30 per [`framing-and-research-question.md`](framing-and-research-question.md).*
+
+OQCI is a modular, open-source quantum compiler infrastructure that builds upon the broader LLVM/QIR quantum compilation ecosystem but draws a different architectural boundary: quantum-native compiler infrastructure first, LLVM interoperability second. A strongly validated, Rust-native IR is the core; QIR is an interoperability artifact emitted at the output boundary.
+
+Research question: *can a quantum-first, strongly validated intermediate representation provide a clean foundation for deterministic quantum compiler transformations while remaining interoperable with established LLVM/QIR infrastructure?*
+
+The previous identity statement — "a vendor-neutral quantum compiler infrastructure inspired by the decoupling principles of LLVM/Q-LLVM-style compiler ecosystems" — is superseded. Vendor neutrality remains a design property (no vendor types in the IR, no vendor branching in the core).
 
 The core purpose is to separate:
 
@@ -36,7 +42,7 @@ The core purpose is to separate:
 - benchmarking;
 - plugin/research extensions.
 
-The main research value is the infrastructure and the ability to compose and compare compiler techniques across target backends, not the construction of a new quantum programming language.
+The main research value is the validated IR and the infrastructure built on it — the ability to compose, check and compare compiler transformations across target backends — not the construction of a new quantum programming language.
 
 The supplied project presentation describes the intended architecture as:
 
@@ -162,19 +168,16 @@ The implementation must converge toward the following conceptual structure.
                                 │
                     ┌───────────┴───────────┐
                     ▼                       ▼
-             QIR / LLVM              Backend-specific
-             artifacts              executable form
-                    │                       │
-                    ▼                       ▼
-               Simulators             IBM / future
-                                      hardware
+          QIR 1.0 module             Backend-specific
+       (interop artifact;            executable form
+        honestly labeled)                   │
+                    │                       ▼
+                    ▼               Simulators / IBM /
+         external QIR tools          future hardware
+         (PyQIR, llvm-as, …)
 ```
 
-*As implemented (0.4.1):* the simulator path runs through the right-hand
-branch — the Qiskit Aer adapter consumes the backend-specific `Executable`,
-not QIR. QIR is emitted separately and no backend consumes it
-([`../backend_contract.md`](../backend_contract.md),
-[`../qir_lowering.md`](../qir_lowering.md) §1.4).
+*Amended 2026-09-30 per [`framing-and-research-question.md`](framing-and-research-question.md).* Execution runs through the right-hand branch only: backends consume the backend-specific executable, never QIR. QIR is an interoperability artifact — one canonical module per compilation, emitted from the most-lowered circuit available — whose evidence of interoperability is that external QIR tools accept it (§14). As of `0.4.1`, QIR is still emitted outside the orchestrator by each tool separately ([`../qir_lowering.md`](../qir_lowering.md) §1.4); §14 specifies the target state.
 
 MLIR may appear within the IR/pass/lowering layers as an enabling infrastructure component, but it is not the sole definition of the OQCI architecture.
 
@@ -311,6 +314,10 @@ Validation must reject or report:
 - semantic inconsistencies that QC-IR cannot represent safely.
 
 Do not let frontends bypass QC-IR validation.
+
+## 5.7 QIR Ingestion (future work, not a deliverable)
+
+*Amended 2026-09-30 per [`framing-and-research-question.md`](framing-and-research-question.md).* Reading QIR back into QC-IR is **not** part of the locked deliverable. If it is taken up, the intended first scope is a hand-written Rust reader for a strict Base Profile subset, reviewed as a mapping onto the existing IR under the no-frontend ADR's principle. It must refuse dynamic qubit allocation, Adaptive-profile branching and result reads (Stage F §5), and controlled (`__ctl`) forms (no control modifier exists in `GateKind`). Round-tripping OQCI's own output is self-consistency only; interoperability evidence would need QIR produced by other tools at pinned versions.
 
 ---
 
@@ -464,6 +471,8 @@ Do not encode an IBM basis into generic QC-IR.
 ---
 
 # 9. IBM Target Deliverable
+
+*Amended 2026-09-30 per [`framing-and-research-question.md`](framing-and-research-question.md).* Execution submission and result retrieval against a live IBM device are **outside the Definition of Done** (§34) and are future work; they need an SDK and credentials the project does not have, and §33.4 forbids implementing a vendor API from memory. Everything else in this section remains required.
 
 IBM is the first real hardware target.
 
@@ -672,27 +681,30 @@ Do not claim a full static-analysis research system unless the implemented rule 
 
 The project must retain a well-defined lowering/output path into QIR/LLVM-compatible artifacts.
 
+*Amended 2026-09-30 per [`framing-and-research-question.md`](framing-and-research-question.md).* QIR is OQCI's interoperability artifact, not its execution path (Stage C §5).
+
 ## 14.1 Current Emitter
 
-The existing textual QIR emitter is part of the current foundation.
+The existing textual QIR emitter is part of the current foundation. Its known limitations — including a `base_profile` label written unconditionally and never validated — are documented in [`../qir_lowering.md`](../qir_lowering.md) and must not be hidden.
 
-It currently emits extended intrinsics for several operations outside the standard intrinsic set.
+## 14.2 Target Specification
 
-That must be treated as a known limitation, not hidden.
-
-## 14.2 Final QIR Direction
-
-The eventual lowering path should distinguish:
-
-- abstract OQCI operations;
-- target-independent QIR lowering;
-- target-specific executable lowering.
+- **Version.** QIR 1.0, as published in `qir-alliance/qir-spec` at tag `1.0` (commit `e872897d107516d889718b5b6f5fee909dd64238`). Every claim of Base Profile conformance cites this commit.
+- **Canonical output.** Each compilation produces at most one QIR module, emitted from the most-lowered circuit available (lowered if a backend was selected and lowering ran, otherwise optimized). It records which stage it came from. CLI, Python SDK and visualization server all use it; none emits QIR separately.
+- **Profile labeling.** A module is labeled `"qir_profiles"="base_profile"` if and only if its circuit is legal against the `qir-base` target profile and the module follows the Base Profile structure. Otherwise it is labeled `"custom"`. A strict mode refuses to produce a non-Base module, with a typed error naming the violations.
+- **The `qir-base` profile.** QIR 1.0 defines no normative quantum instruction set (`specification/Instruction_Set.md`: each backend declares its own). The `qir-base` basis is therefore pinned to the instruction set PyQIR 0.12.5 exposes (`pyqir/qis.py`), excluding `reset` and `barrier`. It is a registered compile target, so any supported circuit can be lowered onto it.
+- **Pointer style.** Opaque pointers (`ptr`) by default; typed pointers (`%Qubit*`) on request.
+- **Abstraction layers.** The path distinguishes abstract OQCI operations, target lowering (which may target `qir-base`), and QIR emission, which performs no decomposition of its own.
 
 Where mature QIR/LLVM infrastructure can replace custom mechanics, prefer reuse.
 
 ## 14.3 Validation
 
 QIR output must be validated to the extent supported by the chosen QIR tooling.
+
+- External validators, pinned: PyQIR 0.12.5 (`Module.from_ir` and `verify`) and `llvm-as` from a pinned LLVM version for each pointer style. They run in CI.
+- What each validator proves must be stated precisely. Parsing and verification by LLVM-based tools prove well-formed IR and readable QIR metadata; they do not prove Base Profile conformance. Base Profile structure checks written by OQCI itself are not independent evidence and must be described as such.
+- Interoperability evidence is consumer-side: a named external tool, at a pinned version, accepted (and where available executed) the artifact.
 
 Do not call arbitrary text "fully QIR compliant" without validation against the relevant specification/tooling.
 
@@ -1195,8 +1207,8 @@ The final non-G deliverable should contain, in a working and tested state:
 - [ ] IBM target profile.
 - [ ] IBM target lowering.
 - [ ] execution preparation.
-- [ ] result retrieval.
 - [ ] provenance metadata.
+- Live submission and result retrieval: outside the Definition of Done (§9, §34); future work.
 
 ### Execution
 - [ ] QIR/LLVM artifact generation.
@@ -1312,6 +1324,7 @@ Any LLM implementing this repository must follow these rules.
 14. Do not optimize away operations across measurement/reset/control barriers without proving the transformation safe.
 15. Do not add benchmark numbers, random seeds, repetitions, hardware-selection rules, or experimental conclusions that belong to Stage G.
 16. When an implementation requirement is genuinely ambiguous, stop and ask for a design decision rather than inventing one.
+17. Any claim about QIR conformance or interoperability must cite the QIR specification commit and the validator names and versions it rests on.
 
 ---
 
@@ -1326,8 +1339,8 @@ The non-G project is complete only when the implementation is demonstrably able 
 → `backend/target selection`
 → `basis-profile validation`
 → `target lowering`
-→ `QIR or backend executable representation`
-→ `simulator or IBM execution adapter`
+→ `backend executable representation` (plus the canonical QIR interop artifact)
+→ `simulator execution adapter`
 
 and produce:
 
@@ -1335,7 +1348,7 @@ and produce:
 2. structured analysis metrics;
 3. target-specific lowering artifacts;
 4. executable simulator output;
-5. a hardware-ready IBM path;
+5. an IBM target path through lowering, validation and execution preparation — live IBM submission and result retrieval are future work, outside this definition (amended 2026-09-30);
 6. reproducible machine-readable metadata;
 7. passing automated tests;
 8. documentation matching actual implementation;
