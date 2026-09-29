@@ -95,7 +95,7 @@ until each does, it calls `emit_qir` itself, on whichever circuit it holds:
 | Caller | Circuit emitted |
 |---|---|
 | `oqci compile`, `optimize`, `lower`, `prepare`, `watch` (`src/cli/pipeline.rs`) | **the canonical artifact.** Shown with its label and source stage; see [`cli.md`](cli.md#the-qir-stage). |
-| visualization server (`server/src/compile.rs`) | the optimized circuit |
+| visualization server (`server/src/compile.rs`) | **the canonical artifact**, with its label and source stage shown above the text. |
 | Python `qasm3_to_qir`, `qiskit_to_qir`, `cudaq_to_qir` (`python/src/lib.rs`) | the source circuit, after binding, with no optimization or lowering |
 
 Only the `oqci lower` path can remove extended intrinsics (§3.1), because only

@@ -52,7 +52,16 @@ export interface StageSnapshot {
   instructions?: InstructionView[];
   graph?: GraphView;
   qir?: string;
+  qir_info?: QirInfoView;
   unavailable?: string;
+}
+
+/** What a QIR module is: see `QirInfoView` in `src/cli/snapshot.rs`. */
+export interface QirInfoView {
+  profile: "base_profile" | "custom";
+  stage: "optimized" | "lowered";
+  pointers: "opaque" | "typed";
+  base_violations: unknown[];
 }
 
 export interface PassRecordView {
