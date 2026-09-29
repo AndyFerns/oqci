@@ -2,7 +2,8 @@
 
 Documentation for **OQCI** (Open Quantum Compiler Infrastructure). This index
 covers the IR core and its conversions, QIR lowering, the frontend layer
-(OpenQASM 3 and Qiskit), the target-independent optimization passes, the
+(OpenQASM 3, CUDA-Q and the Qiskit adapter), the target-independent
+optimization passes, the
 target model, target lowering, the backend contract, the compiler
 orchestrator, and — as of `0.4.0` — a live, browser-based visualization
 companion built entirely as a read-only consumer of the compiler below.
@@ -22,16 +23,24 @@ executable. Two things it deliberately does **not** do:
 ## Pipeline at a glance
 
 ```text
-  parse / adapt          build            optimize          convert       lower
-source ─────────▶ QC-IR ───────▶ Circuit ─────────▶ Circuit ───────▶ QCO-IR ─────▶ QIR
-(QASM 3, Qiskit)  (imperative)   (validated)   (pass pipeline)   (DAG)   (Base Profile)
-                                      ▲
-                                      │ bind_parameters
-                              symbolic circuits (Stage F)
+  parse / adapt       bind          optimize            lower                 prepare
+source ─────────▶ Circuit ─────▶ Circuit ─────────▶ Circuit ─────────▶ Lowered ──────────▶ Executable
+(OpenQASM 3,      (QC-IR,      (Stage F,  (pass pipeline;   (layout, routing,     (what backends
+ CUDA-Q, Qiskit)   validated)   optional)  QCO-IR built      decomposition,        and Aer
+                                           internally)       verification)         consume)
+
+Side output, outside the orchestrator — from the source, optimized or lowered circuit:
+  Circuit ──qc_to_qco──▶ QCO-IR (DAG) ──emit_qir──▶ QIR text
 ```
 
-Run `oqci compile <file>` to see every one of those stages for a real
-program, or `oqci watch <file>` to keep seeing them as you edit — see
+The top row is `compile::compile_circuit` ([`compiler.md`](compiler.md)),
+the one path the CLI, the Python SDK and the visualization server share. QIR
+is not on it: `emit_qir` is called separately by whichever tool wants QIR text
+([`qir_lowering.md`](qir_lowering.md) §1.4), and no backend reads it.
+
+Run `oqci compile <file>` to see the source circuit's QC-IR, QCO-IR and QIR,
+`oqci optimize`, `oqci lower` or `oqci prepare` to go further along the top
+row, or `oqci watch <file>` to keep seeing them as you edit — see
 [`cli.md`](cli.md).
 
 ## Documents
@@ -52,8 +61,8 @@ program, or `oqci watch <file>` to keep seeing them as you edit — see
 | [`cli.md`](cli.md) | **The `oqci` command line.** Inspecting every pipeline stage, pass-by-pass reports, before/after diffs, watch mode, and the JSON schema. |
 | [`visualization.md`](visualization.md) | **Live visualization.** The `server`/`frontend` companion's wire contract, and the self-validating replay technique that gives it pass-by-pass and swap/rule-by-rule detail without any change to compiler logic. |
 | [`architecture_decision_sx_basis_gate.md`](architecture_decision_sx_basis_gate.md) | **ADR.** Why `SX`/`SXdg` were added to the closed gate set, and what that does and does not license. |
-| [`mlir_dialect.md`](mlir_dialect.md) | **The `quantum` MLIR dialect spec.** Types, ops, attribute-vs-operand rules, the complete op↔Rust correspondence table, the Phase 2 integration path, and the implied TableGen skeleton. |
-| [`qir_lowering.md`](qir_lowering.md) | **Lowering rules.** Target QIR format, the op → QIR intrinsic mapping table, angle/qubit encoding, and the two documented conformance caveats (extended intrinsics, mid-circuit measurement). |
+| [`mlir_dialect.md`](mlir_dialect.md) | **The `quantum` MLIR dialect spec** (written spec only; nothing is built). Types, ops, attribute-vs-operand rules, the op↔Rust correspondence table and its two open gaps (symbolic parameters, classical wires), the Phase 2 integration path, and the implied TableGen skeleton. |
+| [`qir_lowering.md`](qir_lowering.md) | **QIR emission.** Target QIR format, where `emit_qir` is called and on which circuit, the op → QIR intrinsic mapping table, angle/qubit encoding, and the conformance caveats (extended intrinsics, mid-circuit measurement and reset, an unconditional and unvalidated `base_profile` label). |
 | [`architecture_decision_no_frontend.md`](architecture_decision_no_frontend.md) | **ADR.** Why no frontend is built before the IR is stable, and how to resist adding one early. |
 | [`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md) | **ADR (binding constraints).** Why pure Rust now, what MLIR adds later, and the constraints C1–C8 that must not change to keep the Phase 2 port mechanical. |
 
@@ -67,14 +76,17 @@ program, or `oqci watch <file>` to keep seeing them as you edit — see
 | QC-IR (`Circuit`, `Instruction`, `CircuitBuilder`) | `src/ir/qc.rs` |
 | QCO-IR (DAG, deterministic toposort) | `src/ir/qco.rs` |
 | QC-IR → QCO-IR conversion | `src/ir/convert.rs` |
-| QCO-IR → QIR lowering | `src/ir/qir.rs` |
+| QCO-IR → QIR emission | `src/ir/qir.rs` |
 | Error type (`IrError`) | `src/ir/error.rs` |
 | Phase 2 MLIR seam (empty by design) | `src/ir/mlir_compat.rs` |
+| Compiler orchestrator (`compile`, `compile_circuit`, `CompilerConfig`) | `src/compile.rs` |
 | Pass manager (`Pass`, `PassManager`) | `src/pass/mod.rs` |
 | Optimization passes | `src/pass/{canonicalize,cancellation,rotation_merge,schedule}.rs` |
 | Shared peephole adjacency | `src/pass/adjacency.rs` |
 | Metrics and diffing | `src/analysis/` |
 | Target profiles, topology, legality, cost | `src/target/` |
+| Target lowering (layout, routing, decomposition rules, verification) | `src/lowering/` |
+| Backend contract, executable representation, provenance | `src/backend/` |
 | CLI inspector | `src/cli/` |
 | Visualization server (ground truth + self-validating replay) | `server/src/` |
 | Visualization frontend | `frontend/src/` |

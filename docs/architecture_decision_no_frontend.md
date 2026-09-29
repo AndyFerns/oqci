@@ -1,6 +1,10 @@
 # ADR: No Frontend in Phase 0
 
-**Status:** Accepted. **Applies to:** Phase 0 (IR core). **Supersedes:** none.
+**Status:** Accepted; Phase 0 complete. **Applies to:** Phase 0 (IR core).
+**Supersedes:** none. Frontends were added after the Phase 0 IR core (`0.0.1`):
+OpenQASM 3 and the Qiskit adapter in `0.2.0`, CUDA-Q later (listed under
+`[Unreleased]` in the changelog; see
+[`adapters.md`](adapters.md)).
 
 ## Context
 

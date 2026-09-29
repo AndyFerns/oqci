@@ -6,7 +6,10 @@ change in the Rust design in order to keep the future MLIR port mechanical.
 
 ## Context
 
-OQCI's long-term middle layer is MLIR (see the README architecture). MLIR brings
+MLIR is the candidate middle-layer technology for OQCI's IR (Stage B,
+[`core_architecture/stage-b-modular-mlir-boundary.md`](core_architecture/stage-b-modular-mlir-boundary.md));
+none of it is implemented, and the root README lists MLIR integration as not
+started. MLIR brings
 a pass manager, a dialect conversion framework, and op verification — real
 leverage for Phase 3 optimization passes and multi-target lowering. But MLIR also
 brings a C++ build, TableGen, and an FFI boundary from Rust.
@@ -50,6 +53,13 @@ Rust op/type has a named dialect counterpart; the seam for MLIR marshalling
 4. **Traits/interfaces** — e.g. a `Collapsing` trait marking
    `quantum.measure`/`quantum.reset`, the MLIR encoding of QCO-IR's
    `DepKind::Control` barrier.
+
+*Status as of 0.4.1:* items 1 and 2 have Rust counterparts that exist without
+MLIR. The optimization passes run under a Rust `PassManager` (`src/pass/`,
+[`pass_manager.md`](pass_manager.md)), target lowering is Rust
+(`src/lowering/`), and the textual emitter in `qir.rs` is the only QIR path.
+The list above is what MLIR could provide; whether any of it replaces the Rust
+implementation is governed by Stage B.
 
 ## Binding constraints — what must NOT change
 
