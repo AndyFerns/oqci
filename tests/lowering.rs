@@ -630,7 +630,7 @@ fn routing_never_moves_a_clbit() {
 
 #[test]
 fn every_two_qubit_operation_ends_up_on_a_declared_coupling() {
-    // Invariant I2/I4, checked directly against the topology rather than
+    // Invariants L2/L4, checked directly against the topology rather than
     // through `check`.
     let profile = builtin::linear_nisq(4);
     let mut b = CircuitBuilder::new("mixed");

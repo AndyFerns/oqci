@@ -882,31 +882,34 @@ overflowing the stack.
 ## The invariant chain
 
 What makes the output *legal*, rather than merely *finished*. Each link is
-established by one phase and preserved by the rest.
+established by one phase and preserved by the rest. They are numbered L1–L4
+to keep them apart from the IR well-formedness invariants I1–I8
+([`ir_spec.md`](ir_spec.md) §3.3), which every circuit satisfies before
+lowering begins.
 
 | # | Statement | Established by | Preserved because |
 |---|---|---|---|
-| **I1** | Every gate has arity at most two, or is a wide gate the profile declares. | D0 | No rule may increase a one-qubit source's arity (check 5), and routing inserts only two-qubit `Swap`s. Re-asserted at V. |
-| **I2** | Every two-qubit gate sits on a coupled pair. | R | See I3. |
-| **I3** | A decomposition rule may only permute the operands it was given, never name a new qubit. | `RuleSet::new`, check 2 | Enforced when the rule set is built, so it holds for every circuit before any circuit is seen. |
-| **I4** | Every two-qubit gate is natively oriented, and every mnemonic is in the basis. | O and D2 | O emits in the declared operand order; D2 only rewrites one-qubit gates. |
+| **L1** | Every gate has arity at most two, or is a wide gate the profile declares. | D0 | No rule may increase a one-qubit source's arity (check 5), and routing inserts only two-qubit `Swap`s. Re-asserted at V. |
+| **L2** | Every two-qubit gate sits on a coupled pair. | R | See L3. |
+| **L3** | A decomposition rule may only permute the operands it was given, never name a new qubit. | `RuleSet::new`, check 2 | Enforced when the rule set is built, so it holds for every circuit before any circuit is seen. |
+| **L4** | Every two-qubit gate is natively oriented, and every mnemonic is in the basis. | O and D2 | O emits in the declared operand order; D2 only rewrites one-qubit gates. |
 
-The load-bearing composition is **I2 ∧ I3 ⇒ I2 survives D1, O and D2**. Because
+The load-bearing composition is **L2 ∧ L3 ⇒ L2 survives D1, O and D2**. Because
 a rule can only permute the operands it was handed, no rewrite after routing can
-move a gate onto a pair routing did not make adjacent. Without I3 this would not
+move a gate onto a pair routing did not make adjacent. Without L3 this would not
 follow: a rule that introduced a fresh qubit could place a two-qubit gate on a
 non-adjacent pair and silently undo routing's work *after* routing had finished,
 with nothing between it and the output.
-`every_builtin_rule_only_permutes_the_operands_it_was_given` checks I3 on both
+`every_builtin_rule_only_permutes_the_operands_it_was_given` checks L3 on both
 the declaration and the expanded output.
 
-I3 also buys **measurement terminality for free**. Since rules preserve operand
+L3 also buys **measurement terminality for free**. Since rules preserve operand
 sets, the question "is this wire touched after instruction *n*?" has the same
 answer before and after decomposition — so a program that was terminal-measured
 on entry is still terminal-measured on exit, and D1 cannot turn a legal
 measurement into a mid-circuit one.
 
-`every_two_qubit_operation_ends_up_on_a_declared_coupling` asserts I2 and I4
+`every_two_qubit_operation_ends_up_on_a_declared_coupling` asserts L2 and L4
 together, directly against `Topology::couples(.., CouplingMode::Directed)`
 rather than through `check`, so the two are not checking each other.
 

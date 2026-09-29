@@ -65,7 +65,7 @@ pub struct SwapEvent {
 /// source instruction rather than once for a whole list — provably
 /// equivalent to the real compiler's own call because a decomposition rule
 /// may only permute the operands it was given (the project's own documented
-/// and tested I3 invariant), so no cross-instruction interaction exists for
+/// and tested L3 invariant), so no cross-instruction interaction exists for
 /// this replay to get wrong.
 #[derive(Debug, Clone, Serialize)]
 pub struct RuleFiringEvent {
