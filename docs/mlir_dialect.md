@@ -167,7 +167,7 @@ non-negotiable constraints):
    the textual emitter in `qir.rs` with a dialect conversion (the mnemonic →
    intrinsic table in [`qir_lowering.md`](qir_lowering.md) becomes the rewrite
    patterns).
-4. **Op verification** encoding Rust invariants I1–I7 as `verify()` methods.
+4. **Op verification** encoding Rust invariants I1–I8 as `verify()` methods.
 5. **The `src/ir/mlir_compat.rs` seam**: Rust↔MLIR marshalling lives here and
    nowhere else, so the rest of the crate stays MLIR-free.
 
