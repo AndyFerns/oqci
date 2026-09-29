@@ -560,6 +560,8 @@ omitted below.
 | `ccx-to-cx` | `ccx` | the standard six-CNOT Toffoli, 15 steps | Exact | yes |
 | `x-to-sx` | `x` | `sx; sx` | Exact | no — `x` is native there |
 | `sxdg-to-sx` | `sxdg` | `sx; sx; sx` | Exact | yes |
+| `sx-to-rx` | `sx` | `rx(π/2)` | UpToGlobalPhase | no — `sx` is native there |
+| `sxdg-to-rx` | `sxdg` | `rx(−π/2)` | UpToGlobalPhase | no (uses `sxdg-to-sx`) |
 | `h-to-rz-sx` | `h` | `rz(π/2); sx; rz(π/2)` | UpToGlobalPhase | yes |
 | `y-to-rz-x` | `y` | `rz(π); x` | UpToGlobalPhase | yes |
 | `z-to-rz` | `z` | `rz(π)` | UpToGlobalPhase | yes |
@@ -571,6 +573,13 @@ omitted below.
 | `rx-to-rz-sx` | `rx(θ)` | `rz(π/2); sx; rz(θ+π); sx; rz(5π/2)` | UpToGlobalPhase | yes |
 | `ry-to-rz-sx` | `ry(θ)` | `sx; rz(θ+π); sx; rz(π)` | UpToGlobalPhase | yes |
 | `u-to-rz-sx` | `u(θ,φ,λ)` | `rz(λ); sx; rz(θ+π); sx; rz(φ+π)` | UpToGlobalPhase | yes |
+| `u-to-rz-ry` | `u(θ,φ,λ)` | `rz(λ); ry(θ); rz(φ)` | UpToGlobalPhase | no (uses `u-to-rz-sx`) |
+
+`sx-to-rx`, `sxdg-to-rx` and `u-to-rz-ry` exist for targets whose basis has
+`rx`/`ry` but no `sx`. Two rules for the same source can coexist in the
+library because a profile names at most one of them (`RuleSet::new` rejects a
+profile naming both). `u-to-rz-ry` passes all three angles through unchanged,
+so unlike `u-to-rz-sx` it lets a symbolic `u` survive lowering.
 
 Sequences read left to right in circuit order: `h-to-rz-sx` applies `rz(π/2)`
 first. `sxdg-to-sx` is three `sx` because `SX` has order four — `SX² = X`,
