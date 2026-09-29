@@ -576,7 +576,9 @@ omitted below.
 | `u-to-rz-ry` | `u(θ,φ,λ)` | `rz(λ); ry(θ); rz(φ)` | UpToGlobalPhase | no (uses `u-to-rz-sx`) |
 
 `sx-to-rx`, `sxdg-to-rx` and `u-to-rz-ry` exist for targets whose basis has
-`rx`/`ry` but no `sx`. Two rules for the same source can coexist in the
+`rx`/`ry` but no `sx`. The `qir-base` profile ([`target_model.md`](target_model.md))
+uses `id-to-nothing`, `sx-to-rx`, `sxdg-to-rx`, `p-to-rz`, `u-to-rz-ry` and
+`cy-to-cx`; everything else registered is native there. Two rules for the same source can coexist in the
 library because a profile names at most one of them (`RuleSet::new` rejects a
 profile naming both). `u-to-rz-ry` passes all three angles through unchanged,
 so unlike `u-to-rz-sx` it lets a symbolic `u` survive lowering.

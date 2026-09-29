@@ -62,6 +62,22 @@ impl SimulatorBackend {
         )
     }
 
+    /// A target whose lowered circuits are exactly what a QIR Base Profile
+    /// module may contain: the `qir-base` profile, all-to-all.
+    ///
+    /// Compiling for it is how a circuit using `sx`, `u`, `p` or `cy` gets a
+    /// QIR module that can honestly be labeled `base_profile`. It prepares an
+    /// executable like any simulator target, which Aer can run, so the
+    /// lowering onto it is checked the same way as every other.
+    #[must_use]
+    pub fn qir_base() -> Self {
+        SimulatorBackend::from_profile(
+            "qir-base",
+            "QIR Base Profile instruction set (PyQIR 0.12.5 QIS), all-to-all; for Base-labeled QIR",
+            builtin::qir_base(builtin::QIR_BASE_WIDTH),
+        )
+    }
+
     /// A simulator backend over any profile.
     ///
     /// # Panics

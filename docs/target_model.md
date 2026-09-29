@@ -359,10 +359,35 @@ because `Topology::linear` declares both directions explicitly; this profile
 therefore makes no claim about directional hardware. A genuinely directed
 device would declare one direction only.
 
-`all()` returns both, with `linear-nisq` instantiated at width 5 so the set is
-enumerable; `by_id` looks one up by `BasisProfile::id`.
+### `qir_base(qubit_count)`
 
-A third profile exists but is not in `builtin`: `ibm-illustrative`, which the
+| Property | Value |
+|---|---|
+| id / version / backend | `qir-base` / `1` / `qir-base-profile` |
+| Qubits | caller-supplied, `all_to_all` (32 in `all()` and in the `qir-base` backend) |
+| Basis | `x`, `y`, `z`, `h`, `s`, `sdg`, `t`, `tdg`, `rx`, `ry`, `rz`, `cx`, `cz`, `swap`, `ccx`, `measure` |
+| Measurement | measurement yes; mid-circuit no; reset no |
+| Decomposition rule ids | `id-to-nothing`, `sx-to-rx`, `sxdg-to-rx`, `p-to-rz`, `u-to-rz-ry`, `cy-to-cx` |
+| Capabilities | `all-to-all-connectivity`, `unrestricted-parameters` |
+| Cost model reference | `uniform` |
+
+Not a device: this profile describes an **output format**. A circuit legal
+against it is exactly what OQCI will emit as a QIR module labeled
+`"qir_profiles"="base_profile"` ([`qir_lowering.md`](qir_lowering.md)).
+
+QIR 1.0 defines no normative quantum instruction set — `Instruction_Set.md` in
+`qir-alliance/qir-spec` at tag `1.0` (commit `e872897`) leaves the choice to
+each backend — so the basis is pinned to the instructions PyQIR 0.12.5 exposes
+(`pyqir/qis.py`), minus `reset` (the Base Profile's measure-last,
+no-reuse-after-measurement structure leaves no sound place for one), `barrier`
+(no QC-IR counterpart) and `if_result` (classical control flow). Measurement is
+terminal only, for the same Base Profile rule.
+
+`all()` returns all three, with `linear-nisq` instantiated at width 5 and
+`qir-base` at width 32 so the set is enumerable; `by_id` looks one up by
+`BasisProfile::id`.
+
+A fourth profile exists but is not in `builtin`: `ibm-illustrative`, which the
 IBM backend carries (`src/backend/ibm.rs`). It is a five-qubit ring with two
 **one-way** couplings, so it is the profile that actually exercises directed
 connectivity end to end. Like the two above it is synthetic and describes no

@@ -625,7 +625,8 @@ fn list_targets() {
     }
     println!(
         "use --target ID on `compile`, `optimize` or `analyze` to check a circuit\n\
-         against one. Both profiles are synthetic: neither describes real hardware."
+         against one. All are synthetic: none describes real hardware, and
+         `qir-base` describes an output format (the QIR Base Profile)."
     );
     println!();
     println!("`--target ID` checks a circuit against one of these and reports.");

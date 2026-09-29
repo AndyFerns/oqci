@@ -280,6 +280,7 @@ oqci backends
 backends:
   simulator            unconstrained simulator: all-to-all connectivity, full gate set
   simulator-nisq       simulator constrained to a linear NISQ basis and topology
+  qir-base             QIR Base Profile instruction set (PyQIR 0.12.5 QIS), all-to-all; for Base-labeled QIR
   ibm-illustrative     synthetic IBM-shaped target; describes no real device and cannot execute
 
 No backend executes in this process.

@@ -144,7 +144,7 @@ At the verified `master` state:
   retrieval are not implemented, and no claim of IBM hardware executability
   is made** (§33.12);
 - per-operation cost and error/noise metadata on profiles (Stage D §2) remain
-  absent, deliberately: both built-in profiles are synthetic, and a profile
+  absent, deliberately: every built-in profile is synthetic, and a profile
   asserting error rates nobody measured would be a fabricated record;
 - a CUDA-Q execution adapter (§15.2) exists on `master` (listed under
   `[Unreleased]`), but it has never run against a

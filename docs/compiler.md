@@ -199,7 +199,7 @@ overwhelmingly common cause and a bare "unknown backend" makes the user go
 looking for the list themselves:
 
 ```text
-unknown backend `quantum-supercomputer`; available: simulator, simulator-nisq, ibm-illustrative
+unknown backend `quantum-supercomputer`; available: simulator, simulator-nisq, qir-base, ibm-illustrative
 ```
 
 `an_unknown_backend_lists_what_is_available` and
