@@ -103,4 +103,17 @@ pub enum IrError {
     /// `unwrap`ped so that no code path can panic.
     #[error("internal error: dependency graph is cyclic")]
     CyclicGraph,
+
+    /// A circuit was to be emitted as a QIR Base Profile module but breaks a
+    /// Base Profile rule the instruction stream shows on its own: it resets a
+    /// qubit, or uses a qubit after measuring it.
+    ///
+    /// The orchestrator checks the full `qir-base` target profile before
+    /// asking for a Base module, so this surfaces only if that check and the
+    /// emitter disagree.
+    #[error("not a QIR Base Profile program: {reason}")]
+    NotBaseProfile {
+        /// Which rule the circuit breaks.
+        reason: String,
+    },
 }

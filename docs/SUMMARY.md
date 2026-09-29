@@ -20,7 +20,7 @@
 # Reference
 
 - [IR Specification](ir_spec.md)
-- [QIR Lowering](qir_lowering.md)
+- [QIR Emission](qir_lowering.md)
 - [MLIR Dialect](mlir_dialect.md)
 
 # Frontends

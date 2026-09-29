@@ -2,12 +2,13 @@
 //! all known variants guards against silent gaps (subject to the external-crate
 //! `#[non_exhaustive]` wildcard requirement).
 
-use oqci::ir::{CircuitBuilder, ClbitId, GateKind, IrError, Param, QubitId};
+use oqci::ir::{CircuitBuilder, ClbitId, GateKind, IrError, Param, QubitId, emit_qir, qc_to_qco};
 
-/// Collect one value of each of the eight `IrError` variants: seven via
-/// `build()` and `CyclicGraph` constructed directly (enum-level
-/// `#[non_exhaustive]` permits variant construction, only exhaustive matching
-/// is blocked).
+/// Collect one value of each of the eleven `IrError` variants: eight via
+/// `build()`, `UnboundParameter` via `emit_qir`, and `CyclicGraph` and
+/// `NotBaseProfile` constructed directly (enum-level `#[non_exhaustive]`
+/// permits variant construction, only exhaustive matching is blocked).
+/// `NotBaseProfile` is only produced by the crate-private Base emitter.
 fn one_of_each() -> Vec<IrError> {
     let qubit_range = {
         let mut b = CircuitBuilder::new("e");
@@ -63,6 +64,19 @@ fn one_of_each() -> Vec<IrError> {
         b.rx(Param::concrete(f64::NAN), q0);
         b.build().expect_err("non finite")
     };
+    let empty_symbol = {
+        let mut b = CircuitBuilder::new("e");
+        let q0 = b.alloc_qubit();
+        b.rx(Param::symbol(""), q0);
+        b.build().expect_err("empty symbol")
+    };
+    let unbound = {
+        let mut b = CircuitBuilder::new("e");
+        let q0 = b.alloc_qubit();
+        b.rx(Param::symbol("theta"), q0);
+        let dag = qc_to_qco(&b.build().unwrap()).unwrap();
+        emit_qir(&dag).expect_err("unbound")
+    };
 
     vec![
         qubit_range,
@@ -72,7 +86,12 @@ fn one_of_each() -> Vec<IrError> {
         empty_name,
         empty_operands,
         non_finite,
+        empty_symbol,
+        unbound,
         IrError::CyclicGraph,
+        IrError::NotBaseProfile {
+            reason: "reset".into(),
+        },
     ]
 }
 
@@ -87,7 +106,10 @@ fn discriminant(e: &IrError) -> &'static str {
         IrError::EmptyOpaqueName => "EmptyOpaqueName",
         IrError::EmptyOpaqueOperands { .. } => "EmptyOpaqueOperands",
         IrError::NonFiniteAngle { .. } => "NonFiniteAngle",
+        IrError::EmptyParameterSymbol { .. } => "EmptyParameterSymbol",
+        IrError::UnboundParameter { .. } => "UnboundParameter",
         IrError::CyclicGraph => "CyclicGraph",
+        IrError::NotBaseProfile { .. } => "NotBaseProfile",
         _ => "unknown",
     }
 }
@@ -96,7 +118,7 @@ fn discriminant(e: &IrError) -> &'static str {
 #[test]
 fn every_error_variant_is_constructible_and_displays() {
     let errors = one_of_each();
-    assert_eq!(errors.len(), 8);
+    assert_eq!(errors.len(), 11);
     for e in &errors {
         assert!(!format!("{e}").is_empty(), "empty Display for {e:?}");
     }
@@ -111,5 +133,5 @@ fn error_variant_match_is_total_over_known_variants() {
         assert_ne!(name, "unknown", "unmatched variant: {e:?}");
         seen.insert(name);
     }
-    assert_eq!(seen.len(), 8, "expected all 8 distinct variants");
+    assert_eq!(seen.len(), 11, "expected all 11 distinct variants");
 }

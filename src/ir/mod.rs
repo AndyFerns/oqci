@@ -40,5 +40,5 @@ pub use error::IrError;
 pub use param::Param;
 pub use qc::{Circuit, CircuitBuilder, Instruction};
 pub use qco::{DepKind, NodeKind, QcoCircuit, QcoNode, Wire};
-pub use qir::emit_qir;
+pub use qir::{PointerStyle, QirOptions, QirProfile, emit_qir, emit_qir_with};
 pub use types::{Angle, ClbitId, GateKind, QubitId};

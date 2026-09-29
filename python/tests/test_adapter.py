@@ -23,14 +23,19 @@ from qiskit.circuit import Parameter  # noqa: E402
 
 
 def body(qir):
-    """The emitted call sequence, without declarations or the module header.
+    """The emitted quantum-instruction calls, without declarations, the module
+    header, or the runtime's initialize/output-recording calls.
 
     Declarations are emitted alphabetically at the top of the module, so
     matching on a bare intrinsic name would find the `declare` line rather
     than the `call`. Comparing bodies also ignores the circuit name, which
     Qiskit rewrites in `assign_parameters`.
     """
-    return [line.strip() for line in qir.splitlines() if line.startswith("  call ")]
+    return [
+        line.strip()
+        for line in qir.splitlines()
+        if line.startswith("  call ") and "__quantum__qis__" in line
+    ]
 
 
 def test_bell_circuit_compiles_to_qir():
@@ -49,7 +54,7 @@ def test_bell_circuit_compiles_to_qir():
 
 def test_empty_circuit_compiles():
     qir = oqci_native.qiskit_to_qir(QuantumCircuit(name="empty"))
-    assert "ret void" in qir
+    assert "ret i64 0" in qir
 
 
 def test_ghz3_preserves_instruction_order():
@@ -87,7 +92,7 @@ def test_multiple_registers_map_to_flat_indices():
 
     qir = oqci_native.qiskit_to_qir(qc)
     # `b[0]` is the second qubit overall, so the CNOT targets index 1.
-    assert "inttoptr (i64 1 to %Qubit*)" in qir
+    assert "inttoptr (i64 1 to ptr)" in qir
 
 
 def test_reset_is_translated():

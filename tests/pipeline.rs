@@ -87,9 +87,9 @@ fn identity_empty_circuit() {
     assert!(dag.topological_ops().unwrap().is_empty());
 
     let qir = emit_qir(&dag).unwrap();
-    // A valid, empty entry point with just `ret void`.
-    assert!(qir.contains("define void @identity() #0"));
-    assert!(qir.contains("ret void"));
+    // A valid, empty entry point: initialize, then return exit code 0.
+    assert!(qir.contains("define i64 @identity() #0"));
+    assert!(qir.contains("ret i64 0"));
     assert!(qir.contains("required_num_qubits\"=\"0\""));
 }
 

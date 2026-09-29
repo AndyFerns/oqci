@@ -86,7 +86,7 @@ fn compile_emits_valid_json() {
         value["stages"][2]["qir"]
             .as_str()
             .unwrap()
-            .contains("define void")
+            .contains("define i64")
     );
 }
 
