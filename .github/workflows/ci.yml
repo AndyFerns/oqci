@@ -1,0 +1,90 @@
+name: CI
+
+# The project's core quality gates (final-deliverables-spec.md §26): build,
+# tests, formatting, lints and rustdoc on every push and pull request, on the
+# platforms the determinism contract is claimed for. Hardware jobs never run
+# here (§26: not without credentials and an explicit resource policy).
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: rust (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # build.rs records the git commit in provenance; a full clone keeps
+          # that value real rather than "unknown".
+          fetch-depth: 0
+
+      # rust-toolchain.toml pins the compiler and components; rustup reads it
+      # on the first cargo invocation.
+      - name: Show toolchain
+        run: rustup show
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # oqci-python is a PyO3 extension module: it links against the Python
+      # interpreter only when loaded, so its tests run in the python job.
+      - name: Test
+        run: cargo test --workspace --exclude oqci-python
+
+      - name: Rustdoc
+        run: cargo doc --no-deps --workspace --exclude oqci-python
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  python:
+    name: python (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show toolchain
+        run: rustup show
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the extension and run the Python tests
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r python/requirements-dev.txt
+          maturin develop --manifest-path python/Cargo.toml
+          pytest python/tests -q
