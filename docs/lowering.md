@@ -1399,7 +1399,7 @@ section tracks what is and is not real. Everything below the first table is
 
 ### Now done
 
-Recorded because earlier revisions of this document listed all four as absent,
+Recorded because earlier revisions of this document listed these as absent,
 and a status table that only ever grows is not a useful one.
 
 | Spec | Status |
@@ -1408,6 +1408,7 @@ and a status table that only ever grows is not a useful one.
 | §8.7 Routing / SWAP insertion | **done.** `ShortestPathRouter` inserts `Swap`s, updates the layout as it goes, reports `swaps_inserted`, and refuses with a typed reason when no path exists. Quality caveat in [Known quality gap](#known-quality-gap-the-router-inserts-more-swaps-than-it-has-to). |
 | Stage D §7 orientation repair | **done**, with the scope caveat in [Where this diverges from §7](#where-this-diverges-from-7-honestly). `lower` derives the routing `CouplingMode` from the rule closure via `reaches(profile, rules, "h")`. |
 | §8.8 `lower()` entry point | **done.** Takes a `Circuit`, a `BasisProfile` and a `LoweringConfig`; returns a `Lowered` or a typed refusal. |
+| Stage D §6 final layout / reporting | **done.** Both layouts leave the process: `Provenance` carries `initial_layout` and `final_layout`, every prepared executable carries a `Provenance`, and `oqci lower`'s report (`LoweringView`) includes both. A consumer outside the process can tell which physical wire a measurement result came from. `Lowered` itself is still not `Serialize`, and no benchmark record exists yet to write a layout into. |
 
 ### Not started
 
@@ -1426,14 +1427,6 @@ and a status table that only ever grows is not a useful one.
   There is no `Approximate { epsilon }` variant and no rule with a bounded
   error, so the "approximate" half of §5 is representable only by adding a
   variant, which would invalidate nothing but has not been needed yet.
-- **Serialized layout reporting.** Stage D §6 lists "final layout/reporting" as
-  a required concept. `Lowered` now carries `initial_layout` and `final_layout`
-  in process, and `Layout` is `Serialize` — but `Lowered` itself is not, and
-  nothing writes a layout into a compilation report, a snapshot or a benchmark
-  record. Both layouts are now persisted: `Provenance` carries
-  `initial_layout` and `final_layout`, and every prepared executable carries a
-  `Provenance`. A consumer outside the process can therefore tell which
-  physical wire a measurement result came from, which it could not before.
 - ~~Any CLI surface for lowering.~~ **Now present.** `oqci lower` renders
   both layouts, the SWAP count, the rules that fired, each step of the
   schedule and the legality report, with `--layout trivial|dense`,
