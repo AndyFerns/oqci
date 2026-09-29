@@ -7,6 +7,7 @@
 # Source of Truth
 
 - [Documentation Index and Locked Decisions](core_architecture/index.md)
+  - [Framing and Research Question](core_architecture/framing-and-research-question.md)
   - [Stage A — Rust-Native IR Foundation](core_architecture/stage-a-rust-native-ir-foundation.md)
   - [Stage B — Modular MLIR Boundary](core_architecture/stage-b-modular-mlir-boundary.md)
   - [Stage C — Explicit Backend Contract](core_architecture/stage-c-explicit-backend-contract.md)

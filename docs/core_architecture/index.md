@@ -18,6 +18,7 @@ The documents are intentionally split into architecture/design decisions and one
 
 | Stage | File | Decision | Status |
 |---|---|---|---|
+| — | [`framing-and-research-question.md`](framing-and-research-question.md) | OQCI is quantum-native compiler infrastructure first and LLVM/QIR-interoperable second; the research question every other decision serves. Takes precedence over older identity statements. | LOCKED |
 | A | [`stage-a-rust-native-ir-foundation.md`](stage-a-rust-native-ir-foundation.md) | Rust-native IR first; stabilize QC-IR/QCO-IR before introducing heavy MLIR infrastructure. | LOCKED |
 | B | [`stage-b-modular-mlir-boundary.md`](stage-b-modular-mlir-boundary.md) | MLIR is a modular/enabling infrastructure layer, not the project's primary research contribution. Integrate progressively after the Rust core is stable. | LOCKED |
 | C | [`stage-c-explicit-backend-contract.md`](stage-c-explicit-backend-contract.md) | Backend execution is governed by an explicit OQCI backend contract; IBM gets a dedicated target-lowering stage. | LOCKED |
