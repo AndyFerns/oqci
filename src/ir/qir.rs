@@ -162,7 +162,6 @@ pub fn emit_qir_with(dag: &QcoCircuit, options: &QirOptions) -> Result<String, I
 ///
 /// [`IrError::NotBaseProfile`] for a reset or an operation after a
 /// measurement on the same qubit, and otherwise as [`emit_qir_with`].
-#[allow(dead_code)] // called by the orchestrator once it labels QIR
 pub(crate) fn emit_qir_base(dag: &QcoCircuit, options: &QirOptions) -> Result<String, IrError> {
     emit(dag, options, QirProfile::Base)
 }

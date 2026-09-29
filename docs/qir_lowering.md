@@ -87,9 +87,10 @@ touches a qubit after measuring it (§3.3).
 
 ### 1.4 Where QIR is emitted
 
-`emit_qir` is not part of the compiler orchestrator: `compile::compile_circuit`
-never calls it, and `CompilationArtifacts` carries no QIR. It is called
-separately, on whichever circuit the caller holds:
+The compiler orchestrator emits one canonical QIR artifact per compilation,
+from the most-lowered circuit available (`CompilationArtifacts::qir`, see
+[`compiler.md`](compiler.md#qirartifact)). The tools below are moving onto it;
+until each does, it calls `emit_qir` itself, on whichever circuit it holds:
 
 | Caller | Circuit emitted |
 |---|---|
@@ -192,18 +193,30 @@ from any other stage (§1.4) may not.
 
 ### 3.3 Profile label
 
-The public emitters, `ir::emit_qir` and `ir::emit_qir_with`, always label a
-module `"qir_profiles"="custom"`: from the IR layer alone they cannot know
-whether a consumer's instruction set covers every gate, so they never claim
-the Base Profile. A `base_profile` module can only come from a crate-private
-emitter meant for the compiler orchestrator. That emitter refuses, with
-`IrError::NotBaseProfile`, a circuit that resets a qubit or uses one after
-measuring it, so even a wrong caller cannot produce a Base-labeled module that
-breaks those rules.
+A module is labeled `"qir_profiles"="base_profile"` **if and only if** its
+circuit is legal against the `qir-base` target profile
+([`target_model.md`](target_model.md)): every gate in the Base instruction set
+(PyQIR 0.12.5's, §2), measurements terminal, no reset, no unbound parameter.
+Otherwise it is labeled `"custom"`, which claims no profile — the label PyQIR
+itself uses for modules outside a profile.
 
-*As of this revision, nothing calls the Base emitter yet, so every module
-OQCI produces is labeled `custom`.* No emitted module has yet been checked by
-an external LLVM or QIR tool.
+The decision is made by the compiler orchestrator, which emits the canonical
+QIR artifact for each compilation
+([`compiler.md`](compiler.md#qirartifact)). A strict mode
+(`QirProfileRequirement::Base`) refuses, with `CompileError::QirProfile`,
+instead of emitting `custom`.
+
+The IR layer cannot make the claim on its own, so its public emitters,
+`ir::emit_qir` and `ir::emit_qir_with`, always write `custom`. The Base form
+comes only from a crate-private emitter the orchestrator calls after the
+check. That emitter also refuses, with `IrError::NotBaseProfile`, a circuit
+that resets a qubit or uses one after measuring it, so even a wrong caller
+cannot produce a Base-labeled module that breaks those rules.
+
+To get a Base-labeled module for a circuit that uses `sx`, `sxdg`, `id`, `p`,
+`u` or `cy`, compile it for the `qir-base` backend: lowering rewrites those
+gates into the Base instruction set first. A circuit with mid-circuit
+measurement or reset can never be Base-labeled (§3.2).
 
 ## 4. Worked example — Bell state
 
