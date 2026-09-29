@@ -65,7 +65,8 @@ row, or `oqci watch <file>` to keep seeing them as you edit — see
 | [`mlir_dialect.md`](mlir_dialect.md) | **The `quantum` MLIR dialect spec** (written spec only; nothing is built). Types, ops, attribute-vs-operand rules, the op↔Rust correspondence table and its two open gaps (symbolic parameters, classical wires), the Phase 2 integration path, and the implied TableGen skeleton. |
 | [`qir_lowering.md`](qir_lowering.md) | **QIR emission.** Target QIR format, where `emit_qir` is called and on which circuit, the op → QIR intrinsic mapping table, angle/qubit encoding, and the conformance caveats (extended intrinsics, mid-circuit measurement and reset, an unconditional and unvalidated `base_profile` label). |
 | [`architecture_decision_no_frontend.md`](architecture_decision_no_frontend.md) | **ADR.** Why no frontend is built before the IR is stable, and how to resist adding one early. |
-| [`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md) | **ADR (binding constraints).** Why pure Rust now, what MLIR adds later, and the constraints C1–C8 that must not change to keep the Phase 2 port mechanical. |
+| [`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md) | **ADR (binding constraints).** The IR contract: constraints C1–C8, what each guarantees about I1–I8, and where each is enforced and tested. |
+| [`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md) | **ADR.** Why the IR is pure Rust, and what MLIR could add later under Stage B. Its constraint table now lives in the IR Contract ADR. |
 
 ## Source map
 
@@ -115,8 +116,10 @@ optional Python and mdBook stages.
 
 ## Reading order
 
-New contributors: start with [`ir_spec.md`](ir_spec.md) for the IR itself, then
-[`qir_lowering.md`](qir_lowering.md) for the output boundary. Before touching any
-core IR type, read
-[`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md) —
-its constraints C1–C8 are what keep the future MLIR port cheap.
+New contributors: start with
+[`core_architecture/framing-and-research-question.md`](core_architecture/framing-and-research-question.md)
+for what the project is and is not claiming, then [`ir_spec.md`](ir_spec.md)
+for the IR itself, then [`qir_lowering.md`](qir_lowering.md) for the output
+boundary. Before touching any core IR type, read
+[`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md) —
+its constraints C1–C8 are what make every circuit a witness of I1–I8.
