@@ -94,9 +94,7 @@ until each does, it calls `emit_qir` itself, on whichever circuit it holds:
 
 | Caller | Circuit emitted |
 |---|---|
-| `oqci compile` (`src/cli/pipeline.rs`) | the source circuit, before optimization |
-| `oqci optimize` | the optimized circuit |
-| `oqci lower` | the lowered (target-legal) circuit |
+| `oqci compile`, `optimize`, `lower`, `prepare`, `watch` (`src/cli/pipeline.rs`) | **the canonical artifact.** Shown with its label and source stage; see [`cli.md`](cli.md#the-qir-stage). |
 | visualization server (`server/src/compile.rs`) | the optimized circuit |
 | Python `qasm3_to_qir`, `qiskit_to_qir`, `cudaq_to_qir` (`python/src/lib.rs`) | the source circuit, after binding, with no optimization or lowering |
 

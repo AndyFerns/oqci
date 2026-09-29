@@ -289,6 +289,16 @@ fn describe_violation(violation: &Violation) -> String {
 fn render_stage(out: &mut String, stage: &StageSnapshot) {
     let _ = write!(out, "\n-- {} --", stage.stage);
 
+    if let Some(info) = &stage.qir_info {
+        let _ = write!(
+            out,
+            " {}, from the {} circuit, {} pointers",
+            info.profile.attribute_value(),
+            info.stage.id(),
+            info.pointers.id()
+        );
+    }
+
     if let Some(metrics) = &stage.metrics {
         let _ = write!(
             out,
@@ -336,6 +346,19 @@ fn render_stage(out: &mut String, stage: &StageSnapshot) {
             for edge in control {
                 let _ = writeln!(out, "    {} -> {} on {}", edge.from, edge.to, edge.wire);
             }
+        }
+    }
+
+    if let Some(info) = &stage.qir_info
+        && !info.base_violations.is_empty()
+    {
+        let _ = writeln!(
+            out,
+            "  not base_profile: the circuit is not legal for qir-base \
+                 (compile for `--backend qir-base` to lower it there):"
+        );
+        for violation in &info.base_violations {
+            let _ = writeln!(out, "    {}", describe_violation(violation));
         }
     }
 

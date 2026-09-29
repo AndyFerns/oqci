@@ -78,6 +78,7 @@ fn build_report(
         instructions: Some(snapshot::instructions_of(&artifacts.source_circuit)),
         graph: None,
         qir: None,
+        qir_info: None,
         unavailable: None,
     });
 
@@ -87,6 +88,7 @@ fn build_report(
         instructions: Some(snapshot::instructions_of(&artifacts.optimized)),
         graph: None,
         qir: None,
+        qir_info: None,
         unavailable: None,
     });
 
@@ -97,6 +99,7 @@ fn build_report(
         instructions: None,
         graph: Some(snapshot::graph_of(&dag)?),
         qir: None,
+        qir_info: None,
         unavailable: None,
     });
 
@@ -107,6 +110,7 @@ fn build_report(
             instructions: None,
             graph: None,
             qir: Some(emit_qir(&dag)?),
+            qir_info: None,
             unavailable: None,
         });
     } else {
@@ -116,6 +120,7 @@ fn build_report(
             instructions: None,
             graph: None,
             qir: None,
+            qir_info: None,
             unavailable: Some(format!(
                 "circuit has unbound parameter(s): {}; supply bindings to enable QIR emission",
                 artifacts.optimized.parameters().join(", ")
@@ -130,6 +135,7 @@ fn build_report(
             instructions: Some(snapshot::instructions_of(&lowered.circuit)),
             graph: None,
             qir: None,
+            qir_info: None,
             unavailable: None,
         });
 

@@ -24,7 +24,7 @@ nothing but render what comes back:
 | every metric | `analysis::analyze` |
 | the diff | `analysis::diff_circuits` |
 | dependency graph | `ir::qc_to_qco` |
-| QIR text | `ir::emit_qir` |
+| QIR text and its profile label | `compile::compile_named` → `CompilationArtifacts::qir` (the canonical artifact; the CLI emits no QIR of its own) |
 | layout, SWAP count, rules applied | `lowering::lower` |
 | legality and cost | `target::check`, the backend's own `CostModel` |
 | the executable | `backend::Executable::from_lowered` |
@@ -44,7 +44,7 @@ No gate is interpreted, no metric recomputed, no circuit rewritten in the CLI.
 ## Commands
 
 ```text
-oqci compile  <input.qasm> [--emit STAGES] [--bind NAME=VALUE] [--target ID] [--json]
+oqci compile  <input.qasm> [--emit STAGES] [--bind NAME=VALUE] [--target ID] [--qir-profile any|base] [--qir-pointers opaque|typed] [--json]
 oqci optimize <input.qasm> [--emit STAGES] [--passes IDS] [--disable IDS] [--diff] [--bind …] [--target ID] [--json]
 oqci analyze  <input.qasm> [--optimized] [--bind …] [--target ID] [--json]
 oqci lower    <input.qasm> --backend ID [--layout trivial|dense] [--no-route]
@@ -69,6 +69,37 @@ reachable from Python through `oqci.compile` — see
 default is all three. The circuit is named after the file stem, so the QIR
 entry point matches the file you are looking at.
 
+Every command that reads a program also takes the two QIR options (shown on
+`compile` above, accepted everywhere):
+
+- `--qir-profile any|base` (default `any`). With `any`, the module is labeled
+  `base_profile` when the circuit is legal for the `qir-base` target and
+  `custom` otherwise, and the report says why. With `base`, a circuit that
+  does not qualify is an error instead (exit code 1), naming the violations.
+- `--qir-pointers opaque|typed` (default `opaque`). `ptr` for LLVM 17+ and
+  PyQIR; `%Qubit*` for LLVM 16 and earlier.
+
+### The `qir` stage
+
+The QIR shown is the compilation's one canonical module
+([`qir_lowering.md`](qir_lowering.md), [`compiler.md`](compiler.md#qirartifact)),
+emitted from the most-lowered circuit the command produced: the lowered
+circuit for `lower`; the optimized circuit for `optimize`; for `compile`, which
+runs no passes, the circuit as read. Its header says which, with the label and
+pointer style:
+
+```text
+-- qir -- custom, from the lowered circuit, opaque pointers
+  not base_profile: the circuit is not legal for qir-base (compile for `--backend qir-base` to lower it there):
+    [1] `sx` is not in the target's basis set
+  ; QIR module for circuit `bell`
+  …
+```
+
+To get a `base_profile` module for a circuit whose gates are outside the Base
+instruction set, lower it onto the `qir-base` backend:
+`oqci lower bell.qasm --backend qir-base --emit qir`.
+
 ### compile
 
 ```console
@@ -87,7 +118,7 @@ $ oqci compile examples/bell.qasm
   layer 1: 1
   layer 2: 2, 3
 
--- qir --
+-- qir -- base_profile, from the optimized circuit, opaque pointers
   ; QIR module for circuit `bell`
   …
 ```
@@ -377,7 +408,11 @@ consumes — everything the terminal shows is in it:
       ]
     },
     { "stage": "qco-ir", "graph": { "depth": 3, "layers": [[0],[1],[2,3]], "edges": [...] } },
-    { "stage": "qir", "qir": "; QIR module…" }
+    {
+      "stage": "qir",
+      "qir": "; QIR module…",
+      "qir_info": { "profile": "base_profile", "stage": "optimized", "pointers": "opaque", "base_violations": [] }
+    }
   ],
   "passes": [ { "id": "gate-cancellation", "changed": true, "before": {…}, "after": {…} } ],
   "diff": [ { "marker": "-", "text": "x %q2" } ]
@@ -425,6 +460,10 @@ Notes on the schema:
   `{"kind":"symbol","name":"theta"}`, so a consumer can distinguish a bound
   angle from a free one without parsing display text.
 - `unavailable` on a stage explains why it produced nothing.
+- `qir_info` on the `qir` stage gives the module's `profile` (`base_profile` or
+  `custom`), the `stage` it was emitted from (`optimized` or `lowered`), its
+  `pointers` style, and `base_violations`: the circuit's violations of the
+  `qir-base` profile, tagged by `kind`, empty for a Base module.
 - `target` is present only when `--target` was given. It carries the profile's
   `id@version`, the legality verdict with every `violations` entry tagged by
   `kind`, the full `cost` breakdown, and `cost_model_configuration` — the
