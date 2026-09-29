@@ -116,10 +116,13 @@ Gates with no member of the QIR *standard* instruction set (`id`, `p`, `u`,
 `cy`, `swap`, `ccx`, `sx`, `sxdg`, and every `Opaque`) are emitted as declared
 `__quantum__qis__*` externs. Every callee is declared, but no emitted module
 has been checked by an LLVM or QIR tool (no `llvm-as` or QIR validator is part
-of the build or of CI). One known defect: an `Opaque` gate's name is spliced
-into the intrinsic name unchanged (`__quantum__qis__<name>__body`), and
-validation only requires the name to be non-empty (I5), so a name containing,
-for example, `-` or a space yields an identifier LLVM would reject.
+of the build or of CI). An `Opaque` gate's name is kept verbatim in its
+intrinsic name (`__quantum__qis__<name>__body`); validation only requires it to
+be non-empty (I5), so when the result falls outside LLVM's unquoted identifier
+syntax (`[-a-zA-Z$._0-9]`, not starting with a digit) — a space, say — the
+symbol is emitted quoted, `@"__quantum__qis__my gate__body"`, with `"`, `\` and
+non-printable bytes written as `\XX` hex escapes. Nothing is mangled, so two
+distinct gates cannot collide on one symbol.
 
 Removing extended intrinsics is target lowering's job, not the emitter's:
 lowering to a profile whose basis excludes them rewrites them with the

@@ -22,7 +22,8 @@
 //!   [`crate::ir::GateKind::Opaque`])
 //!   are emitted as declared `__quantum__qis__*` externs. The emitter does not
 //!   decompose them; target lowering does, for a profile whose basis excludes
-//!   them. An `Opaque` name is used verbatim in the intrinsic name.
+//!   them. An `Opaque` name is kept verbatim in the intrinsic name, quoted
+//!   when LLVM's unquoted identifier syntax cannot express it.
 //! - **Mid-circuit measurement and reset** are emitted in program order. No
 //!   deferred-measurement pass exists.
 //! - **Profile label.** `"qir_profiles"="base_profile"` is written for every
@@ -134,7 +135,11 @@ fn emit_instruction(
                 arg_vals.push(qubit_val(*q));
             }
             register_decl(declarations, &fname, &arg_tys);
-            body.push_str(&format!("  call void @{fname}({})\n", arg_vals.join(", ")));
+            body.push_str(&format!(
+                "  call void {}({})\n",
+                llvm_global(&fname),
+                arg_vals.join(", ")
+            ));
         }
 
         Instruction::Measure { qubit, target } => {
@@ -175,9 +180,44 @@ fn intrinsic_name(kind: &GateKind) -> String {
 }
 
 fn register_decl(declarations: &mut BTreeMap<String, String>, fname: &str, arg_tys: &[String]) {
-    declarations
-        .entry(fname.to_string())
-        .or_insert_with(|| format!("declare void @{fname}({})", arg_tys.join(", ")));
+    declarations.entry(fname.to_string()).or_insert_with(|| {
+        format!(
+            "declare void {}({})",
+            llvm_global(fname),
+            arg_tys.join(", ")
+        )
+    });
+}
+
+/// Spells a global symbol the way LLVM will parse it back unchanged.
+///
+/// An unquoted global identifier may only use `[-a-zA-Z$._0-9]` and must not
+/// start with a digit. Every intrinsic name OQCI generates for a registered
+/// gate satisfies that, but a [`GateKind::Opaque`] name is whatever the
+/// frontend was given — a Qiskit custom gate may be called `my gate` — and I5
+/// only requires it to be non-empty. Such a name is emitted as a quoted
+/// identifier, `@"..."`, with `"`, `\` and non-printable bytes written as
+/// LLVM `\XX` hex escapes. The name is kept exactly as written: nothing is
+/// mangled, so two distinct gates can never collide on one symbol.
+fn llvm_global(name: &str) -> String {
+    let plain = !name.is_empty()
+        && !name.starts_with(|c: char| c.is_ascii_digit())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '$' | '.' | '_'));
+    if plain {
+        return format!("@{name}");
+    }
+    let mut quoted = String::from("@\"");
+    for byte in name.bytes() {
+        if byte == b'"' || byte == b'\\' || !(0x20..0x7f).contains(&byte) {
+            quoted.push_str(&format!("\\{byte:02X}"));
+        } else {
+            quoted.push(char::from(byte));
+        }
+    }
+    quoted.push('"');
+    quoted
 }
 
 fn qubit_val(q: QubitId) -> String {

@@ -102,3 +102,26 @@ fn required_counts_reflect_registers() {
     assert!(qir.contains("\"required_num_qubits\"=\"3\""));
     assert!(qir.contains("\"required_num_results\"=\"2\""));
 }
+
+/// An `Opaque` name LLVM cannot spell unquoted is emitted as a quoted global,
+/// consistently in the declaration and the call, with `"` and `\` escaped.
+#[test]
+fn opaque_names_outside_llvm_identifier_syntax_are_quoted() {
+    let opaque = |name: &str| GateKind::Opaque {
+        name: name.into(),
+        params: vec![],
+    };
+    let qir = qir_of(|b| {
+        let q0 = b.alloc_qubit();
+        b.gate(opaque("my gate"), [q0]);
+        b.gate(opaque("say\"hi\\"), [q0]);
+        b.gate(opaque("kebab-name.v2"), [q0]);
+    });
+
+    assert!(qir.contains("declare void @\"__quantum__qis__my gate__body\"(%Qubit*)"));
+    assert!(qir.contains("call void @\"__quantum__qis__my gate__body\"("));
+    assert!(qir.contains(r#"@"__quantum__qis__say\22hi\5C__body""#));
+    // Hyphens and dots are legal unquoted, so this one needs no quoting.
+    assert!(qir.contains("declare void @__quantum__qis__kebab-name.v2__body(%Qubit*)"));
+    assert!(!qir.contains("@__quantum__qis__my gate"));
+}
