@@ -112,8 +112,10 @@ fully open `Gate(String, …)` representation would make every pass stringly-typ
 and defeat exhaustive matching. A fully closed enum would reject any gate we
 did not foresee (custom pulse-level gates, vendor extensions). The registered
 enum + single `Opaque` variant gives exhaustiveness for the common path and an
-explicit, clearly-marked slow path for the rest — exactly MLIR's model, so the
-Phase 2 mapping is `registered → registered op`, `Opaque → UnregisteredOp`.
+explicit, clearly-marked slow path for the rest — the same split as MLIR's
+registered/unregistered distinction. In the dialect spec every gate is one
+`quantum.gate` op: a registered variant carries a registered `gate` mnemonic,
+and `Opaque` carries an unregistered one (`mlir_dialect.md` §4.1).
 
 ## 3. QC-IR — the imperative IR
 
