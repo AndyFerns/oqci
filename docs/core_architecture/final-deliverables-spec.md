@@ -2,7 +2,7 @@
 
 Status: LOCKED for non-G benchmarking-design scope  
 Stage G: intentionally excluded from the locked experimental protocol  
-Repository baseline verified: `master`, version `0.0.1`, 2026-09-04  
+Repository baseline verified: `master`, version `0.0.1`, 2026-09-04 (historical; see §2 and [`index.md`](index.md))  
 Repository: `https://github.com/AndyFerns/oqci`
 
 ## 0. Purpose
@@ -59,11 +59,13 @@ The locked architecture refines this by making backend targeting explicit:
 
 ---
 
-# 2. Current-State Baseline
+# 2. Baseline at `0.0.1` (historical snapshot)
 
-*This section describes the repository at version `0.0.1` (verified
-2026-09-04). Much of the "does not yet provide" list below has since been
-implemented; the living baseline is [`index.md`](index.md).*
+> **Historical snapshot — the repository at version `0.0.1`, verified
+> 2026-09-04.** Kept unchanged as the starting point this specification was
+> written against. Much of the "does not yet provide" list below has since been
+> implemented. It does not describe the current repository; the only living
+> baseline is [`index.md`](index.md).
 
 The current repository is not a completed compiler.
 
