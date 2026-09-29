@@ -173,8 +173,9 @@ What Phase 2 adds on top of this spec (see the ADR for the "why" and the
 non-negotiable constraints):
 
 1. **TableGen definitions** (§8) generating the C++ op classes.
-2. **A pass manager** hosting Phase 3 optimization passes over `quantum.circuit`
-   regions.
+2. **A pass manager** hosting optimization passes over `quantum.circuit`
+   regions (today the passes run under the Rust `PassManager`,
+   [`pass_manager.md`](pass_manager.md)).
 3. **A conversion framework**: `quantum` → QIR/LLVM dialect lowering, replacing
    the textual emitter in `qir.rs` with a dialect conversion (the mnemonic →
    intrinsic table in [`qir_lowering.md`](qir_lowering.md) becomes the rewrite

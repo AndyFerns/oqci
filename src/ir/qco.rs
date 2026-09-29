@@ -1,10 +1,10 @@
 //! QCO-IR — the optimization IR (directed acyclic dependency graph).
 //!
 //! Where [`crate::ir::qc`] is a linear instruction list, QCO-IR is a **DAG**:
-//! operations are nodes and dependencies are edges. This is the form future
-//! optimization passes (Phase 3: cancellation, fusion, scheduling) will consume,
-//! because it exposes exactly which operations may be reordered and which may
-//! not.
+//! operations are nodes and dependencies are edges. It exposes exactly which
+//! operations may be reordered and which may not; the optimization passes in
+//! [`crate::pass`] build it internally to find wire-adjacent operations and
+//! scheduling layers, and [`crate::analysis`] uses it for depth.
 //!
 //! # Graph shape
 //!

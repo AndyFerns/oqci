@@ -43,8 +43,9 @@ Rust op/type has a named dialect counterpart; the seam for MLIR marshalling
 
 ## What MLIR adds later (Phase 2)
 
-1. **Pass manager** — hosts Phase 3 passes (cancellation, fusion, scheduling,
-   routing) over `quantum.circuit` regions, with pass scheduling/analysis reuse.
+1. **Pass manager** — hosts optimization passes (cancellation, fusion,
+   scheduling, routing) over `quantum.circuit` regions, with pass
+   scheduling/analysis reuse.
 2. **Dialect conversion framework** — `quantum` → QIR/LLVM lowering as rewrite
    patterns, replacing the textual emitter in `qir.rs`. The mapping table in
    [`qir_lowering.md`](qir_lowering.md) §2 becomes the pattern set.
