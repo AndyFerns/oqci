@@ -47,6 +47,7 @@ row, or `oqci watch <file>` to keep seeing them as you edit — see
 
 | Document | What it covers |
 |----------|----------------|
+| [`core_architecture/index.md`](core_architecture/index.md) | **The source of truth.** The locked architecture decisions (Stages A–F), the pending Stage G, the final-deliverables specification, the source hierarchy, and the living description of what the repository currently implements. |
 | [`ir_spec.md`](ir_spec.md) | **Normative IR reference.** Value types, parameters (`Param`) and binding, QC-IR + QCO-IR ops and invariants (I1–I8), operational semantics, and the semantics-preservation proof for QC-IR → QCO-IR. |
 | [`adapters.md`](adapters.md) | **Where every language/runtime adapter lives and what shape it has**: frontends in Rust (`src/frontend/<language>/`), execution adapters in Python (`python/oqci/backends/<runtime>.py`), the shared result and bit-order convention, the CUDA-Q execution adapter, and what became of `cudaq-adapter/`. |
 | [`gate_mapping.md`](gate_mapping.md) | **The shared source-name → `GateKind` table** used by every frontend, and the rule that unknown names become `Opaque` rather than new enum variants. |
