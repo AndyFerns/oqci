@@ -784,3 +784,17 @@ fn typed_pointers_are_available_on_request() {
     assert!(text.contains("typed pointers"));
     assert!(text.contains("%Qubit* inttoptr"));
 }
+
+#[test]
+fn qir_info_serializes_the_profile_exactly_as_the_module_labels_it() {
+    let value = json_of(&[
+        "lower",
+        example("bell.qasm").to_str().unwrap(),
+        "--backend",
+        "qir-base",
+        "--emit",
+        "qir",
+        "--json",
+    ]);
+    assert_eq!(value["stages"][0]["qir_info"]["profile"], "base_profile");
+}

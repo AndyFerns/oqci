@@ -102,6 +102,7 @@ impl PointerStyle {
 #[serde(rename_all = "snake_case")]
 pub enum QirProfile {
     /// `"base_profile"`: the module follows the QIR 1.0 Base Profile.
+    #[serde(rename = "base_profile")]
     Base,
     /// `"custom"`: no profile is claimed.
     Custom,
