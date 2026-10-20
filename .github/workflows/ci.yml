@@ -268,6 +268,9 @@ jobs:
         env:
           # A missing or broken CUDA-Q fails this job instead of skipping it.
           OQCI_REQUIRE_CUDAQ: "1"
+          # Aer and CUDA-Q each bundle a libgomp; glibc's default 512-byte
+          # static TLS reserve fits only the first one loaded (docs/adapters.md).
+          GLIBC_TUNABLES: glibc.rtld.optional_static_tls=16384
         run: |
           source .venv/bin/activate
           bash scripts/ci_annotate.sh "cudaq tests" pytest python/tests/test_backend_cudaq.py python/tests/test_backend_cudaq_live.py -v -rs

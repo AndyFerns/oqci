@@ -14,9 +14,10 @@ import os
 
 import pytest
 
-# Aer before CUDA-Q: Aer's bundled libgomp needs glibc's static TLS block,
-# which CUDA-Q's libraries exhaust once loaded ("cannot allocate memory in
-# static TLS block"). Loaded first, libgomp gets its slot.
+# Aer and CUDA-Q each bundle a libgomp, and glibc's default static TLS
+# reserve fits only one: on Linux this process needs
+# GLIBC_TUNABLES=glibc.rtld.optional_static_tls=16384, as the `cudaq` CI
+# job sets (docs/adapters.md, "Aer and CUDA-Q in one Linux process").
 pytest.importorskip("qiskit_aer")
 
 # Skipped where CUDA-Q is absent — unless OQCI_REQUIRE_CUDAQ=1 (the `cudaq` CI

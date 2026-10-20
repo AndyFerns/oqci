@@ -180,6 +180,22 @@ the generated kernel to a temporary `.py` file and imports it, exactly as a
 user's own kernel would be loaded. The prototype called `exec` on a string,
 which leaves the function with no source file to read.
 
+### Aer and CUDA-Q in one Linux process
+
+Aer and CUDA-Q each bundle their own copy of `libgomp`. Each copy needs a
+slot in glibc's small reserve of static thread-local storage, which by
+default is 512 bytes, and only the first copy loaded fits. The second import,
+in either order, then fails with `cannot allocate memory in static TLS
+block`. Starting Python with a larger reserve fixes this (glibc 2.35 or
+later):
+
+```bash
+GLIBC_TUNABLES=glibc.rtld.optional_static_tls=16384 python ...
+```
+
+The `cudaq` CI job sets this. A process that uses only one of the two
+runtimes, such as `python -m oqci run`, needs nothing.
+
 ### Verification status
 
 | Checked | How |
