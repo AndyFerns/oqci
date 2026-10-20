@@ -1,10 +1,10 @@
 # OQCI Source-of-Truth Documentation Index
 
 Status: Active planning baseline
-Last verified against repository: 2026-10-20
+Last verified against repository: 2026-10-21
 Repository: `https://github.com/AndyFerns/oqci`  
-Branch reviewed: `feat/completion` (0.6.0)  
-Current repository version: `0.6.0`
+Branch reviewed: `feat/completion` (0.7.1)  
+Current repository version: `0.7.1`
 
 ## Purpose
 
@@ -82,7 +82,7 @@ An implementation agent must not silently override a locked decision because ano
 
 ## Current Repository Baseline
 
-At version `0.6.0` (branch `feat/completion`), the non-G Definition of Done
+At version `0.7.1` (branch `feat/completion`), the non-G Definition of Done
 (`final-deliverables-spec.md` §34) is met, and Stage G is locked and
 implemented. In detail:
 
@@ -140,8 +140,9 @@ implemented. In detail:
   - an exhaustive correctness check of every compiled output;
   - determinism across fresh processes, interop and mutation evidence;
   - a validated checker coverage matrix;
-  - a report generated only from serialized data, and a committed
-    reference run (`docs/benchmarks.md`).
+  - a report generated only from serialized data, and a reference run
+    (`docs/benchmarks.md`), being regenerated on `0.7.1` as of 2026-10-21:
+    the `0.6.0` run stopped on a t|ket⟩ defect and was dropped.
 - **Determinism contract**, specified in `docs/determinism.md` and checked
   across processes on ubuntu and windows.
 - **Engineering.**
@@ -174,6 +175,7 @@ The changelog maps the versions:
 | `0.4.1` | A lowering fix. |
 | `0.5.0` | The QIR interoperability boundary, and the CUDA-Q frontend and adapter. |
 | `0.6.0` | Completion: extensions, verification, lint, fusion, runtime targets and the IBM adapter, timing and result retrieval, the benchmark suite under the locked Stage G, and fuzzing and CI hardening. |
+| `0.7.1` | Fixes: a pyo3 security upgrade, five defects found by fuzzing (numerical and structural limits), the t\|ket⟩ permutation fallback, and CI repairs. |
 
 ## How to Use These Documents
 
@@ -202,6 +204,7 @@ does, not by a phase number.
 | "Phase 2" (MLIR integration) | — | Not done; MLIR is optional (Stage B). |
 | — | `0.5.0` | QIR interoperability boundary: `final-deliverables-spec.md` §14. |
 | — | `0.6.0` | Completion of the non-G deliverables and of Stage G (see the baseline above). |
+| — | `0.7.1` | Fixes to `0.6.0`: security, fuzzing findings, CI. |
 
 ## Critical Rule
 

@@ -8,5 +8,5 @@ Files:
 - `stage-d-backend-specific-basis-profiles.md` — Stage D.
 - `stage-e-backend-defined-cost-model.md` — Stage E.
 - `stage-f-static-parameterized-circuit-scope.md` — Stage F.
-- `stage-g-benchmarking-protocol.md` — intentionally pending Stage G placeholder.
+- `stage-g-benchmarking-protocol.md` — Stage G, the benchmarking protocol (locked 2026-10-20).
 - `final-deliverables-spec.md` — consolidated non-G source of truth.

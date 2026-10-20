@@ -32,7 +32,7 @@ It's Rust-native at its core (fast, and the invariants are enforced by the type 
 
 ## Project status
 
-**Current version: `0.6.0`.** This is early-stage, actively-developed infrastructure - treat anything not checked off below as *not there yet*, regardless of what a directory name or diagram might suggest.
+**Current version: `0.7.1`.** This is early-stage, actively-developed infrastructure - treat anything not checked off below as *not there yet*, regardless of what a directory name or diagram might suggest.
 
 | Layer | Status | Notes |
 |---|---|---|
@@ -58,7 +58,7 @@ It's Rust-native at its core (fast, and the invariants are enforced by the type 
 | IBM hardware execution | ✅ Implemented (CZ-native Heron) · tested offline | `oqci.backends.ibm` builds the profile from the device's live target, checks the ISA (it never transpiles), and submits verbatim with twirling and dynamical decoupling off. It is tested end to end through IBM's local testing mode on a Heron snapshot. A run on real hardware is operator-run with your own account. See [`docs/hardware.md`](docs/hardware.md). |
 | MLIR integration | ⛔ Out of scope (by design) | Rust owns the IR; MLIR stays optional (Stage B). |
 | Benchmark suite | ✅ Implemented | Stage G is locked. The harness covers a 64-circuit corpus on three targets, OQCI against Qiskit O3/O0 and t\|ket⟩, an exhaustive correctness check of every output, determinism, interop, mutation evidence and a generated report. See [`docs/benchmarks.md`](docs/benchmarks.md). |
-| Fuzzing and dependency policy | ✅ Implemented | Five cargo-fuzz targets, one of which hunts for miscompilations under `--verify`, plus cargo-deny and cargo-audit, in CI. |
+| Fuzzing and dependency policy | ✅ Implemented | Five fuzz targets, one of which hunts for miscompilations under `--verify`. Each runs coverage-guided (cargo-fuzz, Linux) and through a stable-Rust mutation fuzzer that works on any platform. cargo-deny and cargo-audit check the whole workspace, in CI. See [`docs/fuzzing.md`](docs/fuzzing.md). |
 
 For the authoritative, continuously-updated picture (not just this table), see
 [`docs/core_architecture/index.md`](docs/core_architecture/index.md) and

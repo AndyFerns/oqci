@@ -1253,7 +1253,7 @@ that backs it. An item that is out of scope says so, and by whose decision.
 - [x] frontend extension contract — `extension::FrontendPlugin`.
 - [x] backend extension contract — `Registry::register_backend`, `register_target_json`.
 - [x] configuration mechanism — `CompilerConfig::extensions`, `cli::run_with`.
-- [x] at least one demonstration extension — `examples/plugin-demo`, `tests/no_core_modification.rs`.
+- [x] at least one demonstration extension — `examples/plugin-demo`, `examples/plugin-demo/tests/no_core_modification.rs`.
 
 ### Benchmark infrastructure
 - [x] benchmark runner — `benchmarks/oqci_bench/runner.py`.
@@ -1268,7 +1268,7 @@ that backs it. An item that is out of scope says so, and by whose decision.
 - [x] unit tests.
 - [x] integration tests.
 - [x] property tests where useful — `pass_equivalence`, `lowering_equivalence`, `verifier`.
-- [x] parser fuzzing where applicable — `fuzz/` (five targets), in CI.
+- [x] parser fuzzing where applicable — `fuzz/` (five targets; coverage-guided and mutation), in CI. See `docs/fuzzing.md`.
 - [x] snapshots where useful — CLI and QIR output tests.
 - [x] formatting/linting — `cargo fmt`, `clippy -D warnings`.
 - [x] dependency/security checks — `deny.toml`, cargo-deny and cargo-audit in CI.
@@ -1276,14 +1276,14 @@ that backs it. An item that is out of scope says so, and by whose decision.
 - [x] documentation build — `.github/workflows/docs.yml` (mdBook).
 
 ### Research package
-- [x] raw benchmark data — `records.jsonl` of the reference run.
+- [ ] raw benchmark data — `records.jsonl` of the reference run. *Status 2026-10-21:* the `0.6.0` run stopped on a t\|ket⟩ defect and was dropped (`d42b413`). It is being rerun in full on `0.7.1`, and this box and the three below are re-ticked when it is committed.
 - [x] machine-readable result schema — `benchmarks/schema/result.schema.json`.
-- [x] generated figures — `report/figures/`.
-- [x] generated tables — `report/tables/` (CSV, Markdown, LaTeX).
+- [ ] generated figures — `report/figures/` of the reference run (the generator is tested by the `benchmarks (smoke)` CI job).
+- [ ] generated tables — `report/tables/` (CSV, Markdown, LaTeX) of the reference run.
 - [x] experiment configurations — `benchmarks/configs/stage_g.toml`.
 - [x] ablation framework — the OQCI ablation configurations.
 - [x] reproducibility instructions — `docs/benchmarks.md`, `Dockerfile`.
-- [x] paper-supporting artifacts — the reference run's `report/`.
+- [ ] paper-supporting artifacts — the reference run's `report/`.
 
 ---
 
@@ -1354,13 +1354,13 @@ and produce:
 2. structured analysis metrics;
 3. target-specific lowering artifacts;
 4. executable simulator output;
-5. an IBM target path through lowering, validation and execution preparation — live IBM submission and result retrieval are future work, outside this definition (amended 2026-09-30);
+5. an IBM target path through lowering, validation and execution preparation — live IBM submission and result retrieval are outside this definition (amended 2026-09-30), and have been implemented anyway since `0.6.0` (§9);
 6. reproducible machine-readable metadata;
 7. passing automated tests;
 8. documentation matching actual implementation;
 9. extension points that demonstrate the claimed modular architecture.
 
-The benchmark experiment design and IBM experimental matrix remain intentionally outside this definition until Stage G is researched and locked.
+The benchmark experiment design and IBM experimental matrix are outside this definition. They belong to Stage G, locked on 2026-10-20 ([`stage-g-benchmarking-protocol.md`](stage-g-benchmarking-protocol.md)).
 
 ---
 

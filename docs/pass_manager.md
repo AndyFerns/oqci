@@ -291,7 +291,7 @@ suite would have begun asserting something untrue about it. Stage D §4
 independently requires that target description, target lowering and routing
 not be conflated.
 
-**A pass may now consult the target, though none of the shipped ones does.**
+**A pass may consult the target. One shipped pass does: `single-qubit-fusion`.**
 `Pass::run` takes a `&PassContext`:
 
 ```rust
@@ -316,7 +316,9 @@ backend-defined costs" —
 (`pass::tests::a_pass_can_consult_the_selected_target` demonstrates a pass
 reading both the profile and the cost model, and
 `an_absent_target_is_visible_to_a_pass_rather_than_faked` the other half).
-It is honest to add that all four shipped passes bind it as `_context`. That
+It is honest to add that only `single-qubit-fusion` reads it, and only the
+profile's rule set (to avoid fusing a run into more native operations). The
+other four bind it as `_context`, and no shipped pass reads the cost model. That
 is Stage E §8 working as designed rather than an omission — "target-aware
 behavior must not make every pass backend-specific" — and the genuine
 consumers of target data today are the lowering steps, not the optimizer.
