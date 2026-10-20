@@ -228,9 +228,12 @@ jobs:
           OQCI_MUTATION_ONLY: ${{ matrix.target }}
         run: bash ../scripts/ci_annotate.sh "mutation smoke ${{ matrix.target }}" cargo test --no-default-features --release --test mutate -- --ignored --nocapture
       - name: Fuzz for 60 seconds
+        # --target: the prebuilt cargo-fuzz is a static musl binary and
+        # defaults to its own triple, for which no std is installed and which
+        # AddressSanitizer cannot instrument.
         run: |
           mkdir -p fuzz/corpus/${{ matrix.target }}
-          bash scripts/ci_annotate.sh "cargo fuzz ${{ matrix.target }}" cargo +nightly fuzz run --fuzz-dir fuzz ${{ matrix.target }} fuzz/corpus/${{ matrix.target }} -- -max_total_time=60
+          bash scripts/ci_annotate.sh "cargo fuzz ${{ matrix.target }}" cargo +nightly fuzz run --fuzz-dir fuzz --target x86_64-unknown-linux-gnu ${{ matrix.target }} fuzz/corpus/${{ matrix.target }} -- -max_total_time=60
       - name: Keep crashing inputs
         if: failure()
         uses: actions/upload-artifact@v4
