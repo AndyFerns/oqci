@@ -10,8 +10,9 @@
 id = "rotation-merge-sign-flip"
 description = "rotation merging subtracts the second angle instead of adding it"
 file = "src/pass/rotation_merge.rs"
-find = "Some(Param::concrete(a.radians() + b.radians()))"
-replace = "Some(Param::concrete(a.radians() - b.radians()))"
+# Since 0.7.1 the sum goes through exact_affine(scale, x, offset) = scale*x + offset.
+find = "crate::ir::exact_affine(1.0, a.radians(), b.radians())"
+replace = "crate::ir::exact_affine(-1.0, b.radians(), a.radians())"
 
 [[mutant]]
 id = "cancel-non-inverse-pair"

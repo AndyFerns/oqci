@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import json
 import math
+import shutil
 from pathlib import Path
 
 import pytest
@@ -214,6 +215,22 @@ def test_the_coverage_matrix_cites_only_real_checks():
     by_id = {r["transformation"]: r for r in matrix["rows"]}
     assert by_id["qir-emission"]["checkers"]["semantic-in-compiler"] == []
     assert by_id["pass:single-qubit-fusion"]["strongest"] == "semantic-in-compiler"
+
+
+def test_every_mutant_still_applies_to_the_current_source(tmp_path):
+    # A mutant whose `find` text a refactor removed stops the mutation step
+    # only at the end of a multi-hour run; check it here instead.
+    import tomllib
+
+    from oqci_bench import mutants
+
+    manifest = tomllib.loads((mutants.REPO / "benchmarks/mutants/mutants.toml").read_text(encoding="utf-8"))
+    for mutant in manifest["mutant"]:
+        target = tmp_path / mutant["file"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(mutants.REPO / mutant["file"], target)
+        mutants._apply(tmp_path, mutant)  # raises unless `find` occurs exactly once
+        assert target.read_text(encoding="utf-8") != (mutants.REPO / mutant["file"]).read_text(encoding="utf-8")
 
 
 def test_a_missing_coverage_reference_is_an_error(monkeypatch, tmp_path):
