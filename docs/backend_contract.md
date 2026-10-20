@@ -428,41 +428,47 @@ exactly one place.
 
 This is the section that matters.
 
-**No backend in this build executes a circuit.** All three return
+**No backend in this build executes a circuit.** Every built-in backend returns
 `BackendError::ExecutionNotAvailableInProcess` from `Backend::execute`. This is
 asserted rather than assumed: `no_shipped_backend_claims_to_execute_in_process`
 walks `backend::all()`, lowers and prepares a Bell circuit for each, calls
 `execute`, and requires the error. If a backend ever gains in-process execution,
 that test is where it gets noticed.
 
-### For `IbmBackend`: three reasons
+### For `IbmBackend`: submission is the Python adapter's job
 
-None of them is that it was forgotten.
+Until `0.6.0` this section gave three reasons why nothing submitted to IBM:
 
-1. **`qiskit-ibm-runtime` is not available.** It is not a dependency of this
-   project and is not installed in its environment, so the SDK cannot be
-   checked. §33.4 forbids implementing a vendor-specific API from memory when
-   the current SDK documentation could be consulted instead — and writing a
-   submission path from recollection is precisely that.
-2. **There are no credentials.** Submission code could not be run even once, so
-   it could not be tested even once. Untested code on the path between a
-   verified circuit and real hardware is worse than an explicit boundary,
-   because it would look like a working feature until the moment it mattered.
-3. **§33.12 forbids the claim.** Do not claim hardware executability without
-   target-specific lowering and validation. This module provides both; it does
-   not thereby acquire the right to claim the rest. Lowering and validating
-   against a target description is a checkable statement about that
-   description. It is not a statement about a machine.
+- `qiskit-ibm-runtime` was not available to check against;
+- there were no credentials, so no submission path could be tested;
+- §33.12 forbids claiming hardware executability.
 
-**No claim of IBM hardware executability is made.** What is claimed is narrower
-and verifiable: an `Executable` produced for an IBM backend has been lowered to,
-and validated against, the target description it was given. If that description
-is wrong, so is the conclusion — which is why `from_target_json` exists, and why
-`illustrative()` says in its own name that it is not real. The error text itself
-carries the disclaimer, and
-`execution_is_an_explicit_boundary_not_a_silent_success` asserts the phrase "no
-claim is made" is in it, so the boundary cannot be reworded into something that
-implies hardware readiness without a test failing.
+The first two are now answered *outside* the crate, in the same place every
+other runtime lives: the Python execution adapter
+[`oqci.backends.ibm`](hardware.md).
+
+- It was written against `qiskit-ibm-runtime` 0.50.0's installed source and
+  is pinned to it (§33.4).
+- It is tested end to end offline, through IBM's local testing mode on a
+  Heron device snapshot.
+- It uses only the operator's own saved account.
+
+`Backend::execute` still returns `ExecutionNotAvailableInProcess` and names
+that adapter, because the compiler process does not talk to the network.
+
+The third reason still holds, and shapes the adapter:
+
+- **The target is the device's own.** It is retrieved from the device at
+  snapshot time and loaded through `from_target_json`.
+- **The executable is checked, not transpiled.** It is checked against the
+  device's instruction set and submitted verbatim, with no twirling or
+  dynamical decoupling.
+
+The claim stays narrow: the executable was lowered to, and validated against,
+the target description it was given. For a real device, that description is
+the device's own report of itself. The error text carries the disclaimer, and
+`execution_is_an_explicit_boundary_not_a_silent_success` asserts that "no
+claim is made" is in it.
 
 ### For `SimulatorBackend`: one reason
 
@@ -473,24 +479,30 @@ Execution belongs to Qiskit Aer, through `python/oqci/backends/aer.py`, and the
 error says so by name — `execution_names_where_it_actually_happens` asserts the
 message mentions Aer, so a user who hits the boundary is told where to go next.
 
-The test-only state-vector simulator under `tests/support/` is not a
-counterexample. It exists to verify that rewrites preserve semantics, never
-leaves `cargo test`, and is a dev-dependency precisely so it cannot become a
-product feature by accident.
+Neither the test-only state-vector simulator under `tests/support/` nor the
+in-compiler checker (`crate::verify`, [`verification.md`](verification.md)) is
+a counterexample. Both compare two of the compiler's own circuits and produce
+verdicts — never samples or counts — and neither is reachable through
+`Backend::execute`.
 
 ### Where execution actually happens
 
-A prepared artifact runs in one of two execution adapters. Both share
+A prepared artifact runs in one of three execution adapters. All share
 `python/oqci/backends/_common.py`: the `RunResult` fields, the
 `UnsupportedOperation` refusal, and one counts-key convention (clbit 0
 rightmost). The layout is fixed in [`adapters.md`](adapters.md).
+`oqci.backends.to_execution_result` turns any adapter's result into an
+`ExecutionResult` (below); `python -m oqci run` does both steps in one
+command.
 
 - `python/oqci/backends/aer.py` runs it on Qiskit Aer. This is the adapter
   checked end to end against a real runtime (the table below).
 - `python/oqci/backends/cudaq.py` runs it on CUDA-Q. Its translation,
-  refusals and bit-order conversion are tested. Its run against a real
-  CUDA-Q is **not yet verified**, because none was installed; see
+  refusals and bit-order conversion are tested, and the `cudaq` CI job runs it
+  against a real, pinned CUDA-Q; see
   [`adapters.md`](adapters.md#verification-status).
+- `python/oqci/backends/ibm.py` runs it on IBM Quantum hardware; see
+  [`hardware.md`](hardware.md).
 
 The Aer adapter:
 
@@ -505,8 +517,9 @@ The Aer adapter:
 - times only the Aer call, and reports it as `execution_duration_ms`, keeping
   Stage C §8's separation;
 - accepts a caller's `NoiseModel` and **never constructs one**. Noise policy
-  belongs to the benchmarking protocol, which is not locked, and a built-in
-  model with plausible-looking parameters would be fabricated experimental data
+  belongs to the benchmarking protocol (Stage G locks it: noiseless, except a
+  device snapshot's own model for the hardware subset), and a built-in model
+  with plausible-looking parameters would be fabricated experimental data
   wearing a library's name.
 
 `python/tests/test_aer.py` is the only place in this project where OQCI is
@@ -577,56 +590,23 @@ Per `final-deliverables-spec.md`'s Critical Rule — a feature is not implemente
 merely because a module, interface, type or document names it — the following
 are **absent**, not partly there:
 
-- **Live IBM submission.** There is no code that authenticates, discovers a
-  backend, retrieves a real target, submits a job or polls one. Stage C §8's
-  adapter responsibilities are implemented only as far as *target profile
-  construction* (`from_target_json`); authentication, backend discovery, target
-  retrieval, submission and result retrieval are all missing, for the three
-  reasons [above](#for-ibmbackend-three-reasons).
-- **Result retrieval, on any backend.** `ExecutionResult` is defined,
-  serialized and unit-tested, and **nothing constructs one** outside
-  `src/backend/result.rs`'s own tests. The Rust side has no code path that
-  produces a result object, because no Rust code path executes.
-- **A Rust-side path back from the execution adapters.** `aer.py` and
-  `cudaq.py` return `RunResult` subclasses (`AerResult`, `CudaQResult`);
-  nothing converts either into an `ExecutionResult`, and the
-  two shapes are not interchangeable as they stand. `RunResult` has no
-  `compilation_duration_ms` or `submission_duration_ms`, and serde requires
-  both to be present even though they are `Option` (neither carries
-  `#[serde(default)]`); `RunResult.backend_metadata` also holds non-string
-  values such as Aer's `time_taken`, where `ExecutionResult::backend_metadata`
-  is a `BTreeMap<String, String>`. So the two types agree in spirit and not yet
-  in schema, and `a_result_round_trips_through_json` demonstrates Rust→Rust
-  only.
-- **A Cirq adapter, and a verified CUDA-Q run.** Stage C §7 and §15.2 name
-  both SDKs. CUDA-Q now has a frontend (`src/frontend/cudaq/`) and an
-  execution adapter (`oqci.backends.cudaq`). That adapter has never run
-  against a real CUDA-Q install, so its results are unverified until it is
-  checked against Aer on the same executable. Neither CUDA-Q half adds a Rust
-  backend or profile: CUDA-Q's simulators take any executable
-  `simulator`/`simulator-nisq` produce. Cirq exists in no form (no frontend, no
-  adapter, no import), and [`adapters.md`](adapters.md) lists the steps to add
-  it.
+- **In-process execution.** No `Backend::execute` runs anything; execution
+  happens in the Python adapters ([above](#where-execution-actually-happens)).
+  So `CompilationArtifacts` carries no `ExecutionResult`; one is built from an
+  adapter's result by `ExecutionResult::from_adapter`.
+- **A Cirq adapter.** Out of scope by the project owner's decision for
+  `0.6.0` ([`adapters.md`](adapters.md)).
+- **ECR-native IBM devices.** ECR is not in the gate set, so
+  `target_from_backend` refuses Eagle-family devices by name. Heron (CZ) is
+  supported.
 - **Calibration and error metadata on profiles.** Stage C §4 lists
   "backend error/cost information" among what IBM lowering may need, and
-  Stage D §2 lists per-operation costs and optional error/noise metadata.
-  `BasisProfile` has no field for either, which is why `Cost::estimated_duration`
-  and `Cost::estimated_error` are always `None`, why routing minimizes hop count
-  rather than error, and why `ibm-illustrative` carries no device figures. This
-  is blocked on the profile growing fields, not on the backend layer.
-- **A backend registry a plugin could extend.** §18.3 asks that a new backend
-  supply a profile, lowering, an execution interface and a cost model without
-  modifying the compiler core. The *trait* boundary is real and sufficient for
-  that, but `backend::all()` is a hard-coded `vec![…]` of three constructors,
-  and `cost::resolve` is a hard-coded match of two ids. Adding a backend today
-  means editing `src/backend/mod.rs`. Nothing dynamic, and no `libloading`.
-- **Any noise-model policy.** Aer accepts one from the caller and OQCI supplies
-  none, by design (§33.15). There is no default, no preset, and no
-  device-derived model.
-- **An `oqci run` command.** §19 sketches one. The CLI stops at `oqci prepare`,
-  which writes the artifact; running it is the Python adapter's job. See
-  [`cli.md`](cli.md).
-- **A `--target`/cost report for `ibm-illustrative`.** `oqci lower` resolves the
-  target report through `target::builtin::by_id`, and the illustrative IBM
-  profile is not in `builtin::all()`. Lowering and preparation work normally for
-  that backend; the target/cost section is simply omitted from the report.
+  Stage D §2 lists optional error/noise metadata. `BasisProfile` has no field
+  for either. That is why `Cost::estimated_duration` and
+  `Cost::estimated_error` are always `None`, and why layout and routing
+  minimize hop count rather than error. A device snapshot carries the
+  coupling map and basis, not its error rates.
+- **A dynamic plugin mechanism.** Backends, frontends, passes and lint rules
+  can be added through the source-level extension API
+  ([`extensions.md`](extensions.md)). Nothing loads compiled plugins
+  (`libloading`), because no ABI contract is specified (§18.4).

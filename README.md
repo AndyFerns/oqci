@@ -32,29 +32,33 @@ It's Rust-native at its core (fast, and the invariants are enforced by the type 
 
 ## Project status
 
-**Current version: `0.5.0`.** This is early-stage, actively-developed infrastructure - treat anything not checked off below as *not there yet*, regardless of what a directory name or diagram might suggest.
+**Current version: `0.6.0`.** This is early-stage, actively-developed infrastructure - treat anything not checked off below as *not there yet*, regardless of what a directory name or diagram might suggest.
 
 | Layer | Status | Notes |
 |---|---|---|
-| QC-IR / QCO-IR core | ✅ Implemented | Validated construction (I1-I8), deterministic QC-IR → QCO-IR conversion. See [`docs/ir_spec.md`](docs/ir_spec.md). |
-| QIR emission | ✅ Implemented (interop artifact) | One canonical QIR 1.0 module per compilation, emitted from the most-lowered circuit, labeled `base_profile` only when it is legal against the `qir-base` profile and `custom` otherwise. Accepted by PyQIR 0.12.5, `llvm-as` 18 (opaque and typed pointers) and `llvm-as` 14 (typed), observed in CI. Acceptance proves well-formed IR and readable QIR metadata, not execution. See [`docs/qir_lowering.md`](docs/qir_lowering.md). |
-| Symbolic parameters | ✅ Implemented | Gate angles can be concrete or symbolic (`Rz(theta)`), with explicit binding before lowering - for VQE-style parameterized circuits. |
-| OpenQASM 3 frontend | ✅ Implemented | A documented, intentionally partial subset - see [`docs/openqasm_frontend.md`](docs/openqasm_frontend.md) for exactly what's in and what's refused. |
-| Qiskit frontend | ✅ Implemented | Pure-Rust translation core plus a PyO3 boundary exposed to Python. A `QuantumCircuit` now reaches the whole pipeline — lowering, an executable, provenance — through `oqci.compile`, not just QIR. See [`docs/qiskit_adapter.md`](docs/qiskit_adapter.md). |
-| CUDA-Q frontend | ✅ Implemented (documented subset) | Reads the `@cudaq.kernel` function in a `.py` file into the same QC-IR, and reaches the CLI, the SDK and the visualizer. Subset verified against NVIDIA's docs; loops, conditionals and kernel calls are refused by name. See [`docs/cudaq_frontend.md`](docs/cudaq_frontend.md). Running *on* CUDA-Q: see Simulator execution. |
-| Cirq frontend | ⛔ Not started | Reserved in the design; no code yet. |
-| Pass manager | ✅ Implemented | Explicit registration/ordering, enable/disable per pass, deterministic execution, ablation support. See [`docs/pass_manager.md`](docs/pass_manager.md). |
-| Optimization passes | ✅ Implemented (target-independent only) | Canonicalization, gate cancellation, rotation merging, and scheduling-as-analysis - all verified against an independent state-vector simulator, not just unit-tested. Passes can now consult the selected target, though none of the shipped ones needs to. |
-| Target model | ✅ Implemented | Basis profiles, **directed** connectivity, legality checking, and a cost model the *target* supplies rather than the optimizer assuming. See [`docs/target_model.md`](docs/target_model.md). |
-| Qubit mapping / routing / basis decomposition | ✅ Implemented | Layout, deterministic shortest-path routing with SWAP insertion, and 18 decomposition rules — each verified against *two* independent implementations of gate semantics. Lowering re-checks its own output and refuses to return a circuit the target rejects. See [`docs/lowering.md`](docs/lowering.md). |
-| Backend contract | ✅ Implemented | Lowering, validation, execution preparation and execution as four distinct stages, with full provenance on every result. See [`docs/backend_contract.md`](docs/backend_contract.md). |
-| Compiler orchestration | ✅ Implemented | One path from source to artifacts, taken by the CLI, the Python SDK and library callers alike. See [`docs/compiler.md`](docs/compiler.md). |
-| `oqci` CLI | ✅ Implemented | Inspect every pipeline stage for a real program — now including `lower` and `prepare` — plus a live `watch` mode. See [`docs/cli.md`](docs/cli.md). |
-| Live visualization | ✅ Implemented (local dev-companion) | `server/` + `frontend/`: a browser view of the same pipeline, live-updating on save, with a scrubbable pass-by-pass and swap/rule-by-rule replay that self-validates against the real compiler on every request. Read-only by construction — the only change to the `oqci` crate is one visibility flip. See [`docs/visualization.md`](docs/visualization.md). No hosted/multi-user mode. |
-| Simulator execution | ✅ Implemented (Aer) · 🚧 CUDA-Q unverified | `oqci.backends.aer` runs a prepared circuit on Qiskit Aer, which is how the compiler's output is checked against something other than itself. `oqci.backends.cudaq` runs the same artifact on CUDA-Q, with counts keyed like Aer's. Its translation is tested, but it has never run against a real CUDA-Q install. Every adapter follows one layout; see [`docs/adapters.md`](docs/adapters.md). |
-| IBM hardware execution | 🚧 Prepared, not submitted (future work) | Lowering, validation, the executable artifact and its provenance all exist and are tested. **Submission does not**, and it is outside the project's definition of done. That needs an SDK this project doesn't depend on and credentials it doesn't have — and untested code between a verified circuit and real hardware is worse than an honest gap. **No claim is made that anything here will run on an IBM device.** |
-| MLIR integration | ⛔ Not started (by design) | Rust owns the IR; MLIR is optional enabling infrastructure, adopted only where it adds concrete value, per the [locked architecture decisions](docs/core_architecture/index.md). |
-| Benchmark suite | ⛔ Not started | [`benchmarks/`](benchmarks/) is a placeholder; the experimental protocol isn't locked yet either. |
+| QC-IR / QCO-IR core | ✅ Implemented | Validated construction (I1-I8), deterministic QC-IR → QCO-IR conversion. Untrusted register widths are refused before allocation. See [`docs/ir_spec.md`](docs/ir_spec.md). |
+| QIR emission | ✅ Implemented (interop artifact) | One canonical QIR 1.0 module per compilation, emitted from the most-lowered circuit. It is labeled `base_profile` only when legal against the `qir-base` profile, `custom` otherwise. Accepted by PyQIR 0.12.5, `llvm-as` 18 and `llvm-as` 14, observed in CI. Acceptance proves well-formed IR and readable metadata, not execution. See [`docs/qir_lowering.md`](docs/qir_lowering.md). |
+| Symbolic parameters | ✅ Implemented | Concrete or symbolic angles (`Rz(theta)`), with explicit binding before lowering. |
+| OpenQASM 3 frontend | ✅ Implemented | A documented, intentionally partial subset. See [`docs/openqasm_frontend.md`](docs/openqasm_frontend.md). |
+| Qiskit frontend | ✅ Implemented | A pure-Rust translation core plus a PyO3 boundary. A `QuantumCircuit` reaches the whole pipeline through `oqci.compile`. See [`docs/qiskit_adapter.md`](docs/qiskit_adapter.md). |
+| CUDA-Q frontend | ✅ Implemented (documented subset) | The `@cudaq.kernel` function in a `.py` file. See [`docs/cudaq_frontend.md`](docs/cudaq_frontend.md). |
+| Cirq frontend | ⛔ Out of scope | Out of scope by the project owner's decision for 0.6.0. The spec reserves it "to the committed scope", and that scope is none. |
+| Pass manager | ✅ Implemented | Explicit ordering, enable/disable per pass, deterministic execution, ablation, and extension passes. See [`docs/pass_manager.md`](docs/pass_manager.md). |
+| Optimization passes | ✅ Implemented | Canonicalization, gate cancellation, rotation merging, single-qubit gate fusion (target-aware: it only fuses when the result is cheaper on the target), and scheduling as analysis. All are property-tested against an independent state-vector model. |
+| Semantic verification | ✅ Implemented | `--verify` checks binding, every pass and lowering during compilation, and refuses to produce an executable if one changed what the circuit computes. See [`docs/verification.md`](docs/verification.md). |
+| Lint | ✅ Implemented (small rule set) | Five rules behind a modular `LintRule` boundary: `oqci lint`. |
+| Target model | ✅ Implemented | Basis profiles, **directed** connectivity, legality, and a target-supplied cost model. Profiles can be loaded at runtime (`--target-file`, `target=`). See [`docs/target_model.md`](docs/target_model.md). |
+| Qubit mapping / routing / basis decomposition | ✅ Implemented | Layout, deterministic shortest-path routing with SWAP insertion, and 22 decomposition rules covering CX- and CZ-native bases. Each rule is verified against *two* independent implementations of gate semantics. See [`docs/lowering.md`](docs/lowering.md). |
+| Backend contract | ✅ Implemented | Lowering, validation, preparation and execution as distinct stages, with full provenance. Adapter results convert back into `ExecutionResult`. See [`docs/backend_contract.md`](docs/backend_contract.md). |
+| Extensions | ✅ Implemented (source-level) | Frontends, passes, backends and lint rules can be added without modifying the core. A demonstration crate is tested end to end. See [`docs/extensions.md`](docs/extensions.md). |
+| Compiler orchestration | ✅ Implemented | One path from source to artifacts, with per-stage timings. See [`docs/compiler.md`](docs/compiler.md). |
+| `oqci` CLI | ✅ Implemented | Every pipeline stage, `lint`, `--verify`, `--target-file`, and `watch`. `python -m oqci run` compiles and executes. See [`docs/cli.md`](docs/cli.md). |
+| Live visualization | ✅ Implemented (local dev-companion) | `server/` + `frontend/`. See [`docs/visualization.md`](docs/visualization.md). |
+| Simulator execution | ✅ Implemented (Aer, CUDA-Q) | `oqci.backends.aer` and `oqci.backends.cudaq`. CUDA-Q is checked against a real, pinned CUDA-Q in a Linux CI job, because it has no Windows wheels. See [`docs/adapters.md`](docs/adapters.md). |
+| IBM hardware execution | ✅ Implemented (CZ-native Heron) · tested offline | `oqci.backends.ibm` builds the profile from the device's live target, checks the ISA (it never transpiles), and submits verbatim with twirling and dynamical decoupling off. It is tested end to end through IBM's local testing mode on a Heron snapshot. A run on real hardware is operator-run with your own account. See [`docs/hardware.md`](docs/hardware.md). |
+| MLIR integration | ⛔ Out of scope (by design) | Rust owns the IR; MLIR stays optional (Stage B). |
+| Benchmark suite | ✅ Implemented | Stage G is locked. The harness covers a 64-circuit corpus on three targets, OQCI against Qiskit O3/O0 and t\|ket⟩, an exhaustive correctness check of every output, determinism, interop, mutation evidence and a generated report. See [`docs/benchmarks.md`](docs/benchmarks.md). |
+| Fuzzing and dependency policy | ✅ Implemented | Five cargo-fuzz targets, one of which hunts for miscompilations under `--verify`, plus cargo-deny and cargo-audit, in CI. |
 
 For the authoritative, continuously-updated picture (not just this table), see
 [`docs/core_architecture/index.md`](docs/core_architecture/index.md) and
@@ -80,6 +84,12 @@ cargo run -- optimize examples/ghz3.qasm --diff
 
 # Keep the pipeline re-running as you edit a file.
 cargo run -- watch examples/bell.qasm --mode optimize
+
+# Check that every transformation preserved the program's semantics, and lint it.
+cargo run -- lower examples/ghz3.qasm --backend simulator-nisq --verify --lint
+
+# Compile and run on Aer (after building the Python bindings, below).
+python -m oqci run examples/bell.qasm --backend simulator-nisq --shots 2000
 ```
 
 See [`examples/README.md`](examples/README.md) for what each sample file demonstrates, and [`docs/cli.md`](docs/cli.md) for the full command reference (JSON output, parameter binding, ablation runs, and so on).
@@ -106,10 +116,14 @@ Interop output: Circuit ──▶ QCO-IR (DAG) ──emit──▶ QIR text (for
 | [`src/lowering/`](src/lowering/) | Layout, routing, basis decomposition — applying a target to a circuit. |
 | [`src/backend/`](src/backend/) | The backend contract, the executable representation, provenance. |
 | [`src/compile.rs`](src/compile.rs) | The orchestrator: the one path from source to artifacts. |
+| [`src/extension.rs`](src/extension.rs) | The extension registry: frontends, passes, backends and lint rules from outside the core. |
+| [`src/verify/`](src/verify/) | In-compiler semantic verification. |
 | [`src/cli/`](src/cli/) | The `oqci` inspector CLI. |
-| [`python/`](python/) | PyO3 bindings, the Python SDK, and the execution adapters (`oqci/backends/`: Aer, CUDA-Q). |
+| [`python/`](python/) | PyO3 bindings, the Python SDK, and the execution adapters (`oqci/backends/`: Aer, CUDA-Q, IBM). |
 | [`docs/`](docs/) | The locked architecture decisions and the normative specs for the IR, frontends, passes, targets, lowering, backends and CLI — read these before the source if you're getting oriented. |
-| [`examples/`](examples/) | Small runnable programs: OpenQASM 3 (`.qasm`) and CUDA-Q kernels (`.py`). |
+| [`examples/`](examples/) | Small runnable programs: OpenQASM 3 (`.qasm`) and CUDA-Q kernels (`.py`), and [`plugin-demo/`](examples/plugin-demo/), an extension crate. |
+| [`benchmarks/`](benchmarks/) | The Stage G benchmark and research harness, and the committed reference run. |
+| [`fuzz/`](fuzz/) | cargo-fuzz targets and their seed corpus. |
 
 Each directory also has its own `README.md` going into more depth.
 

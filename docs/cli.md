@@ -47,16 +47,47 @@ No gate is interpreted, no metric recomputed, no circuit rewritten in the CLI.
 oqci compile  <input.qasm> [--emit STAGES] [--bind NAME=VALUE] [--target ID] [--qir-profile any|base] [--qir-pointers opaque|typed] [--json]
 oqci optimize <input.qasm> [--emit STAGES] [--passes IDS] [--disable IDS] [--diff] [--bind …] [--target ID] [--json]
 oqci analyze  <input.qasm> [--optimized] [--bind …] [--target ID] [--json]
-oqci lower    <input.qasm> --backend ID [--layout trivial|dense] [--no-route]
-                                          [--no-decompose] [--emit STAGES] [--diff]
-                                          [--bind …] [--json]
-oqci prepare  <input.qasm> --backend ID [--layout …] [--shots N] [--seed N]
-                                          [-o FILE] [--bind …]
+oqci lower    <input.qasm> (--backend ID | --target-file FILE [--target-kind K] [--target-id ID])
+                           [--layout trivial|dense] [--no-route] [--no-decompose]
+                           [--emit STAGES] [--diff] [--bind …] [--json]
+oqci prepare  <input.qasm> (--backend ID | --target-file FILE …) [--layout …] [--shots N] [--seed N]
+                           [-o FILE] [--bind …]
+oqci lint     <input.qasm> [--backend ID | --target-file FILE | --target ID] [--optimized]
+                           [--deny warnings|errors] [--json]
 oqci watch    <input.qasm> [--mode compile|optimize] [...same flags] [--json]
 oqci passes
 oqci targets
 oqci backends
+oqci lint-rules
 ```
+
+Every command that reads a program also accepts:
+
+- `--frontend ID` — read with this frontend instead of the one the file
+  extension implies (`openqasm3`, `cudaq`, or an extension's).
+- `--verify` — check that binding, every pass and lowering preserved the
+  circuit's semantics, and fail (exit 1) if one did not. `--verify-max-qubits N`
+  (default 8) bounds the width simulated; wider circuits are reported
+  inconclusive. `--verify-report-only` reports a mismatch instead of failing.
+  See [`verification.md`](verification.md).
+- `--lint` — include lint findings in the report.
+- `--timings` — include per-stage compile times. They are measurements, so
+  they are omitted unless asked for, and never part of a determinism
+  comparison ([`determinism.md`](determinism.md)).
+
+`--target-file FILE` compiles for a target described in a JSON file: a
+serialized basis profile, for example one built from a real IBM device by
+`oqci.backends.ibm.target_from_backend` ([`hardware.md`](hardware.md)). The
+file is validated before anything compiles: rule closure, cost model, and a
+qubit count within `ir::MAX_REGISTER_WIDTH`. `--target-kind` (`ibm` or
+`simulator`) defaults to the profile's own `backend_id`.
+
+Running an executable is not a command of this binary, because execution lives
+outside the compiler crate. `python -m oqci run FILE --runtime aer|cudaq|ibm`
+compiles through the same library and runs the result
+([`adapters.md`](adapters.md)). An extension crate ships its own CLI, with its
+frontends, passes and backends registered, through `oqci::cli::run_with`
+([`extensions.md`](extensions.md)).
 
 Input is OpenQASM 3 (see [`openqasm_frontend.md`](openqasm_frontend.md)), or a
 CUDA-Q kernel when the file ends in `.py` (see
@@ -474,7 +505,23 @@ The IR types themselves stay serde-free: these are view types built in
 `src/cli/snapshot.rs`. The IR's shape is a compiler contract governed by
 [`ir_spec.md`](ir_spec.md) and should not acquire a wire format by accident.
 
+### lint
+
+Runs the lint rules ([`verification.md`](verification.md#lint-135)) over the
+parsed circuit, or the optimized one with `--optimized`. With a device, the
+rules about that device run too. `--deny warnings` or `--deny errors` makes
+findings at or above that severity an exit-code failure, for use in scripts
+and CI. `oqci lint-rules` lists the rules.
+
+```bash
+oqci lint examples/ghz3.qasm --backend simulator-nisq
+```
+
 ## Exit codes
 
-`0` on success; `1` with a diagnostic on stderr otherwise. Unbound parameters
-are not a failure.
+`0` on success; `1` with a diagnostic on stderr otherwise. Failures include:
+
+- a semantic mismatch under `--verify`;
+- lint findings above `--deny`.
+
+Unbound parameters are not a failure.

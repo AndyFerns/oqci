@@ -19,6 +19,8 @@ explained under [Execution](#execution).
 | `oqci/backends/_common.py` | What every execution adapter shares: `RunResult`, `UnsupportedOperation`, and the counts-key convention (clbit 0 rightmost). |
 | `oqci/backends/aer.py` | Execution on Qiskit Aer. |
 | `oqci/backends/cudaq.py` | Execution on CUDA-Q, which replaces the old root-level `cudaq-adapter/` package. See [`../docs/adapters.md`](../docs/adapters.md). |
+| `oqci/backends/ibm.py` | Execution on IBM Quantum hardware (CZ-native Heron devices). See [`../docs/hardware.md`](../docs/hardware.md). |
+| `oqci/__main__.py` | `python -m oqci run FILE --runtime aer\|cudaq\|ibm`: compile and execute in one command. |
 | `oqci_native.py` | A compatibility shim, see below. |
 
 The compiled module is `oqci._native`, nested inside the package because
@@ -154,8 +156,39 @@ The generated kernel uses only operations NVIDIA's CUDA-Q docs show in
 Python. Anything the adapter cannot map exactly (`reset`, a gate after a
 measurement, two measurements into one bit) raises `UnsupportedOperation`.
 CUDA-Q's bit order is converted to Aer's, so the two runtimes' counts compare
-key by key. **Not yet verified against a real CUDA-Q install**; see
+key by key. The `cudaq` CI job runs this adapter against a real CUDA-Q
+(0.16.0.post1, pinned in the extra) and checks its counts against the exact
+distribution and against Aer. CUDA-Q has no Windows wheels; see
 [`../docs/adapters.md`](../docs/adapters.md#verification-status).
+
+### On IBM Quantum hardware
+
+```python
+from qiskit_ibm_runtime import QiskitRuntimeService      # your own saved account
+import oqci
+from oqci.backends import ibm
+
+backend = QiskitRuntimeService().backend("ibm_fez")       # or ibm.least_busy_cz_backend(service)
+artifacts = oqci.compile(source, target=ibm.target_from_backend(backend), shots=4000)
+result = ibm.run(artifacts["executable"], backend=backend)
+oqci.backends.to_execution_result(result, artifacts)       # counts, queue/execution time, provenance
+```
+
+The target is the device's own, read from its live `Target`. The executable
+is checked against the device's instruction set and submitted verbatim:
+nothing is transpiled, and twirling and dynamical decoupling are off.
+`pip install oqci[ibm]` pins `qiskit-ibm-runtime` 0.50. Swap `backend` for
+`qiskit_ibm_runtime.fake_provider.FakeFez()` to run the same code offline.
+See [`../docs/hardware.md`](../docs/hardware.md).
+
+### Verification, lint, targets and timing
+
+```python
+oqci.compile(source, backend="simulator-nisq", verify=True)["verification"]  # every pass and lowering checked
+oqci.lint(source, backend="simulator-nisq")["diagnostics"]
+oqci.compile(source, target=profile_dict)          # a device described as data
+oqci.compile(source)["timings"]                    # per-stage microseconds; a measurement
+```
 
 ### Why execution is here and not in Rust
 
@@ -165,10 +198,10 @@ error. Two different reasons:
 - **Simulators** — the project's non-goals rule out "a custom quantum
   simulator replacing established simulator frameworks". Writing one in Rust
   to satisfy the trait would trade an honest boundary for a violation.
-- **Hardware** — submission needs `qiskit-ibm-runtime` and credentials,
-  neither of which this project has, and §33.4 forbids implementing a vendor
-  API from memory. **No claim is made that anything OQCI produces will run on
-  a real quantum device.**
+- **Hardware** — the compiler process does not talk to a network or hold
+  credentials. Submission is `oqci.backends.ibm`'s job, with the operator's
+  own account. What is claimed: the executable was lowered for, and checked
+  against, the device's own reported target, and ran unmodified.
 
 ### Why the artifact is not OpenQASM
 
@@ -188,6 +221,10 @@ checked to exist on the pinned Qiskit rather than recalled from memory.
 | `tests/test_rules.py` | Every decomposition rule re-checked against `qiskit.quantum_info.Operator`, with each rule's exactness **derived from Qiskit's verdict** rather than trusted. The rule table is read out of the compiler, so it cannot drift from a hand-copied list. |
 | `tests/test_aer.py` | Compile-and-execute, checking measured distributions. |
 | `tests/test_frontends.py` | Qiskit and CUDA-Q through the full pipeline (including runs on Aer), ablations from Python, and the shared schema with the CLI. |
+| `tests/test_backend_ibm.py` | The IBM adapter end to end, offline. It runs through IBM's local testing mode on the Heron snapshot `FakeFez` and covers the device-target conversion, ISA refusal, distributions under the device's noise, the bit order, provenance, and conversion into `ExecutionResult`. |
+| `tests/test_backend_cudaq_live.py` | The CUDA-Q adapter against real CUDA-Q (skipped without it; run in CI). Counts must fit the exact distribution and agree with Aer. |
+| `tests/test_sdk_extensions.py` | `target=`, `verify=`, `lint`, timings, `load_target`, `basis_rule_sets`, `to_execution_result`. |
+| `tests/test_run_command.py` | `python -m oqci run` on Aer, with a target file, and on a fake IBM backend. |
 | `tests/test_backend_cudaq.py` | The CUDA-Q execution adapter, without CUDA-Q. The generated kernel is compiled back through OQCI's CUDA-Q frontend and must match the executable's unitary (`Operator.equiv`). Also covered: every refusal, the bit-order conversion checked against Aer's counts, and `run` against a stand-in `cudaq` module. |
 
 `test_rules.py` is why the rule library can claim two independent oracles: the
@@ -204,15 +241,22 @@ between the qubits the program asked for.
 
 ## Scope
 
-Covered: all three frontends (OpenQASM 3, CUDA-Q, Qiskit) through the whole
-pipeline, backend selection, layout and pass configuration, the rule library,
-and simulator execution on Aer (and on CUDA-Q, unverified).
+Covered:
 
-Not covered yet, and worth knowing before you reach for them:
+- all three frontends (OpenQASM 3, CUDA-Q, Qiskit) through the whole
+  pipeline;
+- backend selection and runtime target files;
+- layout and pass configuration;
+- verification and lint;
+- the rule library;
+- execution on Aer, CUDA-Q and IBM hardware;
+- conversion of every adapter's result into `ExecutionResult`.
 
-- **Circuit construction.** There is no builder API; build a circuit in Qiskit
-  and pass it in, or write OpenQASM / CUDA-Q text.
-- **Verified execution on CUDA-Q.** `oqci.backends.cudaq` exists and is
-  tested up to the runtime call, but it has never run against a real CUDA-Q.
-  Compare it against Aer on the same executable before trusting its counts.
-- **Hardware execution**, per above.
+Not covered, and worth knowing before you reach for them:
+
+- **Circuit construction.** There is no builder API. Build a circuit in Qiskit
+  and pass it in, or write OpenQASM or CUDA-Q text.
+- **Registering Rust extensions from Python.** Extensions are a Rust,
+  source-level API ([`../docs/extensions.md`](../docs/extensions.md)). Python
+  reaches the built-ins and runtime target files.
+- **ECR-native IBM devices**, which are refused by name.

@@ -58,14 +58,17 @@ cannot disagree.
 ## The default pipeline
 
 ```text
-canonicalize → gate-cancellation → rotation-merge → canonicalize → schedule
+canonicalize → gate-cancellation → rotation-merge → single-qubit-fusion → canonicalize → schedule
 ```
 
 The ordering is deliberate:
 
 - `canonicalize` first, so later passes see a normalized circuit. An explicit
   identity gate between two `H`s would otherwise hide a cancellable pair.
-- `canonicalize` **again** after `rotation-merge`, because merging
+- `single-qubit-fusion` after the peephole passes, so it fuses what they
+  could not remove rather than hiding a cancellable pair inside a `U` the
+  cancellation pass cannot see into.
+- `canonicalize` **again** after `rotation-merge` and fusion, because merging
   `Rz(a); Rz(-a)` produces `Rz(0)`, which canonicalization already removes
   exactly.
 - `schedule` last, and read-only: it measures what actually came out.
@@ -163,6 +166,44 @@ gates. That is §8.3's own instruction applied honestly — "Do not claim
 arbitrary unitary synthesis unless it is actually implemented" — not an
 oversight.
 
+### `single-qubit-fusion` — fuse single-qubit runs (§8.3)
+
+The fusion policy §8.3 requires the implementation to document:
+
+- **Family.** Runs of single-qubit gates on one wire. Two-qubit blocks are
+  not fused, and nothing synthesizes a multi-qubit unitary.
+- **Operand compatibility and scope.** A run is a maximal sequence of
+  single-qubit gates on the same qubit with nothing else touching that qubit
+  in between. Gates on other wires may interleave in program order: they act
+  on disjoint qubits and commute with the run.
+- **What prevents fusion.** Any of these ends a run:
+  - a multi-qubit gate on the qubit;
+  - a measurement or reset, which are barriers (§33.14);
+  - a gate with a symbolic parameter, whose matrix is unknown until binding;
+  - an opaque gate.
+- **Parameter composition.** The run's matrices are multiplied in order, and
+  the product is re-expressed exactly, up to one global phase, as one of:
+  - nothing, if it is the identity;
+  - `rz(λ)`, if it is diagonal;
+  - otherwise `U(θ, φ, λ)` in the OpenQASM 3 convention documented on
+    `GateKind::U`, by closed-form ZYZ Euler angles.
+
+  "Identity" and "diagonal" are decided within 1e-12 on matrix entries. That
+  is the only approximation, and both the property test and the in-compiler
+  checker re-check every fusion.
+- **When a run is replaced.**
+  - Only runs of two or more gates.
+  - With a target, only when the replacement expands to *strictly fewer*
+    native operations under that target's own decomposition rules. On
+    `{rz, sx, x}`, `h; t` (4 native operations) is left alone, because a `U`
+    costs 5. `h; s; h` (7) is fused.
+
+  So fusion never makes lowered output larger.
+
+This is not arbitrary unitary synthesis. It does not search for an optimal
+sequence in any basis: it fuses, and lets target lowering's rules expand the
+result.
+
 ### `schedule` — report parallelism
 
 Computes the ASAP layering (`QcoCircuit::layers`) and reports depth and
@@ -207,7 +248,18 @@ angle in a rewrite rule cannot hide behind a matching mistake in the check.
 The harness has been verified to fail when a rule is broken: inverting the
 sign in `rotation-merge`'s angle addition makes four of its tests fail,
 including the randomized property. A property test that cannot fail proves
-nothing.
+nothing. The benchmark suite's mutation evidence repeats that experiment for
+every pass, against every checker ([`benchmarks.md`](benchmarks.md)).
+
+Since `0.6.0` the same property can also be checked **during compilation**:
+with `--verify`, every pass that runs — extension passes included — is
+compared against its input by the in-compiler checker
+([`verification.md`](verification.md)), and a pass that changes what the
+circuit computes stops compilation.
+
+Extension passes register through the extension API
+([`extensions.md`](extensions.md)); `PassManager::insert` places them, and
+`PassManager::run_observed` lets a caller see each transformation.
 
 ## Not implemented
 
@@ -215,9 +267,9 @@ Per `final-deliverables-spec.md`'s Critical Rule — a feature is not
 implemented merely because a module or diagram names it — the following from
 §8 are **absent**:
 
-| Spec | Status |
-|---|---|
-| §8.3 general gate fusion | only additive-parameter fusion, as described above |
+Nothing from §8 is absent any more. §8.3 gate fusion was listed here until
+`0.6.0`, which added `single-qubit-fusion` (above). Two-qubit block fusion
+(KAK synthesis) is not implemented and is not claimed.
 
 §8.6 (qubit mapping), §8.7 (routing) and §8.8 (basis decomposition) used to be
 listed here too. They are now implemented — but **not as passes**, and not in

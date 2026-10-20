@@ -25,6 +25,12 @@ implementation-internal cases and live next to the code they test).
 | [`lowering.rs`](lowering.rs) | Target lowering's behaviour: each refusal fires for its own reason, reported metadata means what it says, orientation policies are the identities they claim to be. |
 | [`lowering_equivalence.rs`](lowering_equivalence.rs) | **The central lowering property.** Generated circuits on generated devices either refuse for an independently confirmed reason, or lower to a circuit that is equivalent modulo the final layout, legal, and byte-identical across runs. |
 | [`qir_conformance.rs`](qir_conformance.rs) | QIR 1.0 Base Profile structure of every emitted module (every example × every backend × both pointer styles). OQCI's own reading of the spec, so *not independent evidence*; it also writes the corpus CI feeds to PyQIR and `llvm-as`. |
+| [`target_file.rs`](target_file.rs) | Compiling for a target supplied at runtime (§9.2): loading, kind and id overrides, refusals, and a CZ-native fixture compiled, verified and recorded in provenance. |
+| [`extensions.rs`](extensions.rs) | The extension registry: an empty registry is the built-in compiler, placement, the refusals, extension frontends, and per-stage timings. |
+| [`verifier.rs`](verifier.rs) | The in-compiler semantic checker: property agreement with the test oracle, a deliberately wrong extension pass that must stop compilation, every example verified on every backend. |
+| [`lint.rs`](lint.rs) | One firing and one non-firing case per lint rule, deterministic ordering, an extension rule. |
+| [`determinism.rs`](determinism.rs) | The determinism contract across separate `oqci` processes, with measurements stripped ([`../docs/determinism.md`](../docs/determinism.md)). |
+| [`limits.rs`](limits.rs) | Untrusted register widths refused before allocation, at every boundary (found by fuzzing). |
 | [`cli.rs`](cli.rs) | The compiled `oqci` binary, invoked as a subprocess against the fixtures in [`../examples/`](../examples/) — the parts unit tests can't reach: argument parsing, file I/O, exit codes, and `--json` output actually parsing as JSON. |
 
 ## `support/`
@@ -48,3 +54,9 @@ project's non-goals rule out.
 - Malformed-input tests are paired with the exact invariant/error variant
   they exercise, one test per rule, so a coverage gap is visible by
   inspection.
+
+## Elsewhere
+
+- [`../examples/plugin-demo/tests/no_core_modification.rs`](../examples/plugin-demo/tests/no_core_modification.rs) — the extension demonstration, end to end.
+- [`../fuzz/`](../fuzz/) — cargo-fuzz targets; `fuzz/tests/corpus.rs` runs their seed corpus on any toolchain.
+- [`../python/tests/`](../python/tests/) and [`../benchmarks/tests/`](../benchmarks/tests/) — the SDK, adapters and benchmark harness.
