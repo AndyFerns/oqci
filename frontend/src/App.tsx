@@ -111,6 +111,12 @@ function App() {
                   />
                 )}
                 {activeStage?.graph && <DagGraph graph={activeStage.graph} />}
+                {activeStage?.qir_info && (
+                  <div className="info-panel__key">
+                    {activeStage.qir_info.profile}, from the {activeStage.qir_info.stage} circuit,{" "}
+                    {activeStage.qir_info.pointers} pointers
+                  </div>
+                )}
                 {activeStage?.qir && <pre className="qir-text">{activeStage.qir}</pre>}
                 {activeStage?.unavailable && <div className="panel-empty">{activeStage.unavailable}</div>}
 

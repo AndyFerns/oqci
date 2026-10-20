@@ -26,11 +26,13 @@ use crate::analysis::{analyze, diff_circuits};
 use crate::backend::ExecutionSettings;
 use crate::cli::CliError;
 use crate::cli::snapshot::{
-    PassRecordView, PipelineReport, StageSnapshot, diff_view, executable_view, graph_of,
-    instructions_of, lowering_view, target_report,
+    PassRecordView, PipelineReport, QirInfoView, StageSnapshot, diff_view, executable_view,
+    graph_of, instructions_of, lowering_view, target_report,
 };
-use crate::compile::{CompilationArtifacts, CompilerConfig, Frontend, Stop};
-use crate::ir::{Circuit, emit_qir, qc_to_qco};
+use crate::compile::{
+    CompilationArtifacts, CompilerConfig, Frontend, QirArtifact, QirRequest, Stop,
+};
+use crate::ir::{Circuit, qc_to_qco};
 use crate::lowering::LoweringConfig;
 use crate::pass::PassSelection;
 use crate::target::{BasisProfile, WeightedCostModel, cost};
@@ -75,6 +77,27 @@ pub fn run_compile(
     emit: &[Stage],
     target: Option<&BasisProfile>,
 ) -> Result<PipelineReport, CliError> {
+    run_compile_with(path, source, bindings, emit, target, &QirRequest::default())
+}
+
+/// As [`run_compile`], with an explicit request for the QIR output.
+///
+/// No passes run, so the canonical QIR is emitted from the circuit exactly as
+/// the frontend read it (recorded as stage `optimized`, the pass pipeline's
+/// output, which here is the identity).
+///
+/// # Errors
+///
+/// As [`run_compile`], plus [`crate::compile::CompileError::QirProfile`] when
+/// `qir` demands the Base Profile and the circuit does not qualify.
+pub fn run_compile_with(
+    path: &Path,
+    source: &str,
+    bindings: &HashMap<String, f64>,
+    emit: &[Stage],
+    target: Option<&BasisProfile>,
+    qir: &QirRequest,
+) -> Result<PipelineReport, CliError> {
     // Everything before rendering comes from the orchestrator, so the CLI
     // cannot drift from the library (spec 19: the CLI "must not duplicate
     // compiler logic"). Only presentation lives here.
@@ -83,9 +106,10 @@ pub fn run_compile(
         source,
         bindings,
         &PassSelection::only::<[&str; 0], &str>([]),
+        qir,
     )?;
     let mut report = new_report(path, &artifacts.source_circuit);
-    report.stages = stages_for(&artifacts.source_circuit, emit)?;
+    report.stages = stages_for(&artifacts.source_circuit, emit, artifacts.qir.as_ref())?;
     report.target = target_for(&artifacts.source_circuit, target)?;
     Ok(report)
 }
@@ -101,6 +125,7 @@ fn orchestrate(
     source: &str,
     bindings: &HashMap<String, f64>,
     passes: &PassSelection,
+    qir: &QirRequest,
 ) -> Result<CompilationArtifacts, CliError> {
     let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("main");
     let config = CompilerConfig {
@@ -108,6 +133,7 @@ fn orchestrate(
         bindings: bindings.clone(),
         passes: passes.clone(),
         stop: Stop::Optimized,
+        qir: *qir,
         ..CompilerConfig::default()
     };
     Ok(crate::compile::compile_named(source, name, &config)?)
@@ -157,7 +183,36 @@ pub fn run_optimize(
     want_diff: bool,
     target: Option<&BasisProfile>,
 ) -> Result<PipelineReport, CliError> {
-    let artifacts = orchestrate(path, source, bindings, selection)?;
+    run_optimize_with(
+        path,
+        source,
+        bindings,
+        selection,
+        emit,
+        want_diff,
+        target,
+        &QirRequest::default(),
+    )
+}
+
+/// As [`run_optimize`], with an explicit request for the QIR output.
+///
+/// # Errors
+///
+/// As [`run_optimize`], plus [`crate::compile::CompileError::QirProfile`]
+/// when `qir` demands the Base Profile and the circuit does not qualify.
+#[allow(clippy::too_many_arguments)]
+pub fn run_optimize_with(
+    path: &Path,
+    source: &str,
+    bindings: &HashMap<String, f64>,
+    selection: &PassSelection,
+    emit: &[Stage],
+    want_diff: bool,
+    target: Option<&BasisProfile>,
+    qir: &QirRequest,
+) -> Result<PipelineReport, CliError> {
+    let artifacts = orchestrate(path, source, bindings, selection, qir)?;
     let original = artifacts.source_circuit.clone();
     let optimized = artifacts.optimized.clone();
 
@@ -181,11 +236,12 @@ pub fn run_optimize(
             instructions: Some(instructions_of(&original)),
             graph: None,
             qir: None,
+            qir_info: None,
             unavailable: None,
         });
     }
     report.stages.extend(
-        stages_for(&optimized, emit)?
+        stages_for(&optimized, emit, artifacts.qir.as_ref())?
             .into_iter()
             .map(|mut snapshot| {
                 // Distinguish the post-pass circuit from the input above.
@@ -222,6 +278,8 @@ pub struct LowerRequest<'a> {
     pub want_diff: bool,
     /// Whether to go on and build the executable.
     pub prepare: bool,
+    /// How to emit the canonical QIR output.
+    pub qir: QirRequest,
 }
 
 /// Runs the whole pipeline through to target lowering, and optionally to a
@@ -255,6 +313,7 @@ pub fn run_lower(
         } else {
             Stop::Lowered
         },
+        qir: request.qir,
         ..CompilerConfig::default()
     };
     let artifacts = crate::compile::compile_named(source, name, &config)?;
@@ -283,11 +342,12 @@ pub fn run_lower(
             instructions: Some(instructions_of(&artifacts.source_circuit)),
             graph: None,
             qir: None,
+            qir_info: None,
             unavailable: None,
         });
     }
     report.stages.extend(
-        stages_for(&lowered.circuit, emit)?
+        stages_for(&lowered.circuit, emit, artifacts.qir.as_ref())?
             .into_iter()
             .map(|mut snapshot| {
                 if snapshot.stage == "qc-ir" {
@@ -336,7 +396,14 @@ fn new_report(path: &Path, circuit: &Circuit) -> PipelineReport {
 }
 
 /// Builds the requested stage snapshots for one circuit.
-fn stages_for(circuit: &Circuit, emit: &[Stage]) -> Result<Vec<StageSnapshot>, CliError> {
+///
+/// The QIR stage is the compilation's canonical artifact, never emitted here:
+/// the CLI shows the one module the compiler produced.
+fn stages_for(
+    circuit: &Circuit,
+    emit: &[Stage],
+    qir: Option<&QirArtifact>,
+) -> Result<Vec<StageSnapshot>, CliError> {
     let mut stages = Vec::new();
 
     for stage in emit {
@@ -347,6 +414,7 @@ fn stages_for(circuit: &Circuit, emit: &[Stage]) -> Result<Vec<StageSnapshot>, C
                 instructions: Some(instructions_of(circuit)),
                 graph: None,
                 qir: None,
+                qir_info: None,
                 unavailable: None,
             },
             Stage::QcoIr => StageSnapshot {
@@ -355,18 +423,20 @@ fn stages_for(circuit: &Circuit, emit: &[Stage]) -> Result<Vec<StageSnapshot>, C
                 instructions: None,
                 graph: Some(graph_of(&qc_to_qco(circuit)?)?),
                 qir: None,
+                qir_info: None,
                 unavailable: None,
             },
             Stage::Qir => {
                 // Unbound parameters are a normal state for a parameterized
                 // circuit, not a failure — say so rather than aborting.
-                if circuit.is_concrete() {
+                if let Some(artifact) = qir {
                     StageSnapshot {
                         stage: stage.label().into(),
                         metrics: None,
                         instructions: None,
                         graph: None,
-                        qir: Some(emit_qir(&qc_to_qco(circuit)?)?),
+                        qir: Some(artifact.text.clone()),
+                        qir_info: Some(QirInfoView::new(artifact)),
                         unavailable: None,
                     }
                 } else {
@@ -376,6 +446,7 @@ fn stages_for(circuit: &Circuit, emit: &[Stage]) -> Result<Vec<StageSnapshot>, C
                         instructions: None,
                         graph: None,
                         qir: None,
+                        qir_info: None,
                         unavailable: Some(format!(
                             "circuit has unbound parameter(s): {}; supply values with --bind NAME=VALUE",
                             circuit.parameters().join(", ")

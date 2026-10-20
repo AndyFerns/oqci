@@ -1,9 +1,11 @@
 //! Built-in target profiles.
 //!
 //! Stage D exit criterion 2 asks for at least one backend profile implemented
-//! end to end. There are two here, and **both are explicitly synthetic**.
+//! end to end. There are three here, and **all are explicitly synthetic**:
+//! two describe shapes of device, and [`qir_base`] describes an output format
+//! (the QIR Base Profile), not a device at all.
 //!
-//! Neither claims to describe a real device. `final-deliverables-spec.md` §9.2
+//! None claims to describe a real device. `final-deliverables-spec.md` §9.2
 //! forbids hard-coding a physical IBM device name into the compiler core, and
 //! §33.3–33.4 forbid assuming a vendor's API or implementing one from memory
 //! rather than checking it. Calibration data falls under the same caution: a
@@ -115,13 +117,79 @@ pub fn linear_nisq(qubit_count: u32) -> BasisProfile {
     .expect("the linear-nisq profile is well-formed by construction")
 }
 
+/// The identifier of [`qir_base`].
+pub const QIR_BASE: &str = "qir-base";
+
+/// The width at which [`all`] instantiates [`qir_base`], and at which the
+/// `qir-base` backend compiles.
+pub const QIR_BASE_WIDTH: u32 = 32;
+
+/// A target that accepts exactly what a QIR 1.0 Base Profile module may
+/// contain, as OQCI understands it.
+///
+/// It is not a device. It is the target a circuit is lowered onto so that its
+/// QIR can honestly be labeled `"qir_profiles"="base_profile"`, and the
+/// profile a circuit is *checked* against to decide that label
+/// (`docs/qir_lowering.md`).
+///
+/// **Where the basis comes from.** QIR 1.0 defines no normative quantum
+/// instruction set: `specification/Instruction_Set.md` in `qir-alliance/qir-spec`
+/// at tag `1.0` (commit `e872897`) says each backend declares its own. The
+/// basis is therefore pinned to the instructions PyQIR 0.12.5 exposes
+/// (`pyqir/qis.py`: `ccx, cx, cz, h, mz, reset, rx, ry, rz, s, s_adj, swap, t,
+/// t_adj, x, y, z`, plus `barrier` and `if_result`), minus three:
+///
+/// - `reset`, because the Base Profile requires unitaries before measurements
+///   and no use of a qubit after one, which leaves no sound place for a reset;
+/// - `barrier`, which has no QC-IR counterpart;
+/// - `if_result`, which is classical control flow (Stage F §5).
+///
+/// Measurement is terminal only, for the same Base Profile rule. Everything
+/// else registered in QC-IR has a rule into the basis, so any supported
+/// circuit can be lowered here.
+///
+/// # Panics
+///
+/// Never; see [`ideal_simulator`].
+#[must_use]
+pub fn qir_base(qubit_count: u32) -> BasisProfile {
+    BasisProfileBuilder::new(
+        QIR_BASE,
+        "1",
+        "qir-base-profile",
+        Topology::all_to_all(qubit_count),
+    )
+    .operations([
+        "x", "y", "z", "h", "s", "sdg", "t", "tdg", "rx", "ry", "rz", "cx", "cz", "swap", "ccx",
+        "measure",
+    ])
+    .measurement(MeasurementSupport {
+        measurement: true,
+        mid_circuit_measurement: false,
+        reset: false,
+    })
+    .decomposition_rules([
+        "id-to-nothing",
+        "sx-to-rx",
+        "sxdg-to-rx",
+        "p-to-rz",
+        "u-to-rz-ry",
+        "cy-to-cx",
+    ])
+    .capability("all-to-all-connectivity")
+    .capability("unrestricted-parameters")
+    .cost_model("uniform")
+    .build()
+    .expect("the qir-base profile is well-formed by construction")
+}
+
 /// Every built-in profile, for listing and lookup by id.
 ///
-/// `linear-nisq` is instantiated at a fixed width here so the set is
-/// enumerable; [`linear_nisq`] takes any width.
+/// `linear-nisq` and `qir-base` are instantiated at fixed widths here so the
+/// set is enumerable; [`linear_nisq`] and [`qir_base`] take any width.
 #[must_use]
 pub fn all() -> Vec<BasisProfile> {
-    vec![ideal_simulator(), linear_nisq(5)]
+    vec![ideal_simulator(), linear_nisq(5), qir_base(QIR_BASE_WIDTH)]
 }
 
 /// Looks a built-in profile up by its [`BasisProfile::id`].
@@ -137,9 +205,51 @@ mod tests {
     use crate::target::topology::PhysicalQubit;
 
     #[test]
-    fn both_builtin_profiles_are_well_formed() {
+    fn every_builtin_profile_is_well_formed() {
         // The `expect` in each constructor is only safe if this holds.
-        assert_eq!(all().len(), 2);
+        assert_eq!(all().len(), 3);
+    }
+
+    #[test]
+    fn the_qir_base_profile_accepts_exactly_its_pinned_basis() {
+        let profile = qir_base(4);
+        assert_eq!(
+            profile.supported_operations(),
+            vec![
+                "ccx", "cx", "cz", "h", "measure", "rx", "ry", "rz", "s", "sdg", "swap", "t",
+                "tdg", "x", "y", "z"
+            ]
+        );
+        for excluded in ["sx", "sxdg", "id", "p", "u", "cy", "reset"] {
+            assert!(
+                !profile.supports_operation(excluded),
+                "`{excluded}` must not be in qir-base"
+            );
+        }
+        assert!(profile.topology().is_symmetric());
+        assert!(
+            profile
+                .topology()
+                .supports(PhysicalQubit(0), PhysicalQubit(3))
+        );
+    }
+
+    #[test]
+    fn the_qir_base_profile_names_a_rule_for_every_gate_outside_its_basis() {
+        // Same property as for linear-nisq: every registered gate can be
+        // lowered onto qir-base. `RuleSet::new` proves closure; this checks
+        // each gap is named.
+        let profile = qir_base(4);
+        let named = profile.decomposition_rules();
+        for mnemonic in ["id", "sx", "sxdg", "p", "u", "cy"] {
+            assert!(
+                named
+                    .iter()
+                    .any(|id| id.starts_with(&format!("{mnemonic}-to-"))),
+                "no decomposition rule named for `{mnemonic}`"
+            );
+        }
+        assert!(crate::lowering::RuleSet::new(&profile).is_ok());
     }
 
     #[test]
@@ -246,6 +356,7 @@ mod tests {
     fn profiles_are_addressable_by_id() {
         assert_eq!(by_id(IDEAL_SIMULATOR).unwrap().id(), IDEAL_SIMULATOR);
         assert_eq!(by_id(LINEAR_NISQ).unwrap().id(), LINEAR_NISQ);
+        assert_eq!(by_id(QIR_BASE).unwrap().id(), QIR_BASE);
         assert!(by_id("no-such-target").is_none());
     }
 
@@ -253,6 +364,7 @@ mod tests {
     fn profiles_carry_a_cost_model_reference() {
         assert_eq!(ideal_simulator().cost_model_id(), "uniform");
         assert_eq!(linear_nisq(5).cost_model_id(), "nisq-weighted");
+        assert_eq!(qir_base(4).cost_model_id(), "uniform");
     }
 
     #[test]

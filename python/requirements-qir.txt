@@ -1,0 +1,5 @@
+# External QIR validator for CI (scripts/validate_qir.py).
+#
+# Pinned: the validation claims in docs/qir_lowering.md name this exact
+# version. PyQIR 0.12.5 builds on LLVM 18-20.
+pyqir==0.12.5

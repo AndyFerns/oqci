@@ -1,7 +1,9 @@
 # Stage B — Modular MLIR Integration Boundary
 
 Status: LOCKED  
-Decision: **B2/B3 — MLIR is enabling/modular infrastructure; OQCI's main contribution is the Q-LLVM-inspired, vendor-neutral compiler architecture and reusable optimization/backend ecosystem.**
+Decision: **B2/B3 — MLIR is enabling/modular infrastructure, not the project's main contribution.** What the main contribution *is* is stated by [`framing-and-research-question.md`](framing-and-research-question.md), which takes precedence here.
+
+*Amended 2026-09-30:* this line previously named "the Q-LLVM-inspired, vendor-neutral compiler architecture and reusable optimization/backend ecosystem" as the main contribution. That identity statement is superseded by the framing record; the MLIR decision itself is unchanged.
 
 ## 1. Objective
 
@@ -14,7 +16,7 @@ The purpose of MLIR in OQCI is to support:
 - verification hooks;
 - reusable transformation infrastructure;
 - a future scalable lowering path;
-- interoperability with LLVM/QIR;
+- interoperability with LLVM/QIR (one possible route; the Rust QIR emitter, `src/ir/qir.rs`, is the current one);
 - modular pass infrastructure where justified.
 
 The purpose is not to rewrite stable Rust IR code simply to satisfy a diagram.

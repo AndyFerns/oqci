@@ -22,7 +22,10 @@ use serde::Serialize;
 
 use crate::analysis::{CircuitDiff, ResourceReport};
 use crate::backend::Executable;
-use crate::ir::{Circuit, GateKind, Instruction, Param, QcoCircuit, Wire};
+use crate::compile::{QirArtifact, QirStage};
+use crate::ir::{
+    Circuit, GateKind, Instruction, Param, PointerStyle, QcoCircuit, QirProfile, Wire,
+};
 use crate::lowering::Lowered;
 use crate::pass::PassRecord;
 use crate::target::{BasisProfile, Cost, CostModel, Violation, check};
@@ -155,9 +158,40 @@ pub struct StageSnapshot {
     /// Emitted QIR text, for the QIR stage.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub qir: Option<String>,
+    /// What the QIR module is: its profile label, the circuit it came from,
+    /// its pointer style, and why it is not `base_profile` when it is not.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub qir_info: Option<QirInfoView>,
     /// Why this stage produced nothing, when it could not run.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unavailable: Option<String>,
+}
+
+/// The facts about a QIR module that its text alone does not say plainly.
+#[derive(Debug, Clone, Serialize)]
+pub struct QirInfoView {
+    /// `base_profile` or `custom`.
+    pub profile: QirProfile,
+    /// `optimized` or `lowered`: which circuit the module was emitted from.
+    pub stage: QirStage,
+    /// `opaque` or `typed`.
+    pub pointers: PointerStyle,
+    /// Why the module is not `base_profile`: the circuit's violations of the
+    /// `qir-base` target profile. Empty for a Base module.
+    pub base_violations: Vec<Violation>,
+}
+
+impl QirInfoView {
+    /// The view of a compilation's canonical QIR artifact.
+    #[must_use]
+    pub fn new(artifact: &QirArtifact) -> Self {
+        QirInfoView {
+            profile: artifact.profile,
+            stage: artifact.stage,
+            pointers: artifact.pointers,
+            base_violations: artifact.base_violations.clone(),
+        }
+    }
 }
 
 /// One instruction.

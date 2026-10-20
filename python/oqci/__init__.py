@@ -68,6 +68,8 @@ def compile(  # noqa: A001  — mirrors the Rust entry point's name deliberately
     layout: str = "trivial",
     passes: Optional[Sequence[str]] = None,
     disable: Optional[Sequence[str]] = None,
+    qir_profile: str = "any",
+    qir_pointers: str = "opaque",
 ) -> dict[str, Any]:
     """Compile a program through the whole pipeline, optionally for a backend.
 
@@ -101,7 +103,17 @@ def compile(  # noqa: A001  — mirrors the Rust entry point's name deliberately
     :param disable: run every pass except these — the shape of an ablation.
         Mutually exclusive with ``passes``; unknown ids are refused.
     :param seed: recorded in the provenance, never chosen here.
+    :param qir_profile: ``"any"`` (default) labels the result's QIR
+        ``base_profile`` when the circuit qualifies and ``custom`` otherwise;
+        ``"base"`` raises instead of producing a ``custom`` module.
+    :param qir_pointers: ``"opaque"`` (default, ``ptr``) or ``"typed"``
+        (``%Qubit*``).
     :raises OqciError: if any stage refuses, with the compiler's own message.
+
+    The result's ``qir`` entry is the compilation's one canonical QIR module:
+    ``{"text", "profile", "stage", "pointers", "base_violations"}``, emitted
+    from the lowered circuit when there is one and the optimized circuit
+    otherwise, or ``None`` if parameters are still unbound.
     """
     bound = dict(bindings) if bindings else None
     passes = list(passes) if passes is not None else None
@@ -119,6 +131,8 @@ def compile(  # noqa: A001  — mirrors the Rust entry point's name deliberately
             layout,
             passes,
             disable,
+            qir_profile,
+            qir_pointers,
         )
 
     if frontend not in (None, "qiskit"):
@@ -128,7 +142,17 @@ def compile(  # noqa: A001  — mirrors the Rust entry point's name deliberately
             "Qiskit QuantumCircuit"
         )
     return oqci_native.compile_qiskit(
-        program, backend, bound, name, shots, seed, layout, passes, disable
+        program,
+        backend,
+        bound,
+        name,
+        shots,
+        seed,
+        layout,
+        passes,
+        disable,
+        qir_profile,
+        qir_pointers,
     )
 
 
@@ -150,17 +174,46 @@ def decomposition_rules() -> list[dict[str, Any]]:
     return oqci_native.decomposition_rules()
 
 
-def qasm3_to_qir(source: str, bindings: Optional[Mapping[str, float]] = None) -> str:
-    """Compile OpenQASM 3 to textual QIR.
+def qasm3_to_qir(
+    source: str,
+    bindings: Optional[Mapping[str, float]] = None,
+    *,
+    backend: Optional[str] = None,
+    qir_profile: str = "any",
+    qir_pointers: str = "opaque",
+) -> str:
+    """Compile OpenQASM 3 to textual QIR 1.0.
 
-    QIR is a lowering artifact, **not** an execution guarantee: Stage C §5 is
-    explicit that emitted QIR does not by itself mean a circuit will run on
-    hardware. Use :func:`compile` with a backend for something executable.
+    The circuit goes through the same pipeline as :func:`compile`: it is
+    optimized, and lowered too when ``backend`` is given, and the text returned
+    is the compilation's canonical QIR module. It is labeled ``base_profile``
+    only when the circuit qualifies for the QIR Base Profile, ``custom``
+    otherwise; ``backend="qir-base"`` lowers any supported circuit into the
+    Base instruction set first, and ``qir_profile="base"`` raises instead of
+    returning a ``custom`` module. See ``docs/qir_lowering.md``.
+
+    QIR is an interoperability artifact, **not** an execution guarantee:
+    Stage C §5 is explicit that emitted QIR does not by itself mean a circuit
+    will run on hardware. Use :func:`compile` with a backend for something
+    executable.
     """
-    return oqci_native.qasm3_to_qir(source, dict(bindings) if bindings else None)
+    return oqci_native.qasm3_to_qir(
+        source,
+        dict(bindings) if bindings else None,
+        backend,
+        qir_profile,
+        qir_pointers,
+    )
 
 
-def cudaq_to_qir(source: str, bindings: Optional[Mapping[str, float]] = None) -> str:
+def cudaq_to_qir(
+    source: str,
+    bindings: Optional[Mapping[str, float]] = None,
+    *,
+    backend: Optional[str] = None,
+    qir_profile: str = "any",
+    qir_pointers: str = "opaque",
+) -> str:
     """Compile a CUDA-Q kernel's source text to textual QIR.
 
     Reads the ``@cudaq.kernel`` function out of Python *source* — CUDA-Q
@@ -168,7 +221,13 @@ def cudaq_to_qir(source: str, bindings: Optional[Mapping[str, float]] = None) ->
     ``docs/cudaq_frontend.md``. See :func:`qasm3_to_qir` on what QIR does and
     does not promise.
     """
-    return oqci_native.cudaq_to_qir(source, dict(bindings) if bindings else None)
+    return oqci_native.cudaq_to_qir(
+        source,
+        dict(bindings) if bindings else None,
+        backend,
+        qir_profile,
+        qir_pointers,
+    )
 
 
 def qiskit_parameters(circuit: Any) -> list[str]:
@@ -182,9 +241,23 @@ def qiskit_parameters(circuit: Any) -> list[str]:
     return oqci_native.qiskit_parameters(circuit)
 
 
-def qiskit_to_qir(circuit: Any, bindings: Optional[Mapping[str, Any]] = None) -> str:
-    """Compile a Qiskit ``QuantumCircuit`` to textual QIR.
+def qiskit_to_qir(
+    circuit: Any,
+    bindings: Optional[Mapping[str, Any]] = None,
+    *,
+    backend: Optional[str] = None,
+    qir_profile: str = "any",
+    qir_pointers: str = "opaque",
+) -> str:
+    """Compile a Qiskit ``QuantumCircuit`` to textual QIR 1.0.
 
-    See :func:`qasm3_to_qir` on what QIR does and does not promise.
+    See :func:`qasm3_to_qir` on the options and on what QIR does and does not
+    promise.
     """
-    return oqci_native.qiskit_to_qir(circuit, dict(bindings) if bindings else None)
+    return oqci_native.qiskit_to_qir(
+        circuit,
+        dict(bindings) if bindings else None,
+        backend,
+        qir_profile,
+        qir_pointers,
+    )

@@ -49,9 +49,12 @@ requirements in:
 ```text
 frontend  →  parameter binding  →  analyze source  →  backend selection
           →  pass pipeline      →  analyze optimized
-          →  [stop?]  →  target lowering  →  cost evaluation  →  provenance
-          →  [stop?]  →  execution preparation
+          →  [stop?]  →  target lowering  →  canonical QIR  →  cost evaluation
+          →  provenance  →  [stop?]  →  execution preparation
 ```
+
+At an early stop (no backend, or `Stop::Optimized`) the canonical QIR is
+emitted from the optimized circuit instead; see [`QirArtifact`](#qirartifact).
 
 Two deviations, both deliberate:
 
@@ -78,6 +81,7 @@ pub struct CompilerConfig {
     pub lowering: LoweringConfig,
     pub settings: ExecutionSettings,
     pub stop: Stop,
+    pub qir: QirRequest,
 }
 ```
 
@@ -90,6 +94,7 @@ pub struct CompilerConfig {
 | `lowering` | `LayoutChoice::Trivial`, routing on, decomposition on | How to lower. Documented in [`lowering.md`](lowering.md). |
 | `settings` | 1024 shots, no seed, no per-shot memory | Carried into the provenance record and into the executable. The seed default is `None` because choosing one would be picking an experimental parameter §33.15 assigns to Stage G. |
 | `stop` | `Stop::Prepared` | Where to stop. |
+| `qir` | opaque pointers, `QirProfileRequirement::Any` | How to emit the canonical QIR artifact: `pointers` (`PointerStyle::Opaque` or `Typed`) and `profile` (`Any`: label `base_profile` when the circuit qualifies, `custom` otherwise; `Base`: refuse with `CompileError::QirProfile` unless it qualifies). |
 
 ### `Stop`
 
@@ -199,7 +204,7 @@ overwhelmingly common cause and a bare "unknown backend" makes the user go
 looking for the list themselves:
 
 ```text
-unknown backend `quantum-supercomputer`; available: simulator, simulator-nisq, ibm-illustrative
+unknown backend `quantum-supercomputer`; available: simulator, simulator-nisq, qir-base, ibm-illustrative
 ```
 
 `an_unknown_backend_lists_what_is_available` and
@@ -222,6 +227,7 @@ pub struct CompilationArtifacts {
     pub cost: Option<Cost>,
     pub backend_id: Option<String>,
     pub provenance: Option<Provenance>,
+    pub qir: Option<QirArtifact>,
 }
 ```
 
@@ -237,6 +243,42 @@ pub struct CompilationArtifacts {
 | `cost` | as `lowered` | What the **target** thinks the lowered circuit costs, from the model the profile names — not a figure the orchestrator invented (Stage E §1). Components are kept alongside the scalar (Stage E §4, §7). |
 | `backend_id` | a backend was selected | Even when nothing was lowered. |
 | `provenance` | as `lowered` | Everything needed to cite a result. |
+| `qir` | the final circuit is concrete | The one QIR module this compilation produces. See below. |
+
+### `QirArtifact`
+
+```rust
+pub struct QirArtifact {
+    pub text: String,
+    pub profile: QirProfile,          // Base | Custom
+    pub stage: QirStage,              // Optimized | Lowered
+    pub pointers: PointerStyle,       // Opaque | Typed
+    pub base_violations: Vec<Violation>,
+}
+```
+
+Every compilation that succeeds emits at most one QIR module, from
+`final_circuit()` — the lowered circuit when lowering ran, the optimized one
+otherwise — and records which (`stage`). This is the only QIR the CLI, the
+Python SDK and the visualization server show; none of them emits its own
+(`final-deliverables-spec.md` §14.2).
+
+The label is decided here, not by the emitter. The circuit is checked against
+the `qir-base` target profile ([`target_model.md`](target_model.md)), sized to
+its own register:
+
+- **legal** → the module is emitted in the Base Profile form and labeled
+  `base_profile`; `base_violations` is empty;
+- **not legal**, `QirProfileRequirement::Any` → the module is labeled
+  `custom`, and `base_violations` says why (for example, an `sx` from lowering
+  onto `linear-nisq`, or a mid-circuit measurement);
+- **not legal**, `QirProfileRequirement::Base` → compilation fails with
+  `CompileError::QirProfile` carrying the same violations.
+
+`qir` is `None` exactly when the final circuit still has unbound parameters:
+QIR needs concrete values, and OQCI never invents one. To get Base-labeled QIR
+for a circuit that uses `sx`, `u`, `p` or `cy`, compile it for the `qir-base`
+backend, which lowers it into the Base instruction set first.
 
 ### Why every stage's output is kept, not just the last
 
@@ -259,7 +301,7 @@ does not have to reimplement that rule.
 
 ### Every `CompileError`
 
-`#[non_exhaustive]`, and four of the five variants are `#[error(transparent)]`,
+`#[non_exhaustive]`, and four of the six variants are `#[error(transparent)]`,
 so the message a user sees is written by the layer that actually refused.
 
 | Variant | Wraps | Raised when |
@@ -268,7 +310,11 @@ so the message a user sees is written by the layer that actually refused.
 | `Ir` | `IrError` | Parameter binding failed, or an analysis that builds a QCO-IR graph did. |
 | `Pass` | `PassError` | A pass failed. |
 | `Backend` | `BackendError` | Lowering, validation or preparation refused. |
-| `UnknownBackend` | — | The configuration named a backend that does not exist. The only variant with a message of its own, because it is the only failure the orchestrator itself detects. |
+| `QirProfile` | — | `QirProfileRequirement::Base` was requested and the final circuit is not legal against `qir-base`. Carries the violations. |
+| `UnknownBackend` | — | The configuration named a backend that does not exist. |
+
+`QirProfile` and `UnknownBackend` have messages of their own, because they are
+the two failures the orchestrator itself detects.
 
 The pipeline stops at the first failure and returns nothing. There is
 deliberately no partially-compiled artifact: a caller cannot tell from one how
@@ -276,8 +322,8 @@ far it is safe to trust it, and an artifact that is trustworthy only up to an
 unmarked point is worse than no artifact.
 
 `compilation_is_deterministic` compiles the same source twice with the same
-config and requires the optimized circuit, the lowered circuit and the
-executable to be equal each time — the precondition for every claim the
+config and requires the optimized circuit, the lowered circuit, the
+executable and the QIR artifact to be equal each time — the precondition for every claim the
 provenance record makes.
 
 ## Three consumers, one entry point

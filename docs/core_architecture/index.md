@@ -4,7 +4,7 @@ Status: Active planning baseline
 Last verified against repository: 2026-09-30
 Repository: `https://github.com/AndyFerns/oqci`  
 Branch reviewed: `master`  
-Current repository version: `0.4.1`
+Current repository version: `0.5.0`
 
 ## Purpose
 
@@ -18,13 +18,19 @@ The documents are intentionally split into architecture/design decisions and one
 
 | Stage | File | Decision | Status |
 |---|---|---|---|
+| — | [`framing-and-research-question.md`](framing-and-research-question.md) | OQCI is quantum-native compiler infrastructure first and LLVM/QIR-interoperable second; the research question every other decision serves. Takes precedence over older identity statements. | LOCKED |
 | A | [`stage-a-rust-native-ir-foundation.md`](stage-a-rust-native-ir-foundation.md) | Rust-native IR first; stabilize QC-IR/QCO-IR before introducing heavy MLIR infrastructure. | LOCKED |
 | B | [`stage-b-modular-mlir-boundary.md`](stage-b-modular-mlir-boundary.md) | MLIR is a modular/enabling infrastructure layer, not the project's primary research contribution. Integrate progressively after the Rust core is stable. | LOCKED |
 | C | [`stage-c-explicit-backend-contract.md`](stage-c-explicit-backend-contract.md) | Backend execution is governed by an explicit OQCI backend contract; IBM gets a dedicated target-lowering stage. | LOCKED |
 | D | [`stage-d-backend-specific-basis-profiles.md`](stage-d-backend-specific-basis-profiles.md) | Target-independent abstract gates are lowered through backend-specific basis profiles. | LOCKED |
 | E | [`stage-e-backend-defined-cost-model.md`](stage-e-backend-defined-cost-model.md) | Optimization cost is supplied by the selected backend/target cost model. Preserve raw metrics; do not collapse the research evaluation to one scalar. | LOCKED |
 | F | [`stage-f-static-parameterized-circuit-scope.md`](stage-f-static-parameterized-circuit-scope.md) | Main project supports static circuits plus symbolic/numeric parameterized rotations. Runtime-dependent dynamic control flow is deferred. | LOCKED |
-| G | `stage-g-benchmarking-protocol.md` | Benchmark corpus, repetitions, noise policy, hardware selection, statistical protocol, and IBM experiment design. | PENDING — NOT LOCKED |
+| G | [`stage-g-benchmarking-protocol.md`](stage-g-benchmarking-protocol.md) | Experimental protocol. Primary axes: validation strength, determinism, interoperability (definitions only); hardware experiments secondary. All numeric parameters pending. | PENDING — NOT LOCKED |
+
+The binding IR constraints C1–C8 are recorded in the IR Contract ADR,
+[`../architecture_decision_ir_contract.md`](../architecture_decision_ir_contract.md),
+and carry the same weight as a locked decision: they may only be changed by an
+explicit architecture decision that amends that ADR.
 
 ## Consolidated Deliverables Specification
 
@@ -78,7 +84,7 @@ An implementation agent must not silently override a locked decision because ano
 
 At the verified `master` state:
 
-- the repository is at version `0.4.1`;
+- the repository is at version `0.5.0`;
 - the implemented core is the Phase 0 IR foundation, the frontend layer, the
   pass manager, the target model, target lowering, the backend contract and
   compiler orchestration;
@@ -138,7 +144,7 @@ At the verified `master` state:
   retrieval are not implemented, and no claim of IBM hardware executability
   is made** (§33.12);
 - per-operation cost and error/noise metadata on profiles (Stage D §2) remain
-  absent, deliberately: both built-in profiles are synthetic, and a profile
+  absent, deliberately: every built-in profile is synthetic, and a profile
   asserting error rates nobody measured would be a fabricated record;
 - a CUDA-Q execution adapter (§15.2) exists on `master` (listed under
   `[Unreleased]`), but it has never run against a
@@ -167,11 +173,13 @@ described above — a new consumer of the compiler, not a change to it — and
 `ccx` on `ideal-simulator`, is no longer refused). The CUDA-Q frontend and
 execution adapter are on `master` but listed under `[Unreleased]`.
 
-What remains before the non-G definition of done is met is the hardware half
-of Stage C §8 — authentication, backend discovery, submission and result
-retrieval against a live device — plus the benchmark infrastructure of §20.
-Everything the compiler can verify without a quantum computer is verified;
-what is left is precisely what needs one.
+What remains before the non-G definition of done is met is the QIR
+interoperability boundary specified in `final-deliverables-spec.md` §14 —
+QIR 1.0 structure and module flags, honest `base_profile`/`custom` labeling
+against a `qir-base` profile, one canonical QIR output per compilation, and
+external validation in CI (planned for `0.5.0`) — plus the benchmark
+infrastructure of §20. Live IBM submission and result retrieval are outside
+the definition of done (§34, amended 2026-09-30) and remain future work.
 
 ## How to Use These Documents
 
@@ -179,9 +187,26 @@ Implement stages in dependency order rather than alphabetic-letter order when th
 
 The practical high-level progression is:
 
-`A → frontend/contracts → pass infrastructure → optimization → target model → routing/lowering → backend execution → analysis/benchmark infrastructure → B MLIR boundary expansion → hardware-specific integration`
+`A → frontend/contracts → pass infrastructure → optimization → target model → routing/lowering → backend execution → interop hardening (QIR conformance and validation) → determinism contract → semantic validation → analysis/benchmark infrastructure → B MLIR boundary expansion (optional) → hardware-specific integration`
 
-The exact phase decomposition belongs to the final implementation roadmap; these documents define the constraints that roadmap must obey.
+These documents define the constraints any roadmap must obey.
+
+## Phases and Versions
+
+Older documents use "Phase n" labels. They are historical: each names a
+completed step and maps to a released version. Future work is named by what it
+does, not by a phase number.
+
+| Label in older documents | Version | What it was |
+|---|---|---|
+| Phase 0 | `0.0.1` | The IR core: QC-IR, QCO-IR, conversion, textual QIR emission, validation. |
+| Phase 1 | `0.2.0` | The frontend layer (OpenQASM 3, Qiskit), Stage F parameters, the pass manager with its passes, the CLI. |
+| "Phase 3" (optimization passes) | `0.2.0` | Not a separate release: the passes shipped with the frontend layer, in Rust rather than MLIR. |
+| — | `0.3.0` | Target model, target lowering, backend contract, orchestrator. |
+| — | `0.4.0` | Live visualization companion. |
+| — | `0.4.1` | A lowering fix (declared wide gates). |
+| "Phase 2" (MLIR integration) | — | Not done; MLIR is optional (Stage B). |
+| — | `0.5.0` | QIR interoperability boundary: `final-deliverables-spec.md` §14. |
 
 ## Critical Rule
 

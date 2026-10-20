@@ -62,10 +62,12 @@ row, or `oqci watch <file>` to keep seeing them as you edit — see
 | [`cli.md`](cli.md) | **The `oqci` command line.** Inspecting every pipeline stage, pass-by-pass reports, before/after diffs, watch mode, and the JSON schema. |
 | [`visualization.md`](visualization.md) | **Live visualization.** The `server`/`frontend` companion's wire contract, and the self-validating replay technique that gives it pass-by-pass and swap/rule-by-rule detail without any change to compiler logic. |
 | [`architecture_decision_sx_basis_gate.md`](architecture_decision_sx_basis_gate.md) | **ADR.** Why `SX`/`SXdg` were added to the closed gate set, and what that does and does not license. |
-| [`mlir_dialect.md`](mlir_dialect.md) | **The `quantum` MLIR dialect spec** (written spec only; nothing is built). Types, ops, attribute-vs-operand rules, the op↔Rust correspondence table and its two open gaps (symbolic parameters, classical wires), the Phase 2 integration path, and the implied TableGen skeleton. |
+| [`mlir_dialect.md`](mlir_dialect.md) | **The `quantum` MLIR dialect spec** (written spec only; nothing is built). Types, ops, attribute-vs-operand rules, the op↔Rust correspondence table and its one open gap (classical wires), the Phase 2 integration path, and the implied TableGen skeleton. |
 | [`qir_lowering.md`](qir_lowering.md) | **QIR emission.** Target QIR format, where `emit_qir` is called and on which circuit, the op → QIR intrinsic mapping table, angle/qubit encoding, and the conformance caveats (extended intrinsics, mid-circuit measurement and reset, an unconditional and unvalidated `base_profile` label). |
 | [`architecture_decision_no_frontend.md`](architecture_decision_no_frontend.md) | **ADR.** Why no frontend is built before the IR is stable, and how to resist adding one early. |
-| [`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md) | **ADR (binding constraints).** Why pure Rust now, what MLIR adds later, and the constraints C1–C8 that must not change to keep the Phase 2 port mechanical. |
+| [`related_work.md`](related_work.md) | **Positioning.** The QIR spec, PyQIR and MLIR-based quantum compilers, each claim checked against a dated primary source or marked to verify. |
+| [`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md) | **ADR (binding constraints).** The IR contract: constraints C1–C8, what each guarantees about I1–I8, and where each is enforced and tested. |
+| [`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md) | **ADR.** Why the IR is pure Rust, and what MLIR could add later under Stage B. Its constraint table now lives in the IR Contract ADR. |
 
 ## Source map
 
@@ -79,7 +81,7 @@ row, or `oqci watch <file>` to keep seeing them as you edit — see
 | QC-IR → QCO-IR conversion | `src/ir/convert.rs` |
 | QCO-IR → QIR emission | `src/ir/qir.rs` |
 | Error type (`IrError`) | `src/ir/error.rs` |
-| Phase 2 MLIR seam (empty by design) | `src/ir/mlir_compat.rs` |
+| MLIR seam (empty by design; MLIR is optional, Stage B) | `src/ir/mlir_compat.rs` |
 | Compiler orchestrator (`compile`, `compile_circuit`, `CompilerConfig`) | `src/compile.rs` |
 | Pass manager (`Pass`, `PassManager`) | `src/pass/mod.rs` |
 | Optimization passes | `src/pass/{canonicalize,cancellation,rotation_merge,schedule}.rs` |
@@ -115,8 +117,10 @@ optional Python and mdBook stages.
 
 ## Reading order
 
-New contributors: start with [`ir_spec.md`](ir_spec.md) for the IR itself, then
-[`qir_lowering.md`](qir_lowering.md) for the output boundary. Before touching any
-core IR type, read
-[`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md) —
-its constraints C1–C8 are what keep the future MLIR port cheap.
+New contributors: start with
+[`core_architecture/framing-and-research-question.md`](core_architecture/framing-and-research-question.md)
+for what the project is and is not claiming, then [`ir_spec.md`](ir_spec.md)
+for the IR itself, then [`qir_lowering.md`](qir_lowering.md) for the output
+boundary. Before touching any core IR type, read
+[`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md) —
+its constraints C1–C8 are what make every circuit a witness of I1–I8.

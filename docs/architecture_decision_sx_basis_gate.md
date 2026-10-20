@@ -70,9 +70,17 @@ rather than being folded into `Rx`: the two differ by a global phase, and
 - **Cancellation.** `SX`↔`SXdg` join the mutual-inverse table alongside
   `S`↔`Sdg` and `T`↔`Tdg`. Note that `SX` is **not** self-inverse: `SX; SX` is
   `X`, not the identity, so it must not be added to the involution list.
-- **QIR.** `sx` is outside the QIR standard instruction set, so it lowers to a
-  declared extended intrinsic `__quantum__qis__sx__body`, exactly as `p`, `u`,
-  `cy`, `swap` and `ccx` already do. See [`qir_lowering.md`](qir_lowering.md).
+- **QIR.** An `sx` that reaches QIR emission is emitted as
+  `__quantum__qis__sx__body`. QIR 1.0 defines no normative instruction set,
+  and `sx` is not among the instructions PyQIR 0.12.5 exposes, so a module
+  containing it is labeled `custom`, not `base_profile`. Lowering onto the
+  `qir-base` target rewrites it with `sx-to-rx` (`SX = e^{iπ/4}·Rx(π/2)`).
+  That rule is sound for the reason every `UpToGlobalPhase` rule is: nothing
+  in OQCI applies a fragment under control ([`lowering.md`](lowering.md),
+  "The global-phase invariant"). The alternative rejected below — rewriting
+  `sx` to `Rx(π/2)` everywhere — is still rejected: the rewrite happens only
+  for a target that has no `sx`. See [`qir_lowering.md`](qir_lowering.md).
+  *(Amended 2026-09-30.)*
 - **Verification.** Both gates get matrices in the test-only state-vector
   simulator and enter the `proptest` generator, so the cancellation rule is
   covered by the same equivalence property as every other rewrite.
@@ -92,5 +100,5 @@ OQCI cannot simulate cannot be optimized safely, and belongs in `Opaque`.
 | Option | Why not |
 |---|---|
 | Keep `sx` as `Opaque` | Blocks optimization and equivalence-checking of exactly the circuits the IBM-target research depends on (above). |
-| Rewrite `sx` → `Rx(π/2)` during decomposition | Differs by a global phase, so a *controlled* version of the circuit would mean something different. OQCI tracks no global phase (there is no `gphase` op), so the rewrite is not sound in general. |
+| Rewrite `sx` → `Rx(π/2)` during decomposition | Differs by a global phase, so a *controlled* version of the circuit would mean something different. OQCI tracks no global phase (there is no `gphase` op), so the rewrite is not sound in general. *(Clarified 2026-09-30: this rejects making `Rx(π/2)` the IR's representation of `sx`, applied to every circuit. Decomposing `sx` into `Rx(π/2)` during target lowering, for a target that lacks `sx`, is sound under the global-phase invariant — no fragment is ever applied under control — and is what `sx-to-rx` does.)* |
 | Open `GateKind` to arbitrary named gates | Discards exhaustive matching across every pass and the QIR lowering table — the reason the closed-enum-plus-`Opaque` model was chosen in Stage A. |

@@ -1,14 +1,15 @@
-//! MLIR compatibility boundary — **intentionally empty in Phase 0.**
+//! MLIR compatibility boundary — **intentionally empty.**
 //!
 //! This module exists so that the module boundary for MLIR integration is
-//! established *now*, before Phase 2, rather than bolted on later. It is the
-//! single seam through which the future MLIR port will flow, keeping the rest of
-//! the IR (`qc`, `qco`, `convert`, `qir`) free of any MLIR dependency today.
+//! established ahead of any integration rather than bolted on later. It is the
+//! single seam through which an MLIR port would flow, keeping the rest of the
+//! IR (`qc`, `qco`, `convert`, `qir`) free of any MLIR dependency.
 //!
-//! # Phase 2 role
+//! # Role, if MLIR is adopted
 //!
-//! When the MLIR integration lands (see
-//! `docs/architecture_decision_mlir_phase2.md`), this module will host:
+//! If MLIR integration is ever added (see
+//! `docs/architecture_decision_mlir_phase2.md` and Stage B), this module will
+//! host:
 //!
 //! - Conversions between OQCI's pure-Rust IR types and the C++/TableGen-defined
 //!   `quantum` dialect ops, types, and attributes described in
@@ -23,7 +24,7 @@
 //!
 //! The mapping is designed to be *mechanical*. The Rust type boundaries that
 //! must remain stable for that to hold (the `GateKind` closed-enum + `Opaque`
-//! escape hatch, `QubitId`/`ClbitId` newtypes, the `Angle` parameter type, and
-//! parameters-as-attributes / qubits-as-operands separation) are enumerated in
-//! `docs/architecture_decision_mlir_phase2.md`. Do not change them without
-//! updating that ADR.
+//! escape hatch, `QubitId`/`ClbitId` newtypes, the `Angle`/`Param` parameter
+//! types, and parameters-as-attributes / qubits-as-operands separation) are the
+//! IR contract, enumerated in `docs/architecture_decision_ir_contract.md`. Do
+//! not change them without updating that ADR.

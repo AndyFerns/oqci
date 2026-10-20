@@ -384,6 +384,7 @@ a user's first circuit.
 |---|---|---|---|
 | `simulator` | `ideal-simulator@1`, 32 qubits, all-to-all, every registered mnemonic | `uniform` | An unconstrained simulator. Lowering is effectively a no-op, which makes it the control in any comparison. |
 | `simulator-nisq` | `linear-nisq@1`, 5 qubits, linear chain, `{rz, sx, x, cx, measure}`, no reset, no mid-circuit measurement | `nisq-weighted` | A simulator constrained like a small NISQ device. It exercises routing and decomposition while staying runnable, so the same circuit can be run on it and on `simulator` and the results compared. |
+| `qir-base` | `qir-base@1`, 32 qubits, all-to-all, the PyQIR 0.12.5 instruction set (`{x, y, z, h, s, sdg, t, tdg, rx, ry, rz, cx, cz, swap, ccx, measure}`), no reset, no mid-circuit measurement | `uniform` | Not a device: the target to lower onto when the goal is QIR that can honestly be labeled `base_profile` ([`qir_lowering.md`](qir_lowering.md)). Its executable is runnable like any simulator target's. |
 | `ibm-illustrative` | `ibm-illustrative@1`, 5 qubits, ring with two one-way couplings, `{rz, sx, x, cx, measure}` | `nisq-weighted` | **Synthetic. It describes no real device.** |
 
 ### `ibm-illustrative` is not a device

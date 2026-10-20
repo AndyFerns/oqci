@@ -1,0 +1,176 @@
+name: CI
+
+# The project's core quality gates (final-deliverables-spec.md §26): build,
+# tests, formatting, lints and rustdoc on every push and pull request, on the
+# platforms the determinism contract is claimed for. Hardware jobs never run
+# here (§26: not without credentials and an explicit resource policy).
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: rust (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # build.rs records the git commit in provenance; a full clone keeps
+          # that value real rather than "unknown".
+          fetch-depth: 0
+
+      # rust-toolchain.toml pins the compiler and components; rustup reads it
+      # on the first cargo invocation.
+      - name: Show toolchain
+        run: rustup show
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # oqci-python is a PyO3 extension module: it links against the Python
+      # interpreter only when loaded, so its tests run in the python job.
+      - name: Test
+        run: cargo test --workspace --exclude oqci-python
+
+      - name: Rustdoc
+        run: cargo doc --no-deps --workspace --exclude oqci-python
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  python:
+    name: python (ubuntu-latest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show toolchain
+        run: rustup show
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the extension and run the Python tests
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r python/requirements-dev.txt
+          maturin develop --manifest-path python/Cargo.toml
+          pytest python/tests -q
+
+  # External validation of every QIR module OQCI emits
+  # (final-deliverables-spec.md §14.3). tests/qir_conformance.rs checks the
+  # Base Profile structure itself and writes the corpus; these jobs hand the
+  # same files to tools OQCI did not write. What each proves is stated in
+  # docs/qir_lowering.md §4.
+  qir-validate:
+    name: qir (PyQIR 0.12.5, llvm-as 18)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show toolchain
+        run: rustup show
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Write the QIR corpus
+        run: cargo test --test qir_conformance
+        env:
+          OQCI_QIR_CORPUS_DIR: ${{ github.workspace }}/qir-corpus
+
+      - name: Install LLVM 18
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-18
+          llvm-as-18 --version
+
+      - name: llvm-as 18 (opaque and typed)
+        run: |
+          set -euo pipefail
+          for module in qir-corpus/opaque/*.ll qir-corpus/typed/*.ll; do
+            llvm-as-18 "$module" -o /dev/null
+            echo "ok  $module"
+          done
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: PyQIR 0.12.5 (opaque and typed)
+        run: |
+          pip install -r python/requirements-qir.txt
+          python scripts/validate_qir.py qir-corpus/opaque
+          python scripts/validate_qir.py qir-corpus/typed
+
+  qir-typed-llvm14:
+    name: qir (typed pointers, llvm-as 14)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show toolchain
+        run: rustup show
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Write the QIR corpus
+        run: cargo test --test qir_conformance
+        env:
+          OQCI_QIR_CORPUS_DIR: ${{ github.workspace }}/qir-corpus
+
+      - name: Install LLVM 14
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-14
+          llvm-as-14 --version
+
+      # LLVM 14 defaults to typed pointers, the spelling of the QIR 1.0
+      # specification's own examples, so only the typed corpus is given to it.
+      - name: llvm-as 14 (typed)
+        run: |
+          set -euo pipefail
+          for module in qir-corpus/typed/*.ll; do
+            llvm-as-14 "$module" -o /dev/null
+            echo "ok  $module"
+          done

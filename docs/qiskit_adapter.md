@@ -88,9 +88,9 @@ qir = oqci.qiskit_to_qir(qc)
 | Function | Purpose |
 |---|---|
 | `oqci.compile(circuit, backend=…, bindings=…, passes=…, disable=…, …)` | The whole pipeline, returning the same dict an OpenQASM program gets, with `"frontend": "qiskit"`. `name` defaults to the circuit's own `name`. Native: `compile_qiskit`. |
-| `qiskit_to_qir(circuit, bindings=None)` | Compile a `QuantumCircuit` straight to QIR text, with no optimization or lowering. `bindings` keys may be parameter names or `Parameter` objects. |
+| `qiskit_to_qir(circuit, bindings=None, *, backend=None, qir_profile="any", qir_pointers="opaque")` | Compile a `QuantumCircuit` and return its canonical QIR 1.0 text. Since `0.5.0` the circuit is **optimized** first, and lowered when `backend` is given (before, QIR came from the unoptimized circuit). The module is labeled `base_profile` only when the circuit qualifies; `backend="qir-base"` lowers it into the Base instruction set, and `qir_profile="base"` raises instead of returning `custom`. See [`qir_lowering.md`](qir_lowering.md). `bindings` keys may be parameter names or `Parameter` objects. |
 | `qiskit_parameters(circuit)` | The circuit's free parameters *as OQCI sees them*. A name Qiskit reports but this omits reached OQCI inside a compound expression. |
-| `qasm3_to_qir(source, bindings=None)` | The OpenQASM 3 path, through the same IR and the same gate table. |
+| `qasm3_to_qir(source, bindings=None, *, backend=None, qir_profile="any", qir_pointers="opaque")` | The OpenQASM 3 path, through the same IR, the same gate table and the same pipeline. |
 
 `python/tests/test_frontends.py` checks that a Qiskit circuit compiles to the
 same executable as its OpenQASM twin, and that the result runs correctly on

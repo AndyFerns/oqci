@@ -898,6 +898,32 @@ static BUILTIN: &[DecompositionRule] = &[
         note: "SX has order four, so SX cubed is its inverse",
     },
     DecompositionRule {
+        id: "sx-to-rx",
+        source: "sx",
+        source_arity: 1,
+        source_params: 0,
+        steps: &[RuleStep {
+            op: "rx",
+            operands: &[0],
+            params: &[Constant(FRAC_PI_2)],
+        }],
+        exactness: Exactness::UpToGlobalPhase,
+        note: "SX = e^(i pi/4) Rx(pi/2); used where the target's basis has rx but no sx",
+    },
+    DecompositionRule {
+        id: "sxdg-to-rx",
+        source: "sxdg",
+        source_arity: 1,
+        source_params: 0,
+        steps: &[RuleStep {
+            op: "rx",
+            operands: &[0],
+            params: &[Constant(-FRAC_PI_2)],
+        }],
+        exactness: Exactness::UpToGlobalPhase,
+        note: "SXdg = e^(-i pi/4) Rx(-pi/2); used where the target's basis has rx but no sx",
+    },
+    DecompositionRule {
         id: "h-to-rz-sx",
         source: "h",
         source_arity: 1,
@@ -1052,5 +1078,30 @@ static BUILTIN: &[DecompositionRule] = &[
         ],
         exactness: Exactness::UpToGlobalPhase,
         note: "the standard ZSXZSXZ form for an arbitrary one-qubit unitary",
+    },
+    DecompositionRule {
+        id: "u-to-rz-ry",
+        source: "u",
+        source_arity: 1,
+        source_params: 3,
+        steps: &[
+            RuleStep {
+                op: "rz",
+                operands: &[0],
+                params: &[ParamTransform::passthrough(2)],
+            },
+            RuleStep {
+                op: "ry",
+                operands: &[0],
+                params: &[ParamTransform::passthrough(0)],
+            },
+            RuleStep {
+                op: "rz",
+                operands: &[0],
+                params: &[ParamTransform::passthrough(1)],
+            },
+        ],
+        exactness: Exactness::UpToGlobalPhase,
+        note: "U(theta, phi, lambda) = e^(i(phi+lambda)/2) Rz(phi) Ry(theta) Rz(lambda); every angle passes through unchanged, so symbolic parameters survive",
     },
 ];

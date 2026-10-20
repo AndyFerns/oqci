@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use oqci::analysis::diff_circuits;
 use oqci::cli::snapshot::{self, PassRecordView, PipelineReport, StageSnapshot};
 use oqci::compile::{CompilationArtifacts, CompilerConfig, Frontend, Stop};
-use oqci::ir::{emit_qir, qc_to_qco};
+use oqci::ir::qc_to_qco;
 
 use crate::error::ServerError;
 
@@ -78,6 +78,7 @@ fn build_report(
         instructions: Some(snapshot::instructions_of(&artifacts.source_circuit)),
         graph: None,
         qir: None,
+        qir_info: None,
         unavailable: None,
     });
 
@@ -87,6 +88,7 @@ fn build_report(
         instructions: Some(snapshot::instructions_of(&artifacts.optimized)),
         graph: None,
         qir: None,
+        qir_info: None,
         unavailable: None,
     });
 
@@ -97,16 +99,21 @@ fn build_report(
         instructions: None,
         graph: Some(snapshot::graph_of(&dag)?),
         qir: None,
+        qir_info: None,
         unavailable: None,
     });
 
-    if artifacts.optimized.is_concrete() {
+    // The compilation's canonical QIR artifact, never emitted here: it comes
+    // from the most-lowered circuit (the lowered one when a backend was
+    // selected), and `qir_info` says which, with its profile label.
+    if let Some(qir) = &artifacts.qir {
         report.stages.push(StageSnapshot {
             stage: "qir".into(),
             metrics: None,
             instructions: None,
             graph: None,
-            qir: Some(emit_qir(&dag)?),
+            qir: Some(qir.text.clone()),
+            qir_info: Some(snapshot::QirInfoView::new(qir)),
             unavailable: None,
         });
     } else {
@@ -116,9 +123,10 @@ fn build_report(
             instructions: None,
             graph: None,
             qir: None,
+            qir_info: None,
             unavailable: Some(format!(
                 "circuit has unbound parameter(s): {}; supply bindings to enable QIR emission",
-                artifacts.optimized.parameters().join(", ")
+                artifacts.final_circuit().parameters().join(", ")
             )),
         });
     }
@@ -130,6 +138,7 @@ fn build_report(
             instructions: Some(snapshot::instructions_of(&lowered.circuit)),
             graph: None,
             qir: None,
+            qir_info: None,
             unavailable: None,
         });
 

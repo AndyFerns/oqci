@@ -32,11 +32,17 @@ use crate::analysis::{ResourceReport, analyze};
 use crate::backend::{
     BackendError, Executable, ExecutionSettings, Provenance, simulator::provenance_for,
 };
+use serde::Serialize;
+
 use crate::frontend::{FrontendError, parse_cudaq_named, parse_openqasm3_named};
-use crate::ir::{Circuit, IrError, bind_parameters};
+use crate::ir::qir::emit_qir_base;
+use crate::ir::{
+    Circuit, IrError, PointerStyle, QirOptions, QirProfile, bind_parameters, emit_qir_with,
+    qc_to_qco,
+};
 use crate::lowering::{Lowered, LoweringConfig};
 use crate::pass::{PassContext, PassError, PassManager, PassRecord, PassSelection};
-use crate::target::Cost;
+use crate::target::{Cost, Violation, builtin, check};
 
 /// Which frontend to read source text with.
 ///
@@ -132,6 +138,89 @@ pub struct CompilerConfig {
     pub settings: ExecutionSettings,
     /// Where to stop.
     pub stop: Stop,
+    /// How to emit the canonical QIR artifact.
+    pub qir: QirRequest,
+}
+
+/// What a compilation must do about its QIR output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct QirRequest {
+    /// How pointers are spelled.
+    pub pointers: PointerStyle,
+    /// Whether a module that is not Base Profile is acceptable.
+    pub profile: QirProfileRequirement,
+}
+
+/// Whether compilation may produce a `custom`-labeled QIR module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum QirProfileRequirement {
+    /// Emit `base_profile` when the circuit qualifies, `custom` otherwise.
+    #[default]
+    Any,
+    /// Emit `base_profile` or fail with [`CompileError::QirProfile`].
+    Base,
+}
+
+impl QirProfileRequirement {
+    /// A stable identifier, used on the command line and by the Python SDK.
+    #[must_use]
+    pub fn id(self) -> &'static str {
+        match self {
+            QirProfileRequirement::Any => "any",
+            QirProfileRequirement::Base => "base",
+        }
+    }
+
+    /// Resolves an [`id`](QirProfileRequirement::id).
+    #[must_use]
+    pub fn from_id(id: &str) -> Option<QirProfileRequirement> {
+        [QirProfileRequirement::Any, QirProfileRequirement::Base]
+            .into_iter()
+            .find(|requirement| requirement.id() == id)
+    }
+}
+
+/// Which circuit a QIR artifact was emitted from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QirStage {
+    /// The optimized circuit: no backend was selected, or compilation stopped
+    /// before lowering.
+    Optimized,
+    /// The lowered, target-legal circuit.
+    Lowered,
+}
+
+impl QirStage {
+    /// A stable identifier, for reports.
+    #[must_use]
+    pub fn id(self) -> &'static str {
+        match self {
+            QirStage::Optimized => "optimized",
+            QirStage::Lowered => "lowered",
+        }
+    }
+}
+
+/// The canonical QIR output of a compilation.
+///
+/// One per compilation, emitted from the most-lowered circuit available
+/// (`final-deliverables-spec.md` §14.2). Every tool that shows QIR — the CLI,
+/// the Python SDK, the visualization server — takes it from here rather than
+/// emitting its own.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct QirArtifact {
+    /// The module text.
+    pub text: String,
+    /// The `"qir_profiles"` label the module carries.
+    pub profile: QirProfile,
+    /// Which circuit it was emitted from.
+    pub stage: QirStage,
+    /// How its pointers are spelled.
+    pub pointers: PointerStyle,
+    /// Why the module is not `base_profile`: the circuit's violations of the
+    /// `qir-base` target profile. Empty for a Base module.
+    pub base_violations: Vec<Violation>,
 }
 
 /// Why compilation failed.
@@ -165,6 +254,17 @@ pub enum CompileError {
         /// What the backend refused.
         #[from]
         source: BackendError,
+    },
+    /// Strict QIR mode was requested and the circuit does not qualify for the
+    /// QIR Base Profile.
+    #[error(
+        "the circuit cannot be emitted as a QIR Base Profile module (lower it onto the \
+         `qir-base` backend, or drop the strict profile requirement); violations of \
+         the qir-base profile: {violations:?}"
+    )]
+    QirProfile {
+        /// The circuit's violations of the `qir-base` target profile.
+        violations: Vec<Violation>,
     },
     /// The configuration named a backend that does not exist.
     #[error("unknown backend `{requested}`; available: {available}")]
@@ -203,6 +303,11 @@ pub struct CompilationArtifacts {
     pub backend_id: Option<String>,
     /// Everything needed to cite a result, when a backend was selected.
     pub provenance: Option<Provenance>,
+    /// The canonical QIR output, emitted from [`final_circuit`]. `None` iff
+    /// that circuit still has unbound parameters (QIR needs concrete values).
+    ///
+    /// [`final_circuit`]: CompilationArtifacts::final_circuit
+    pub qir: Option<QirArtifact>,
 }
 
 impl CompilationArtifacts {
@@ -315,19 +420,23 @@ pub fn compile_circuit(
         cost: None,
         backend_id: backend.as_ref().map(|b| b.id().to_string()),
         provenance: None,
+        qir: None,
     };
 
     let Some(backend) = backend else {
         // Target-independent compilation is a complete result, not a failure
         // to reach a target. There is nothing to lower *to*.
+        artifacts.qir = canonical_qir(&artifacts.optimized, QirStage::Optimized, &config.qir)?;
         return Ok(artifacts);
     };
     if config.stop == Stop::Optimized {
+        artifacts.qir = canonical_qir(&artifacts.optimized, QirStage::Optimized, &config.qir)?;
         return Ok(artifacts);
     }
 
     // --- Target lowering ---
     let lowered = backend.lower(&artifacts.optimized, &config.lowering)?;
+    artifacts.qir = canonical_qir(&lowered.circuit, QirStage::Lowered, &config.qir)?;
     artifacts.cost = Some(
         backend
             .cost_model()
@@ -360,6 +469,56 @@ pub fn compile_circuit(
     artifacts.executable = Some(backend.prepare(&lowered, &config.settings, provenance)?);
     artifacts.lowered = Some(lowered);
     Ok(artifacts)
+}
+
+/// Emits the canonical QIR artifact for `circuit`.
+///
+/// The label is decided by checking the circuit against the `qir-base` target
+/// profile — the same legality check lowering uses — sized to the circuit's
+/// own register: legal means every gate is in the Base Profile's instruction
+/// set, measurements are terminal and nothing resets. Only then is the module
+/// emitted, and labeled, as `base_profile`.
+///
+/// # Errors
+///
+/// [`CompileError::QirProfile`] when [`QirProfileRequirement::Base`] was asked
+/// for and the circuit does not qualify; IR errors from emission.
+fn canonical_qir(
+    circuit: &Circuit,
+    stage: QirStage,
+    request: &QirRequest,
+) -> Result<Option<QirArtifact>, CompileError> {
+    let options = QirOptions {
+        pointers: request.pointers,
+    };
+    let report = check(circuit, &builtin::qir_base(circuit.num_qubits().max(1)));
+
+    if report.is_legal() {
+        let text = emit_qir_base(&qc_to_qco(circuit)?, &options)?;
+        return Ok(Some(QirArtifact {
+            text,
+            profile: QirProfile::Base,
+            stage,
+            pointers: request.pointers,
+            base_violations: Vec::new(),
+        }));
+    }
+    if request.profile == QirProfileRequirement::Base {
+        return Err(CompileError::QirProfile {
+            violations: report.violations,
+        });
+    }
+    if !circuit.is_concrete() {
+        return Ok(None);
+    }
+    let text = emit_qir_with(&qc_to_qco(circuit)?, &options)?;
+    Ok(Some(QirArtifact {
+        text,
+        profile: QirProfile::Custom,
+        stage,
+        pointers: request.pointers,
+        base_violations: report.violations,
+    }))
 }
 
 /// Every backend this build can compile for, as `(id, description)`.
@@ -550,6 +709,117 @@ mod tests {
             twice.lowered.as_ref().unwrap().circuit
         );
         assert_eq!(once.executable, twice.executable);
+        assert_eq!(once.qir, twice.qir);
+    }
+
+    fn qir_of(source: &str, config: &CompilerConfig) -> QirArtifact {
+        compile(source, config)
+            .unwrap()
+            .qir
+            .expect("a concrete circuit always yields QIR")
+    }
+
+    #[test]
+    fn a_circuit_inside_the_qir_base_instruction_set_is_labeled_base() {
+        // h, cx and terminal measurements are all in qir-base, so even the
+        // target-independent (optimized) circuit qualifies.
+        let qir = qir_of(BELL, &config(None));
+        assert_eq!(qir.profile, QirProfile::Base);
+        assert_eq!(qir.stage, QirStage::Optimized);
+        assert!(qir.base_violations.is_empty());
+        assert!(qir.text.contains("\"qir_profiles\"=\"base_profile\""));
+        assert!(qir.text.contains("measurements:"));
+    }
+
+    #[test]
+    fn qir_comes_from_the_lowered_circuit_when_there_is_one() {
+        // Lowered onto linear-nisq, `h` becomes `rz; sx; rz`, and `sx` is not
+        // in qir-base: the module must say `custom`, and say why.
+        let qir = qir_of(BELL, &config(Some("simulator-nisq")));
+        assert_eq!(qir.stage, QirStage::Lowered);
+        assert_eq!(qir.profile, QirProfile::Custom);
+        assert!(qir.text.contains("\"qir_profiles\"=\"custom\""));
+        assert!(qir.text.contains("__quantum__qis__sx__body"));
+        assert!(!qir.base_violations.is_empty());
+    }
+
+    #[test]
+    fn lowering_onto_qir_base_makes_any_supported_circuit_base() {
+        let source = "qubit[2] q; bit[2] c; sx q[0]; u(0.1, 0.2, 0.3) q[1]; \
+                      cy q[0], q[1]; p(0.5) q[0]; c = measure q;";
+        assert_eq!(qir_of(source, &config(None)).profile, QirProfile::Custom);
+
+        let qir = qir_of(source, &config(Some("qir-base")));
+        assert_eq!(qir.profile, QirProfile::Base);
+        assert_eq!(qir.stage, QirStage::Lowered);
+        for absent in ["sx__body", "__u__body", "cy__body", "__p__body"] {
+            assert!(!qir.text.contains(absent), "`{absent}` survived lowering");
+        }
+    }
+
+    #[test]
+    fn mid_circuit_measurement_and_reset_are_never_labeled_base() {
+        let mid = "qubit[2] q; bit[1] c; h q[0]; c[0] = measure q[0]; x q[0];";
+        assert_eq!(qir_of(mid, &config(None)).profile, QirProfile::Custom);
+        let reset = "qubit[1] q; reset q[0]; h q[0];";
+        assert_eq!(qir_of(reset, &config(None)).profile, QirProfile::Custom);
+    }
+
+    #[test]
+    fn strict_base_mode_refuses_instead_of_emitting_custom() {
+        let strict = |backend: Option<&str>| CompilerConfig {
+            qir: QirRequest {
+                profile: QirProfileRequirement::Base,
+                ..QirRequest::default()
+            },
+            ..config(backend)
+        };
+        let err = compile(BELL, &strict(Some("simulator-nisq"))).unwrap_err();
+        assert!(matches!(err, CompileError::QirProfile { .. }), "got {err}");
+        assert!(compile(BELL, &strict(Some("qir-base"))).is_ok());
+    }
+
+    #[test]
+    fn an_unbound_circuit_has_no_qir_unless_strict_mode_makes_that_an_error() {
+        let source = "input float[64] theta; qubit[1] q; rz(theta) q[0];";
+        assert!(compile(source, &config(None)).unwrap().qir.is_none());
+
+        let strict = CompilerConfig {
+            qir: QirRequest {
+                profile: QirProfileRequirement::Base,
+                ..QirRequest::default()
+            },
+            ..config(None)
+        };
+        assert!(matches!(
+            compile(source, &strict).unwrap_err(),
+            CompileError::QirProfile { .. }
+        ));
+    }
+
+    #[test]
+    fn the_pointer_style_is_honoured_and_recorded() {
+        let typed = CompilerConfig {
+            qir: QirRequest {
+                pointers: PointerStyle::Typed,
+                ..QirRequest::default()
+            },
+            ..config(None)
+        };
+        let qir = qir_of(BELL, &typed);
+        assert_eq!(qir.pointers, PointerStyle::Typed);
+        assert!(qir.text.contains("%Qubit*"));
+    }
+
+    #[test]
+    fn qir_request_ids_round_trip() {
+        for requirement in [QirProfileRequirement::Any, QirProfileRequirement::Base] {
+            assert_eq!(
+                QirProfileRequirement::from_id(requirement.id()),
+                Some(requirement)
+            );
+        }
+        assert_eq!(QirStage::Lowered.id(), "lowered");
     }
 
     const BELL_CUDAQ: &str = "import cudaq\n\n@cudaq.kernel\ndef bell():\n    q = cudaq.qvector(2)\n    h(q[0])\n    x.ctrl(q[0], q[1])\n    mz(q[0])\n    mz(q[1])\n";

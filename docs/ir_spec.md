@@ -16,7 +16,8 @@ QC-IR → QCO-IR conversion is semantics-preserving.
 
 All IR levels share a small set of value types (`src/ir/types.rs`). They are
 newtype-wrapped rather than raw primitives so that they map one-to-one onto
-typed MLIR SSA values / attributes in Phase 2 (see §7 and `mlir_dialect.md`).
+typed MLIR SSA values / attributes if MLIR is ever adopted (see §7 and
+`mlir_dialect.md`).
 
 | Type | Rust | Meaning | Range / domain |
 |------|------|---------|----------------|
@@ -31,7 +32,7 @@ bare `u32` for a classical bit are interchangeable to the compiler and to the
 type checker; a `QubitId`/`ClbitId` split makes "measure this classical bit as
 if it were a qubit" a *compile error*, and makes the eventual MLIR mapping
 (`!quantum.qubit` vs `!quantum.result`) mechanical. `Angle` is a distinct type
-so that Phase 2 can substitute MLIR's `FloatAttr` representation without editing
+so that an MLIR port could substitute `FloatAttr` without editing
 any call site. All three carry zero runtime cost.
 
 **Angles are not normalised.** An `Angle` stores exactly the radian value it was
@@ -375,5 +376,6 @@ the full table is in [`mlir_dialect.md`](mlir_dialect.md). In brief:
 `Instruction::Gate → quantum.gate`, `Measure → quantum.measure`,
 `Reset → quantum.reset`; `QubitId → !quantum.qubit` SSA value,
 `ClbitId → !quantum.result`; gate params → attributes; qubit operands → SSA
-operands. The binding constraints that keep the Phase 2 port mechanical are in
-[`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md).
+operands. The binding constraints that make every circuit a witness of I1–I8,
+and that keep an MLIR port mechanical, are in
+[`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md).

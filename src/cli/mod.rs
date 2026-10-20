@@ -131,6 +131,48 @@ struct InputArgs {
     /// Check the circuit against a target profile (see `oqci targets`).
     #[arg(long, value_name = "ID")]
     target: Option<String>,
+    /// Which QIR profile is acceptable: `any` labels a module `base_profile`
+    /// when the circuit qualifies and `custom` otherwise; `base` refuses
+    /// instead of emitting `custom`.
+    #[arg(long, value_enum, default_value_t = QirProfileArg::Any)]
+    qir_profile: QirProfileArg,
+    /// How QIR spells pointers: `opaque` (`ptr`, LLVM 17+) or `typed`
+    /// (`%Qubit*`, as in the QIR 1.0 specification's examples).
+    #[arg(long, value_enum, default_value_t = QirPointersArg::Opaque)]
+    qir_pointers: QirPointersArg,
+}
+
+/// Which QIR profile a compilation may produce.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum QirProfileArg {
+    /// `base_profile` when the circuit qualifies, `custom` otherwise.
+    Any,
+    /// `base_profile`, or an error naming why the circuit does not qualify.
+    Base,
+}
+
+/// How QIR spells pointers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum QirPointersArg {
+    /// Opaque pointers, `ptr`.
+    Opaque,
+    /// Typed pointers, `%Qubit*` / `%Result*`.
+    Typed,
+}
+
+impl InputArgs {
+    fn qir_request(&self) -> crate::compile::QirRequest {
+        crate::compile::QirRequest {
+            pointers: match self.qir_pointers {
+                QirPointersArg::Opaque => crate::ir::PointerStyle::Opaque,
+                QirPointersArg::Typed => crate::ir::PointerStyle::Typed,
+            },
+            profile: match self.qir_profile {
+                QirProfileArg::Any => crate::compile::QirProfileRequirement::Any,
+                QirProfileArg::Base => crate::compile::QirProfileRequirement::Base,
+            },
+        }
+    }
 }
 
 #[derive(Debug, clap::Args)]
@@ -301,19 +343,20 @@ fn dispatch(cli: Cli) -> Result<(), CliError> {
     match cli.command {
         Command::Compile(args) => {
             let input = prepare(&args.input, &args.emit)?;
-            let report = pipeline::run_compile(
+            let report = pipeline::run_compile_with(
                 &args.input.input,
                 &input.source,
                 &input.bindings,
                 &input.emit,
                 input.target.as_ref(),
+                &args.input.qir_request(),
             )?;
             emit_report(&report, args.input.json, false)
         }
         Command::Optimize(args) => {
             let input = prepare(&args.input, &args.emit)?;
             let selection = selection_from(&args.passes, &args.disable)?;
-            let report = pipeline::run_optimize(
+            let report = pipeline::run_optimize_with(
                 &args.input.input,
                 &input.source,
                 &input.bindings,
@@ -321,6 +364,7 @@ fn dispatch(cli: Cli) -> Result<(), CliError> {
                 &input.emit,
                 args.diff,
                 input.target.as_ref(),
+                &args.input.qir_request(),
             )?;
             emit_report(&report, args.input.json, false)
         }
@@ -360,6 +404,7 @@ fn dispatch(cli: Cli) -> Result<(), CliError> {
                     emit: &input.emit,
                     want_diff: args.diff,
                     prepare: false,
+                    qir: args.input.qir_request(),
                 },
             )?;
             emit_report(&report, args.input.json, false)
@@ -382,6 +427,7 @@ fn dispatch(cli: Cli) -> Result<(), CliError> {
                     emit: &[],
                     want_diff: false,
                     prepare: true,
+                    qir: args.input.qir_request(),
                 },
             )?;
             write_executable(&report, args.output.as_deref(), args.input.json)
@@ -522,15 +568,16 @@ fn run_watch(args: &WatchArgs) -> Result<(), CliError> {
     };
     let (mode, diff, as_json) = (args.mode, args.diff, args.input.json);
     let target = resolve_target(args.input.target.as_deref())?;
+    let qir = args.input.qir_request();
 
     watch::watch(&path.clone(), move || {
         // Re-read every time: the file is the input, and it just changed.
         let source = read(&path)?;
         let report = match mode {
             Mode::Compile => {
-                pipeline::run_compile(&path, &source, &bindings, &emit, target.as_ref())?
+                pipeline::run_compile_with(&path, &source, &bindings, &emit, target.as_ref(), &qir)?
             }
-            Mode::Optimize => pipeline::run_optimize(
+            Mode::Optimize => pipeline::run_optimize_with(
                 &path,
                 &source,
                 &bindings,
@@ -538,6 +585,7 @@ fn run_watch(args: &WatchArgs) -> Result<(), CliError> {
                 &emit,
                 diff,
                 target.as_ref(),
+                &qir,
             )?,
         };
         if as_json {
@@ -625,7 +673,8 @@ fn list_targets() {
     }
     println!(
         "use --target ID on `compile`, `optimize` or `analyze` to check a circuit\n\
-         against one. Both profiles are synthetic: neither describes real hardware."
+         against one. All are synthetic: none describes real hardware, and
+         `qir-base` describes an output format (the QIR Base Profile)."
     );
     println!();
     println!("`--target ID` checks a circuit against one of these and reports.");

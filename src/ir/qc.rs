@@ -1,6 +1,6 @@
 //! QC-IR — the imperative quantum circuit IR.
 //!
-//! QC-IR is the direct lowering target for future frontends (Phase 1). It is a
+//! QC-IR is the direct lowering target of every frontend. It is a
 //! *sequential* list of [`Instruction`]s over a fixed qubit register and a
 //! fixed classical register, mirroring how a source program is written: gates
 //! in program order, measurements writing into classical bits, and resets.

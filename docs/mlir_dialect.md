@@ -2,16 +2,19 @@
 
 **Status:** written spec only. **No TableGen, C++, or FFI exists in the
 repository.** This document defines the dialect that OQCI's Rust IR types
-(`src/ir/`) mirror one-to-one, so that Phase 2 MLIR integration is a *mechanical
-translation, not a redesign*. The binding constraints that keep it mechanical
-are recorded in
-[`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md).
+(`src/ir/`) mirror one-to-one, so that MLIR integration, if it is ever
+undertaken (Stage B), is a *mechanical translation, not a redesign*. The constraints that keep it mechanical are the
+IR contract,
+[`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md);
+whether MLIR is adopted at all is
+[`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md)
+and Stage B.
 
 The correspondence is intended to be total: **every** QC-IR/QCO-IR op has a named
 MLIR op counterpart here, **every** Rust type boundary that would become an MLIR
 type constraint is stated, and **every** field is classified as attribute vs.
-operand. Two gaps are currently open and are marked where they occur:
-symbolic gate parameters (§2) and classical-bit wires (§6).
+operand. One gap is currently open and is marked where it occurs:
+classical-bit wires (§6).
 
 ---
 
@@ -38,13 +41,27 @@ symbolic gate parameters (§2) and classical-bit wires (§6).
 **Type-constraint rationale.** In Rust the newtypes make `QubitId` and `ClbitId`
 non-interchangeable; in MLIR the same guarantee is a *type constraint* on op
 operands (a `quantum.gate` operand must be `!quantum.qubit`). The Rust newtype is
-the cheap stand-in for that constraint today, so the Phase 2 verifier rule is
+the cheap stand-in for that constraint today, so the MLIR verifier rule is
 already implied by the Rust type. Gate parameters in the Rust IR are `Param`
-values (`ir_spec.md` §1.1): either `Concrete(Angle)` or `Symbol(String)`. A
-concrete `Angle` maps to a `FloatAttr`. **How a `Param::Symbol` maps is not yet
-specified**: the `params` attribute below is typed for concrete values only,
-so a circuit with an unbound symbol has no representation in this dialect as
-written.
+values (`ir_spec.md` §1.1): either `Concrete(Angle)` or `Symbol(String)`.
+Both stay **attributes**, so the attribute-vs-operand rule of §3 (and IR
+contract C2) holds for symbolic circuits too:
+
+| `Param` | Attribute | Constraint |
+|---|---|---|
+| `Concrete(Angle)` | `FloatAttr` (`f64`, radians) | finite (I7) |
+| `Symbol(name)` | `StringAttr` holding the symbol's name | non-empty (I8) |
+
+The `params` attribute is therefore an array whose elements are each a
+`FloatAttr` or a `StringAttr`, in canonical parameter order. A symbol is a
+*name awaiting binding*, not a value: it is not an SSA operand, and nothing in
+the dialect computes with it, exactly as in the Rust IR, where
+`bind_parameters` is the only way a symbol becomes a number (Stage F §8).
+
+*Alternative considered and rejected:* making symbols `f64` SSA operands of
+the circuit region. That would move parameters across the
+attribute-vs-operand boundary for symbolic circuits only, so the same gate
+would lower differently depending on whether its angle was bound.
 
 ## 3. Attributes vs. operands — the central mapping rule
 
@@ -79,7 +96,7 @@ are SSA operands and, under value semantics, are also results.
 | Slot | Contents | Rust source |
 |------|----------|-------------|
 | attr `gate` | gate mnemonic, e.g. `"h"`, `"cx"`, `"rz"`, `"sx"`, `"sxdg"` | `GateKind::mnemonic()` |
-| attr `params` | `array<f64>`, canonical param order — concrete values only; see §2 | `GateKind::params()` |
+| attr `params` | array of `FloatAttr` (concrete) / `StringAttr` (symbol), canonical param order; see §2 | `GateKind::params()` |
 | operands | `variadic<!quantum.qubit>`, control(s) then target | `Instruction::qubits` |
 | results | one `!quantum.qubit` per operand (value semantics) | threaded in QCO-IR |
 
@@ -97,7 +114,7 @@ mnemonic, `#operands == GateKind::arity()`, and operands are pairwise distinct
 
 Operand: one `!quantum.qubit`. Results: the post-measurement qubit value and one
 `!quantum.result`. The `target` `ClbitId` becomes the SSA identity of the
-`!quantum.result`. Non-unitary — a Phase 2 op trait `Collapsing` marks it so
+`!quantum.result`. Non-unitary — an op trait `Collapsing` marks it so
 passes can honor the control-dependency barrier.
 
 ### 4.3 `quantum.reset`  ⟵  `Instruction::Reset { qubit }`
@@ -129,7 +146,8 @@ listed here because the Rust IR materialises them as nodes.
 | `NodeKind::Output` | region terminator operand | — | qubit/result | — |
 | `QubitId` | `!quantum.qubit` value | — | — | — |
 | `ClbitId` | `!quantum.result` value | — | — | — |
-| `Angle` | `FloatAttr` (`f64`) | (is an attribute) | — | — |
+| `Param::Concrete(Angle)` | `FloatAttr` (`f64`) | (is an attribute) | — | — |
+| `Param::Symbol(name)` | `StringAttr` | (is an attribute) | — | — |
 
 The table is complete at the *op* level and stays complete as `GateKind` grows:
 every registered gate is the same `quantum.gate` op distinguished by its `gate`
@@ -167,10 +185,13 @@ it (`ir_spec.md` §4.1, §5). This dialect has no classical block arguments,
 fresh `!quantum.result` — so the example above drops `%r0`, and a classical bit
 written by two measurements has no representation.
 
-## 7. Phase 2 integration path
+## 7. Integration path, if MLIR is adopted
 
-What Phase 2 adds on top of this spec (see the ADR for the "why" and the
-non-negotiable constraints):
+What an MLIR integration would add on top of this spec (see
+[`architecture_decision_mlir_phase2.md`](architecture_decision_mlir_phase2.md)
+for the "why" and
+[`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md)
+for the non-negotiable constraints):
 
 1. **TableGen definitions** (§8) generating the C++ op classes.
 2. **A pass manager** hosting optimization passes over `quantum.circuit`
@@ -203,10 +224,11 @@ def Quantum_ResultType : TypeDef<Quantum_Dialect, "Result"> { let mnemonic = "re
 // QuantumOps.td      —— from src/ir/qc.rs Instruction + qco.rs boundaries
 def Quantum_GateOp : Op<Quantum_Dialect, "gate", [Pure]> {
   let arguments = (ins StrAttr:$gate,                    // GateKind::mnemonic()
-                       F64ArrayAttr:$params,             // GateKind::params(); concrete only (§2)
+                       TypedArrayAttrBase<AnyAttrOf<[F64Attr, StrAttr]>,
+                           "gate parameters">:$params,  // GateKind::params(); §2
                        Variadic<Quantum_QubitType>:$qubits);
   let results   = (outs Variadic<Quantum_QubitType>:$out);
-  let hasVerifier = 1;                                   // encodes I3, I4
+  let hasVerifier = 1;                         // encodes I3, I4, I7, I8
 }
 def Quantum_MeasureOp : Op<Quantum_Dialect, "measure", [Collapsing]> {
   let arguments = (ins Quantum_QubitType:$qubit);
@@ -229,7 +251,8 @@ def Quantum_ReturnOp : Op<Quantum_Dialect, "return", [Terminator]> {
 Mapping back to the source of truth: `GateOp` ⟵ `Instruction::Gate`,
 `MeasureOp` ⟵ `Instruction::Measure`, `ResetOp` ⟵ `Instruction::Reset`,
 `CircuitOp`/`ReturnOp` ⟵ `QcoCircuit` + `Input`/`Output` boundary nodes,
-`QubitType`/`ResultType` ⟵ `QubitId`/`ClbitId`, the `$params` attr ⟵ `Angle`
-list. The `Collapsing` trait is the MLIR encoding of QCO-IR's `DepKind::Control`
+`QubitType`/`ResultType` ⟵ `QubitId`/`ClbitId`, the `$params` attr ⟵ the
+`Param` list. The `Collapsing` trait is the MLIR encoding of QCO-IR's `DepKind::Control`
 barrier (`ir_spec.md` §4.2). The `hasVerifier` on `GateOp` is where Rust
-invariants I3/I4 move.
+invariants I3/I4 (arity, distinct operands) and I7/I8 (finite concrete
+parameters, non-empty symbol names) move.

@@ -196,3 +196,28 @@ def test_the_circuits_themselves_are_returned():
     assert len(artifacts["optimized_circuit"]) == 1
     assert artifacts["lowered_circuit"][-1]["op"] == "measure"
     assert artifacts["unbound_parameters"] == []
+
+
+def test_compile_reports_the_canonical_qir_artifact():
+    result = oqci.compile(BELL_QASM, backend="simulator-nisq")
+    qir = result["qir"]
+    assert qir["stage"] == "lowered"
+    assert qir["profile"] == "custom"
+    assert qir["pointers"] == "opaque"
+    assert any(v.get("mnemonic") == "sx" for v in qir["base_violations"])
+    assert '"qir_profiles"="custom"' in qir["text"]
+
+
+def test_qir_base_backend_yields_base_profile_qir():
+    text = oqci.qasm3_to_qir(BELL_QASM, backend="qir-base")
+    assert '"qir_profiles"="base_profile"' in text
+
+
+def test_strict_qir_profile_raises_instead_of_emitting_custom():
+    with pytest.raises(oqci.OqciError, match="QIR Base Profile"):
+        oqci.qasm3_to_qir(BELL_QASM, backend="simulator-nisq", qir_profile="base")
+
+
+def test_typed_pointers_on_request():
+    text = oqci.qasm3_to_qir(BELL_QASM, qir_pointers="typed")
+    assert "%Qubit* inttoptr" in text

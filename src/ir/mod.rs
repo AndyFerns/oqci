@@ -16,11 +16,13 @@
 //! - [`bind`] — [`bind_parameters`], the explicit symbolic → concrete step
 //!   that must precede lowering.
 //! - [`error`] — the [`IrError`] type returned by all fallible IR operations.
-//! - [`mlir_compat`] — the (currently empty) Phase 2 MLIR integration seam.
+//! - [`mlir_compat`] — the (empty) MLIR integration seam; MLIR is optional.
 //!
-//! The design mirrors the `quantum` MLIR dialect one-to-one so that Phase 2 is a
-//! mechanical translation; see `docs/mlir_dialect.md` and
-//! `docs/architecture_decision_mlir_phase2.md`.
+//! The types obey the IR contract (C1–C8,
+//! `docs/architecture_decision_ir_contract.md`), which makes every `Circuit` a
+//! witness of invariants I1–I8. They also mirror the `quantum` MLIR dialect
+//! one-to-one, so a future MLIR port would be a mechanical translation; see
+//! `docs/mlir_dialect.md`.
 
 pub mod bind;
 pub mod convert;
@@ -38,5 +40,5 @@ pub use error::IrError;
 pub use param::Param;
 pub use qc::{Circuit, CircuitBuilder, Instruction};
 pub use qco::{DepKind, NodeKind, QcoCircuit, QcoNode, Wire};
-pub use qir::emit_qir;
+pub use qir::{PointerStyle, QirOptions, QirProfile, emit_qir, emit_qir_with};
 pub use types::{Angle, ClbitId, GateKind, QubitId};

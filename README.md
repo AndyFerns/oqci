@@ -4,7 +4,7 @@
 
 **Open Quantum Compiler Infrastructure**
 
-An open-source, vendor-neutral compiler stack for quantum circuits - built like LLVM, not like a single SDK's transpiler.
+Quantum-native compiler infrastructure first, LLVM/QIR interoperability second.
 
 [Docs](docs/README.md) · [CLI guide](docs/cli.md) · [Pass manager](docs/pass_manager.md) · [Changelog](CHANGELOG.md)
 
@@ -12,24 +12,32 @@ An open-source, vendor-neutral compiler stack for quantum circuits - built like 
 
 ## What is this?
 
-Most quantum SDKs (Qiskit, Cirq, ...) ship their own compiler baked into the SDK, so an optimization pass you write only works inside that one ecosystem. OQCI tries the LLVM approach instead: pull circuits from different front-ends into one shared, well-specified intermediate representation, run optimizations against *that*, and lower the result to a common output (QIR) so the SDK you started in stops mattering.
+OQCI builds on the broader LLVM/QIR quantum compilation ecosystem but draws a different architectural boundary. Its core is a quantum-native, strongly validated intermediate representation written in Rust; every transformation — optimization passes, target lowering, output — works on that IR. QIR is where OQCI meets the LLVM world: an interoperability artifact emitted at the end, not the representation the compiler thinks in.
+
+The research question behind it:
+
+> Can a quantum-first, strongly validated intermediate representation provide a clean foundation for deterministic quantum compiler transformations while remaining interoperable with established LLVM/QIR infrastructure?
+
+See [`docs/core_architecture/framing-and-research-question.md`](docs/core_architecture/framing-and-research-question.md) for what that does and does not claim.
 
 Concretely, that means:
 
 - **Frontends** translate circuits from a source language/SDK into OQCI's IR, and nothing else. A frontend never gets to redefine what the IR means.
-- **QC-IR / QCO-IR** are the two IR levels - an imperative instruction list and a dependency-graph form for optimization - with every invariant validated at construction, not hoped for later.
+- **QC-IR / QCO-IR** are the two IR levels — an imperative instruction list and a dependency-graph form for optimization. Every circuit is validated at construction against invariants I1-I8, and the constraints that keep that true are an explicit contract ([`docs/architecture_decision_ir_contract.md`](docs/architecture_decision_ir_contract.md)).
 - **A pass manager** runs explicit, ordered, individually-toggleable optimization passes over the IR.
-- **QIR lowering** emits LLVM-compatible textual IR as the output boundary, so downstream simulators or hardware backends aren't OQCI's problem to solve twice.
+- **Target lowering** maps, routes and decomposes a circuit onto a specific device's basis and topology, and re-checks its own output.
+- **QIR emission** produces LLVM-compatible textual QIR as an interoperability artifact. Execution does not go through it: backends consume their own executable representation.
 
-It's Rust-native at its core (fast, and the invariants are enforced by the type system rather than by convention), with Python bindings for the parts that need to talk to Qiskit.
+It's Rust-native at its core (fast, and the invariants are enforced by the type system rather than by convention), with Python bindings for the parts that need to talk to Qiskit. Vendor neutrality is a design property — no SDK type reaches the IR and no vendor branch appears in the compiler core — rather than the headline.
 
 ## Project status
 
-**Current version: `0.4.0`.** This is early-stage, actively-developed infrastructure - treat anything not checked off below as *not there yet*, regardless of what a directory name or diagram might suggest.
+**Current version: `0.5.0`.** This is early-stage, actively-developed infrastructure - treat anything not checked off below as *not there yet*, regardless of what a directory name or diagram might suggest.
 
 | Layer | Status | Notes |
 |---|---|---|
-| QC-IR / QCO-IR core | ✅ Implemented | Validated construction, deterministic QC-IR → QCO-IR conversion, QIR (LLVM-compatible) lowering. See [`docs/ir_spec.md`](docs/ir_spec.md). |
+| QC-IR / QCO-IR core | ✅ Implemented | Validated construction (I1-I8), deterministic QC-IR → QCO-IR conversion. See [`docs/ir_spec.md`](docs/ir_spec.md). |
+| QIR emission | 🚧 Emitted, not yet conformant | Textual QIR is produced, but every module is currently labeled `base_profile` whatever it contains, it lacks QIR 1.0 structure and module flags, and no external tool has validated it. The fix — QIR 1.0 structure, honest `base_profile`/`custom` labeling, one canonical output per compilation, PyQIR and `llvm-as` validation in CI — is planned for `0.5.0`. See [`docs/qir_lowering.md`](docs/qir_lowering.md). |
 | Symbolic parameters | ✅ Implemented | Gate angles can be concrete or symbolic (`Rz(theta)`), with explicit binding before lowering - for VQE-style parameterized circuits. |
 | OpenQASM 3 frontend | ✅ Implemented | A documented, intentionally partial subset - see [`docs/openqasm_frontend.md`](docs/openqasm_frontend.md) for exactly what's in and what's refused. |
 | Qiskit frontend | ✅ Implemented | Pure-Rust translation core plus a PyO3 boundary exposed to Python. A `QuantumCircuit` now reaches the whole pipeline — lowering, an executable, provenance — through `oqci.compile`, not just QIR. See [`docs/qiskit_adapter.md`](docs/qiskit_adapter.md). |
@@ -44,8 +52,8 @@ It's Rust-native at its core (fast, and the invariants are enforced by the type 
 | `oqci` CLI | ✅ Implemented | Inspect every pipeline stage for a real program — now including `lower` and `prepare` — plus a live `watch` mode. See [`docs/cli.md`](docs/cli.md). |
 | Live visualization | ✅ Implemented (local dev-companion) | `server/` + `frontend/`: a browser view of the same pipeline, live-updating on save, with a scrubbable pass-by-pass and swap/rule-by-rule replay that self-validates against the real compiler on every request. Read-only by construction — the only change to the `oqci` crate is one visibility flip. See [`docs/visualization.md`](docs/visualization.md). No hosted/multi-user mode. |
 | Simulator execution | ✅ Implemented (Aer) · 🚧 CUDA-Q unverified | `oqci.backends.aer` runs a prepared circuit on Qiskit Aer, which is how the compiler's output is checked against something other than itself. `oqci.backends.cudaq` runs the same artifact on CUDA-Q, with counts keyed like Aer's. Its translation is tested, but it has never run against a real CUDA-Q install. Every adapter follows one layout; see [`docs/adapters.md`](docs/adapters.md). |
-| IBM hardware execution | 🚧 Prepared, not submitted | Lowering, validation, the executable artifact and its provenance all exist and are tested. **Submission does not.** That needs an SDK this project doesn't depend on and credentials it doesn't have — and untested code between a verified circuit and real hardware is worse than an honest gap. **No claim is made that anything here will run on an IBM device.** |
-| MLIR integration | ⛔ Not started (by design) | Rust owns the IR first; MLIR comes later, per the [locked architecture decisions](docs/core_architecture/index.md). |
+| IBM hardware execution | 🚧 Prepared, not submitted (future work) | Lowering, validation, the executable artifact and its provenance all exist and are tested. **Submission does not**, and it is outside the project's definition of done. That needs an SDK this project doesn't depend on and credentials it doesn't have — and untested code between a verified circuit and real hardware is worse than an honest gap. **No claim is made that anything here will run on an IBM device.** |
+| MLIR integration | ⛔ Not started (by design) | Rust owns the IR; MLIR is optional enabling infrastructure, adopted only where it adds concrete value, per the [locked architecture decisions](docs/core_architecture/index.md). |
 | Benchmark suite | ⛔ Not started | [`benchmarks/`](benchmarks/) is a placeholder; the experimental protocol isn't locked yet either. |
 
 For the authoritative, continuously-updated picture (not just this table), see
@@ -60,7 +68,7 @@ cd oqci
 cargo run -- compile examples/bell.qasm
 ```
 
-That parses a small OpenQASM 3 program and prints the QC-IR, the dependency graph, and the emitted QIR, all in one shot. A couple more things worth trying:
+That parses a small OpenQASM 3 program and prints the QC-IR, the dependency graph, and the emitted QIR text, all in one shot. A couple more things worth trying:
 
 ```bash
 # Compile a circuit for a device it doesn't fit on, and watch it get fixed:
@@ -79,20 +87,28 @@ See [`examples/README.md`](examples/README.md) for what each sample file demonst
 ## How it's organized
 
 ```text
-        parse/adapt          build         optimize        convert       lower
- source ──────────▶ QC-IR ─────────▶ Circuit ────────▶ Circuit ───────▶ QCO-IR ─────▶ QIR
-(QASM 3, Qiskit)   (imperative)     (validated)     (pass pipeline)     (DAG)    (LLVM-compatible)
+  parse / adapt       bind          optimize            lower                 prepare
+source ─────────▶ Circuit ─────▶ Circuit ─────────▶ Circuit ─────────▶ Lowered ──────────▶ Executable
+(OpenQASM 3,      (QC-IR,      (Stage F,  (pass pipeline;   (layout, routing,     (what backends
+ CUDA-Q, Qiskit)   validated)   optional)  QCO-IR built      decomposition,        and Aer
+                                           internally)       verification)         consume)
+
+Interop output: Circuit ──▶ QCO-IR (DAG) ──emit──▶ QIR text (for external LLVM/QIR tools)
 ```
 
 | Directory | What's there |
 |---|---|
-| [`src/ir/`](src/ir/) | QC-IR, QCO-IR, validation, QIR lowering - the foundation everything else builds on. |
+| [`src/ir/`](src/ir/) | QC-IR, QCO-IR, validation, QIR emission — the foundation everything else builds on. |
 | [`src/frontend/`](src/frontend/) | OpenQASM 3, CUDA-Q, and the Qiskit adapter's translation core. |
 | [`src/pass/`](src/pass/) | The pass manager and the optimization passes. |
-| [`src/analysis/`](src/analysis/) | Gate counts, depth, circuit diffing - the numbers everything else reports. |
+| [`src/analysis/`](src/analysis/) | Gate counts, depth, circuit diffing — the numbers everything else reports. |
+| [`src/target/`](src/target/) | Basis profiles, topology, legality checking, cost models — what a device accepts. |
+| [`src/lowering/`](src/lowering/) | Layout, routing, basis decomposition — applying a target to a circuit. |
+| [`src/backend/`](src/backend/) | The backend contract, the executable representation, provenance. |
+| [`src/compile.rs`](src/compile.rs) | The orchestrator: the one path from source to artifacts. |
 | [`src/cli/`](src/cli/) | The `oqci` inspector CLI. |
 | [`python/`](python/) | PyO3 bindings, the Python SDK, and the execution adapters (`oqci/backends/`: Aer, CUDA-Q). |
-| [`docs/`](docs/) | Normative specs for the IR, frontends, passes, and CLI - read these before the source if you're getting oriented. |
+| [`docs/`](docs/) | The locked architecture decisions and the normative specs for the IR, frontends, passes, targets, lowering, backends and CLI — read these before the source if you're getting oriented. |
 | [`examples/`](examples/) | Small runnable programs: OpenQASM 3 (`.qasm`) and CUDA-Q kernels (`.py`). |
 
 Each directory also has its own `README.md` going into more depth.

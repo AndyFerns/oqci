@@ -28,7 +28,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 
 use oqci::frontend::{FrontendError, QiskitCircuitIr, QiskitInstruction, QiskitParam};
-use oqci::ir::{Circuit, bind_parameters, emit_qir, qc_to_qco};
+use oqci::ir::Circuit;
 
 create_exception!(
     oqci_native,
@@ -124,16 +124,54 @@ fn read_bindings(
     Ok(map)
 }
 
-/// Applies bindings (when given) and lowers to QIR text.
-fn finish(circuit: Circuit, bindings: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
-    let bindings = read_bindings(bindings)?;
-    let circuit = if bindings.is_empty() && circuit.is_concrete() {
-        circuit
-    } else {
-        bind_parameters(&circuit, &bindings).map_err(|e| to_py_err(&e))?
+/// Reads the two QIR options every entry point accepts.
+fn qir_request(profile: &str, pointers: &str) -> PyResult<oqci::compile::QirRequest> {
+    use oqci::compile::{QirProfileRequirement, QirRequest};
+    use oqci::ir::PointerStyle;
+
+    Ok(QirRequest {
+        profile: QirProfileRequirement::from_id(profile).ok_or_else(|| {
+            OqciError::new_err(format!(
+                "unknown qir_profile `{profile}`; expected `any` or `base`"
+            ))
+        })?,
+        pointers: PointerStyle::from_id(pointers).ok_or_else(|| {
+            OqciError::new_err(format!(
+                "unknown qir_pointers `{pointers}`; expected `opaque` or `typed`"
+            ))
+        })?,
+    })
+}
+
+/// Compiles a circuit and returns its canonical QIR text.
+///
+/// Goes through `oqci::compile::compile_circuit` like everything else: the
+/// circuit is optimized, lowered when `backend` is given, and the QIR is the
+/// compilation's one canonical artifact, labeled `base_profile` or `custom`
+/// by the orchestrator (`docs/qir_lowering.md`). Nothing here emits QIR on
+/// its own.
+fn canonical_qir_text(
+    circuit: Circuit,
+    bindings: Option<&Bound<'_, PyDict>>,
+    backend: Option<&str>,
+    qir_profile: &str,
+    qir_pointers: &str,
+) -> PyResult<String> {
+    let config = oqci::compile::CompilerConfig {
+        bindings: read_bindings(bindings)?,
+        backend: backend.map(str::to_string),
+        qir: qir_request(qir_profile, qir_pointers)?,
+        ..oqci::compile::CompilerConfig::default()
     };
-    let dag = qc_to_qco(&circuit).map_err(|e| to_py_err(&e))?;
-    emit_qir(&dag).map_err(|e| to_py_err(&e))
+    let artifacts = oqci::compile::compile_circuit(circuit, &config).map_err(|e| to_py_err(&e))?;
+    match artifacts.qir {
+        Some(qir) => Ok(qir.text),
+        None => Err(OqciError::new_err(format!(
+            "circuit has unbound parameter(s): {}; supply bindings to emit QIR \
+             (OQCI never invents a value)",
+            artifacts.final_circuit().parameters().join(", ")
+        ))),
+    }
 }
 
 /// Compiles a Qiskit `QuantumCircuit` to QIR text.
@@ -142,14 +180,17 @@ fn finish(circuit: Circuit, bindings: Option<&Bound<'_, PyDict>>) -> PyResult<St
 /// parameter names or `Parameter` objects. A circuit with unbound parameters
 /// and no bindings is an error — OQCI never invents a value.
 #[pyfunction]
-#[pyo3(signature = (circuit, bindings = None))]
+#[pyo3(signature = (circuit, bindings = None, backend = None, qir_profile = "any", qir_pointers = "opaque"))]
 fn qiskit_to_qir(
     circuit: &Bound<'_, PyAny>,
     bindings: Option<&Bound<'_, PyDict>>,
+    backend: Option<&str>,
+    qir_profile: &str,
+    qir_pointers: &str,
 ) -> PyResult<String> {
     let ir = read_circuit(circuit)?;
     let translated = oqci::frontend::qiskit::translate(&ir).map_err(|e| to_py_err(&e))?;
-    finish(translated, bindings)
+    canonical_qir_text(translated, bindings, backend, qir_profile, qir_pointers)
 }
 
 /// Returns the names of a `QuantumCircuit`'s free parameters, as OQCI sees
@@ -170,11 +211,17 @@ fn qiskit_parameters(circuit: &Bound<'_, PyAny>) -> PyResult<Vec<String>> {
 ///
 /// The supported subset is documented in `docs/openqasm_frontend.md`.
 #[pyfunction]
-#[pyo3(signature = (source, bindings = None))]
-fn qasm3_to_qir(source: &str, bindings: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
+#[pyo3(signature = (source, bindings = None, backend = None, qir_profile = "any", qir_pointers = "opaque"))]
+fn qasm3_to_qir(
+    source: &str,
+    bindings: Option<&Bound<'_, PyDict>>,
+    backend: Option<&str>,
+    qir_profile: &str,
+    qir_pointers: &str,
+) -> PyResult<String> {
     let circuit: Circuit =
         oqci::frontend::parse_openqasm3(source).map_err(|e: FrontendError| to_py_err(&e))?;
-    finish(circuit, bindings)
+    canonical_qir_text(circuit, bindings, backend, qir_profile, qir_pointers)
 }
 
 /// Compiles a CUDA-Q kernel's source text to QIR. Reads source text, not a
@@ -182,11 +229,17 @@ fn qasm3_to_qir(source: &str, bindings: Option<&Bound<'_, PyDict>>) -> PyResult<
 ///
 /// The supported subset is documented in `docs/cudaq_frontend.md`.
 #[pyfunction]
-#[pyo3(signature = (source, bindings = None))]
-fn cudaq_to_qir(source: &str, bindings: Option<&Bound<'_, PyDict>>) -> PyResult<String> {
+#[pyo3(signature = (source, bindings = None, backend = None, qir_profile = "any", qir_pointers = "opaque"))]
+fn cudaq_to_qir(
+    source: &str,
+    bindings: Option<&Bound<'_, PyDict>>,
+    backend: Option<&str>,
+    qir_profile: &str,
+    qir_pointers: &str,
+) -> PyResult<String> {
     let circuit: Circuit =
         oqci::frontend::parse_cudaq(source).map_err(|e: FrontendError| to_py_err(&e))?;
-    finish(circuit, bindings)
+    canonical_qir_text(circuit, bindings, backend, qir_profile, qir_pointers)
 }
 
 /// Options every `compile_*` entry point shares, read from Python once.
@@ -198,6 +251,8 @@ struct CompileOptions<'py> {
     layout: &'py str,
     passes: Option<Vec<String>>,
     disable: Option<Vec<String>>,
+    qir_profile: &'py str,
+    qir_pointers: &'py str,
 }
 
 impl CompileOptions<'_> {
@@ -228,6 +283,7 @@ impl CompileOptions<'_> {
                 seed: self.seed,
                 memory: false,
             },
+            qir: qir_request(self.qir_profile, self.qir_pointers)?,
             ..CompilerConfig::default()
         })
     }
@@ -279,7 +335,7 @@ fn pass_selection(
 /// what happened. `backend` names one of `backends()`; omitting it means
 /// target-independent compilation, which stops after optimization.
 #[pyfunction]
-#[pyo3(signature = (source, frontend = "openqasm3", backend = None, bindings = None, name = "main", shots = 1024, seed = None, layout = "trivial", passes = None, disable = None))]
+#[pyo3(signature = (source, frontend = "openqasm3", backend = None, bindings = None, name = "main", shots = 1024, seed = None, layout = "trivial", passes = None, disable = None, qir_profile = "any", qir_pointers = "opaque"))]
 #[allow(clippy::too_many_arguments)]
 fn compile_source<'py>(
     py: Python<'py>,
@@ -293,6 +349,8 @@ fn compile_source<'py>(
     layout: &'py str,
     passes: Option<Vec<String>>,
     disable: Option<Vec<String>>,
+    qir_profile: &'py str,
+    qir_pointers: &'py str,
 ) -> PyResult<PyObject> {
     use oqci::compile::{Frontend, compile_named};
 
@@ -311,6 +369,8 @@ fn compile_source<'py>(
         layout,
         passes,
         disable,
+        qir_profile,
+        qir_pointers,
     };
     let config = oqci::compile::CompilerConfig {
         frontend: selected,
@@ -349,6 +409,8 @@ fn compile_qasm3<'py>(
         layout,
         passes,
         disable,
+        "any",
+        "opaque",
     )
 }
 
@@ -361,7 +423,7 @@ fn compile_qasm3<'py>(
 /// a provenance record exactly like an OpenQASM program. `name` defaults to
 /// the circuit's own `name`.
 #[pyfunction]
-#[pyo3(signature = (circuit, backend = None, bindings = None, name = None, shots = 1024, seed = None, layout = "trivial", passes = None, disable = None))]
+#[pyo3(signature = (circuit, backend = None, bindings = None, name = None, shots = 1024, seed = None, layout = "trivial", passes = None, disable = None, qir_profile = "any", qir_pointers = "opaque"))]
 #[allow(clippy::too_many_arguments)]
 fn compile_qiskit<'py>(
     py: Python<'py>,
@@ -374,6 +436,8 @@ fn compile_qiskit<'py>(
     layout: &'py str,
     passes: Option<Vec<String>>,
     disable: Option<Vec<String>>,
+    qir_profile: &'py str,
+    qir_pointers: &'py str,
 ) -> PyResult<PyObject> {
     let mut ir = read_circuit(circuit)?;
     if let Some(name) = name {
@@ -388,6 +452,8 @@ fn compile_qiskit<'py>(
         layout,
         passes,
         disable,
+        qir_profile,
+        qir_pointers,
     };
     let artifacts = oqci::compile::compile_circuit(translated, &options.config()?)
         .map_err(|e| to_py_err(&e))?;
@@ -474,6 +540,16 @@ fn artifacts_to_dict(
             serde_json::to_value(executable).map_err(json_err)?,
         );
     }
+    // The canonical QIR artifact: text, label, source stage, pointer style,
+    // and the qir-base violations behind a `custom` label. `None` only when
+    // the final circuit still has unbound parameters.
+    body.insert(
+        "qir".to_string(),
+        match &artifacts.qir {
+            Some(qir) => serde_json::to_value(qir).map_err(json_err)?,
+            None => serde_json::Value::Null,
+        },
+    );
     json_to_py(py, &serde_json::Value::Object(body))
 }
 

@@ -86,7 +86,7 @@ fn compile_emits_valid_json() {
         value["stages"][2]["qir"]
             .as_str()
             .unwrap()
-            .contains("define void")
+            .contains("define i64")
     );
 }
 
@@ -720,4 +720,81 @@ fn temp_qasm(name: &str, body: &str) -> std::path::PathBuf {
     let path = std::env::temp_dir().join(format!("oqci-cli-{name}"));
     std::fs::write(&path, body).expect("scratch file");
     path
+}
+
+// --- canonical QIR ------------------------------------------------------------
+
+#[test]
+fn qir_lowered_onto_qir_base_is_labeled_base_profile() {
+    let text = stdout_of(&[
+        "lower",
+        example("bell.qasm").to_str().unwrap(),
+        "--backend",
+        "qir-base",
+        "--emit",
+        "qir",
+    ]);
+    assert!(text.contains("-- qir -- base_profile, from the lowered circuit, opaque pointers"));
+    assert!(text.contains("\"qir_profiles\"=\"base_profile\""));
+    assert!(text.contains("measurements:"));
+}
+
+#[test]
+fn qir_that_is_not_base_says_why() {
+    let value = json_of(&[
+        "lower",
+        example("bell.qasm").to_str().unwrap(),
+        "--backend",
+        "simulator-nisq",
+        "--emit",
+        "qir",
+        "--json",
+    ]);
+    let info = &value["stages"][0]["qir_info"];
+    assert_eq!(info["profile"], "custom");
+    assert_eq!(info["stage"], "lowered");
+    assert_eq!(info["pointers"], "opaque");
+    assert_eq!(info["base_violations"][0]["mnemonic"], "sx");
+}
+
+#[test]
+fn strict_qir_profile_refuses_a_circuit_that_is_not_base() {
+    let output = run(&[
+        "lower",
+        example("bell.qasm").to_str().unwrap(),
+        "--backend",
+        "simulator-nisq",
+        "--qir-profile",
+        "base",
+    ]);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("QIR Base Profile"));
+}
+
+#[test]
+fn typed_pointers_are_available_on_request() {
+    let text = stdout_of(&[
+        "compile",
+        example("bell.qasm").to_str().unwrap(),
+        "--emit",
+        "qir",
+        "--qir-pointers",
+        "typed",
+    ]);
+    assert!(text.contains("typed pointers"));
+    assert!(text.contains("%Qubit* inttoptr"));
+}
+
+#[test]
+fn qir_info_serializes_the_profile_exactly_as_the_module_labels_it() {
+    let value = json_of(&[
+        "lower",
+        example("bell.qasm").to_str().unwrap(),
+        "--backend",
+        "qir-base",
+        "--emit",
+        "qir",
+        "--json",
+    ]);
+    assert_eq!(value["stages"][0]["qir_info"]["profile"], "base_profile");
 }

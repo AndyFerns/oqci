@@ -1,5 +1,6 @@
 //! QIR emitter: extended-intrinsic declarations for non-standard gates,
-//! hexadecimal double literals for angles, and Base-Profile module flags.
+//! hexadecimal double literals for angles, and the QIR 1.0 entry-point
+//! attributes and module flags.
 
 use std::f64::consts::PI;
 
@@ -73,32 +74,67 @@ fn angles_emitted_as_hex_double_not_decimal() {
     assert!(!qir.contains("double 0.5"));
 }
 
-/// The Base-Profile module flags are all present on the entry attribute group.
+/// The QIR 1.0 entry-point attributes and module flags are present, and the
+/// public emitter labels the module `custom`: only the orchestrator, after
+/// checking the `qir-base` profile, may claim `base_profile`.
 #[test]
-fn base_profile_module_flags_present() {
+fn qir_1_0_attributes_and_module_flags_present() {
     let qir = qir_of(|b| {
         let q0 = b.alloc_qubit();
         b.h(q0);
     });
 
-    for flag in [
+    for attribute in [
         "\"entry_point\"",
-        "\"qir_profiles\"=\"base_profile\"",
-        "\"required_num_qubits\"",
-        "\"required_num_results\"",
+        "\"output_labeling_schema\"=\"oqci_clbit\"",
+        "\"qir_profiles\"=\"custom\"",
+        "\"required_num_qubits\"=\"1\"",
+        "\"required_num_results\"=\"0\"",
+        "!llvm.module.flags = !{!0, !1, !2, !3}",
+        "!\"qir_major_version\", i32 1}",
+        "!\"qir_minor_version\", i32 0}",
+        "!\"dynamic_qubit_management\", i1 false}",
+        "!\"dynamic_result_management\", i1 false}",
     ] {
-        assert!(qir.contains(flag), "missing module flag: {flag}");
+        assert!(qir.contains(attribute), "missing: {attribute}");
     }
+    assert!(!qir.contains("base_profile"));
 }
 
-/// required_num_qubits / required_num_results reflect the declared registers.
+/// required_num_qubits / required_num_results count what the entry point
+/// uses (highest index + 1), not the declared register sizes: a lowered
+/// circuit's register is as wide as its device, and the Base Profile asks for
+/// "the number of qubits used by the entry point".
 #[test]
-fn required_counts_reflect_registers() {
+fn required_counts_reflect_what_the_entry_point_uses() {
     let qir = qir_of(|b| {
         let qs = b.alloc_qubits(3);
         let cs = b.alloc_clbits(2);
         b.h(qs[0]).measure(qs[0], cs[0]).measure(qs[1], cs[1]);
     });
-    assert!(qir.contains("\"required_num_qubits\"=\"3\""));
+    assert!(qir.contains("\"required_num_qubits\"=\"2\""));
     assert!(qir.contains("\"required_num_results\"=\"2\""));
+}
+
+/// An `Opaque` name LLVM cannot spell unquoted is emitted as a quoted global,
+/// consistently in the declaration and the call, with `"` and `\` escaped.
+#[test]
+fn opaque_names_outside_llvm_identifier_syntax_are_quoted() {
+    let opaque = |name: &str| GateKind::Opaque {
+        name: name.into(),
+        params: vec![],
+    };
+    let qir = qir_of(|b| {
+        let q0 = b.alloc_qubit();
+        b.gate(opaque("my gate"), [q0]);
+        b.gate(opaque("say\"hi\\"), [q0]);
+        b.gate(opaque("kebab-name.v2"), [q0]);
+    });
+
+    assert!(qir.contains("declare void @\"__quantum__qis__my gate__body\"(ptr)"));
+    assert!(qir.contains("call void @\"__quantum__qis__my gate__body\"("));
+    assert!(qir.contains(r#"@"__quantum__qis__say\22hi\5C__body""#));
+    // Hyphens and dots are legal unquoted, so this one needs no quoting.
+    assert!(qir.contains("declare void @__quantum__qis__kebab-name.v2__body(ptr)"));
+    assert!(!qir.contains("@__quantum__qis__my gate"));
 }

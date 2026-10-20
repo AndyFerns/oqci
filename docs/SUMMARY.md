@@ -7,6 +7,7 @@
 # Source of Truth
 
 - [Documentation Index and Locked Decisions](core_architecture/index.md)
+  - [Framing and Research Question](core_architecture/framing-and-research-question.md)
   - [Stage A — Rust-Native IR Foundation](core_architecture/stage-a-rust-native-ir-foundation.md)
   - [Stage B — Modular MLIR Boundary](core_architecture/stage-b-modular-mlir-boundary.md)
   - [Stage C — Explicit Backend Contract](core_architecture/stage-c-explicit-backend-contract.md)
@@ -19,7 +20,7 @@
 # Reference
 
 - [IR Specification](ir_spec.md)
-- [QIR Lowering](qir_lowering.md)
+- [QIR Emission](qir_lowering.md)
 - [MLIR Dialect](mlir_dialect.md)
 
 # Frontends
@@ -46,8 +47,13 @@
 - [Command Line](cli.md)
 - [Live Visualization](visualization.md)
 
+# Positioning
+
+- [Related Work](related_work.md)
+
 # Architecture Decisions
 
+- [The IR Contract (C1–C8)](architecture_decision_ir_contract.md)
 - [No Frontend in Phase 0](architecture_decision_no_frontend.md)
-- [MLIR Integration Path (Phase 2)](architecture_decision_mlir_phase2.md)
+- [Pure-Rust IR, MLIR as an Optional Later Layer](architecture_decision_mlir_phase2.md)
 - [Adding SX / SXdg to the Gate Set](architecture_decision_sx_basis_gate.md)

@@ -13,10 +13,12 @@ The authoritative core representation for the initial implementation is:
 
 The current repository already implements the first version of this foundation. Stage A is therefore not a request to rebuild the existing IR; it is the requirement that the existing IR become a stable contract that all later frontends, passes, backends, and MLIR integrations must respect.
 
-## 2. Current Verified Baseline
+## 2. Baseline at `0.0.1` (historical snapshot)
 
-*This section describes `master` at version `0.0.1`, when Stage A was written.
-The living baseline is [`index.md`](index.md).*
+> **Historical snapshot — `master` at version `0.0.1`, as verified when Stage A
+> was written (2026-09-04).** It is kept unchanged as the record of where Stage
+> A started. It does not describe the current repository; the only living
+> baseline is [`index.md`](index.md).
 
 The current `master` repository at version `0.0.1` implements:
 
@@ -73,12 +75,12 @@ A later backend must never be assumed to understand arbitrary high-level OQCI op
 
 ## 4. Binding IR Invariants
 
-The following design constraints are load-bearing because they preserve the future MLIR mapping:
+The following design constraints are load-bearing because they are OQCI's validation contract: every later transformation, emission and (possible future) MLIR mapping relies on them. They are stated in full, with where each is enforced, in [`../architecture_decision_ir_contract.md`](../architecture_decision_ir_contract.md).
 
 - `GateKind` remains a closed enum plus one `Opaque` escape hatch until an explicit architecture decision changes this.
 - Gate parameters remain attached to `GateKind`; qubit/classical operands remain on instructions/nodes.
 - `QubitId` and `ClbitId` remain distinct types.
-- `Angle` remains a dedicated parameter/value type and uses radians.
+- `Angle` remains the dedicated concrete parameter type and uses radians; gate parameters are `Param` = `Concrete(Angle) | Symbol(String)` (Stage F), and neither reverts to a bare `f64`.
 - Construction remains centralized through `CircuitBuilder`.
 - Validation remains centralized and returns explicit errors rather than panicking on malformed user input.
 - The IR keeps quantum and classical wire identities explicit.

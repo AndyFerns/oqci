@@ -278,6 +278,7 @@ pub fn all() -> Vec<Box<dyn Backend>> {
     vec![
         Box::new(SimulatorBackend::ideal()),
         Box::new(SimulatorBackend::linear_nisq(5)),
+        Box::new(SimulatorBackend::qir_base()),
         Box::new(IbmBackend::illustrative()),
     ]
 }
