@@ -846,6 +846,15 @@ static BUILTIN: &[DecompositionRule] = &[
         note: "conjugating the target by H turns CX into CZ",
     },
     DecompositionRule {
+        id: "cx-to-cz",
+        source: "cx",
+        source_arity: 2,
+        source_params: 0,
+        steps: &[step("h", &[1]), step("cz", &[0, 1]), step("h", &[1])],
+        exactness: Exactness::Exact,
+        note: "conjugating the target by H turns CZ into CX; a profile lists this or                cz-to-cx, never both, since together they form a cycle",
+    },
+    DecompositionRule {
         id: "cy-to-cx",
         source: "cy",
         source_arity: 2,

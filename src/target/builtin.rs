@@ -23,6 +23,60 @@ pub const IDEAL_SIMULATOR: &str = "ideal-simulator";
 /// The identifier prefix of [`linear_nisq`].
 pub const LINEAR_NISQ: &str = "linear-nisq";
 
+/// The rules that lower every registered gate into `{rz, sx, x, cx}`.
+///
+/// The rule set of [`linear_nisq`] and of the illustrative IBM target, named
+/// so that a profile built from retrieved device data can reuse it rather
+/// than restate it. Every registered gate outside the basis needs a route
+/// into it, or the profile cannot be lowered to; `RuleSet::new` proves the
+/// closure rather than taking this list on trust.
+pub const CX_BASIS_RULES: &[&str] = &[
+    "id-to-nothing",
+    "y-to-rz-x",
+    "z-to-rz",
+    "h-to-rz-sx",
+    "s-to-rz",
+    "sdg-to-rz",
+    "t-to-rz",
+    "tdg-to-rz",
+    "sxdg-to-sx",
+    "rx-to-rz-sx",
+    "ry-to-rz-sx",
+    "p-to-rz",
+    "u-to-rz-sx",
+    "cy-to-cx",
+    "cz-to-cx",
+    "swap-to-cx",
+    "ccx-to-cx",
+];
+
+/// The rules that lower every registered gate into `{rz, sx, x, cz}`.
+///
+/// [`CX_BASIS_RULES`] with `cz-to-cx` replaced by `cx-to-cz`: the two-qubit
+/// gates that reduce to `cx` (`cy`, `swap`, `ccx`) reach `cz` through it. The
+/// two rules are never listed together, since together they form a cycle
+/// that `RuleSet::new` rejects. This is the basis of CZ-native superconducting
+/// devices; which device a profile describes is data, not this list.
+pub const CZ_BASIS_RULES: &[&str] = &[
+    "id-to-nothing",
+    "y-to-rz-x",
+    "z-to-rz",
+    "h-to-rz-sx",
+    "s-to-rz",
+    "sdg-to-rz",
+    "t-to-rz",
+    "tdg-to-rz",
+    "sxdg-to-sx",
+    "rx-to-rz-sx",
+    "ry-to-rz-sx",
+    "p-to-rz",
+    "u-to-rz-sx",
+    "cx-to-cz",
+    "cy-to-cx",
+    "swap-to-cx",
+    "ccx-to-cx",
+];
+
 /// A target with no constraints worth the name: all-to-all connectivity, the
 /// entire registered gate set, unrestricted measurement and reset.
 ///
@@ -92,25 +146,7 @@ pub fn linear_nisq(qubit_count: u32) -> BasisProfile {
     // rather than taking this list on trust, and a gap here is a build
     // failure rather than a circuit that fails to compile later. `x` and the
     // rest of the basis need no rule; they are already native.
-    .decomposition_rules([
-        "id-to-nothing",
-        "y-to-rz-x",
-        "z-to-rz",
-        "h-to-rz-sx",
-        "s-to-rz",
-        "sdg-to-rz",
-        "t-to-rz",
-        "tdg-to-rz",
-        "sxdg-to-sx",
-        "rx-to-rz-sx",
-        "ry-to-rz-sx",
-        "p-to-rz",
-        "u-to-rz-sx",
-        "cy-to-cx",
-        "cz-to-cx",
-        "swap-to-cx",
-        "ccx-to-cx",
-    ])
+    .decomposition_rules(CX_BASIS_RULES.iter().copied())
     .capability("linear-connectivity")
     .cost_model("nisq-weighted")
     .build()

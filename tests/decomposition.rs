@@ -122,6 +122,39 @@ fn compare(a: &[Vec<Complex64>], b: &[Vec<Complex64>]) -> (f64, bool) {
 // --- Every rule computes what it says ---------------------------------------
 
 #[test]
+fn the_u_gate_follows_the_openqasm3_convention_exactly() {
+    // Pinned because everything that synthesizes a `U` depends on it: with
+    // the OpenQASM 3 / Qiskit matrix documented on `GateKind::U`,
+    // `U(pi/2, 0, pi)` is exactly `H` — not merely up to global phase.
+    use std::f64::consts::{FRAC_1_SQRT_2, PI};
+    let mut b = CircuitBuilder::new("u-is-h");
+    let q = b.alloc_qubits(1);
+    b.gate(
+        GateKind::U {
+            theta: Param::Concrete(oqci::ir::Angle::new(PI / 2.0)),
+            phi: Param::Concrete(oqci::ir::Angle::new(0.0)),
+            lambda: Param::Concrete(oqci::ir::Angle::new(PI)),
+        },
+        [q[0]],
+    );
+    let circuit = b.build().unwrap();
+    let expected = [
+        [FRAC_1_SQRT_2, FRAC_1_SQRT_2],  // H|0>
+        [FRAC_1_SQRT_2, -FRAC_1_SQRT_2], // H|1>
+    ];
+    for (input, column) in expected.iter().enumerate() {
+        let set: Vec<u32> = if input == 1 { vec![0] } else { vec![] };
+        let state = support::statevector::simulate_from_basis_state(&circuit, &set, 1);
+        for (amplitude, want) in state.iter().zip(column) {
+            assert!(
+                (amplitude - Complex64::new(*want, 0.0)).norm() < 1e-12,
+                "U(pi/2, 0, pi)|{input}> = {state:?}, expected exactly H|{input}>"
+            );
+        }
+    }
+}
+
+#[test]
 fn every_builtin_rule_reproduces_its_source_operator() {
     for rule in rules::all_builtin() {
         for seed in 0..ANGLES.len() {
@@ -323,6 +356,78 @@ fn the_linear_nisq_rule_set_closes_over_its_basis() {
             );
         }
     }
+}
+
+/// A CZ-native profile over the given rules: `{rz, sx, x, cz}`, the shape of
+/// CZ-native superconducting hardware, on a small ring.
+fn cz_profile(rules: &[&str]) -> oqci::target::BasisProfile {
+    BasisProfileBuilder::new("cz-shaped", "1", "test", Topology::linear(4))
+        .operations(["rz", "sx", "x", "cz", "measure"])
+        .decomposition_rules(rules.iter().copied())
+        .cost_model("nisq-weighted")
+        .build()
+        .unwrap()
+}
+
+#[test]
+fn the_cz_basis_rule_set_closes_over_its_basis() {
+    // The CZ-native counterpart of the test above. `cy`, `swap` and `ccx`
+    // reduce to `cx`, and `cx` must then reach `cz` through `cx-to-cz`, or
+    // the first SWAP routing inserted would be a dead end.
+    let profile = cz_profile(builtin::CZ_BASIS_RULES);
+    let set = RuleSet::new(&profile).expect("the CZ basis rules must close");
+
+    for mnemonic in [
+        "id", "y", "z", "h", "s", "sdg", "t", "tdg", "sxdg", "rx", "ry", "p", "u", "cx", "cy",
+        "swap", "ccx",
+    ] {
+        assert!(
+            set.rule_for(mnemonic).is_some(),
+            "`{mnemonic}` is outside the basis and has no rule"
+        );
+        for reached in set.closure(mnemonic) {
+            assert!(
+                profile.supports_operation(reached) || set.rule_for(reached).is_some(),
+                "lowering `{mnemonic}` reaches `{reached}`, which is a dead end"
+            );
+        }
+    }
+}
+
+#[test]
+fn cx_to_cz_and_cz_to_cx_together_are_refused_as_a_cycle() {
+    // Each is correct alone; together, rewriting never terminates. The rule
+    // set must say so at construction rather than loop at lowering time.
+    let mut rules: Vec<&str> = builtin::CZ_BASIS_RULES.to_vec();
+    rules.push("cz-to-cx");
+    let profile = BasisProfileBuilder::new("both", "1", "test", Topology::linear(3))
+        .operations(["rz", "sx", "x", "measure"])
+        .decomposition_rules(rules)
+        .cost_model("nisq-weighted")
+        .build()
+        .unwrap();
+    let err = RuleSet::new(&profile).unwrap_err();
+    assert!(
+        matches!(err, RuleSetError::CyclicRuleSet { .. }),
+        "got {err}"
+    );
+}
+
+#[test]
+fn cx_to_cz_without_a_route_for_h_is_not_closed() {
+    // `cx-to-cz` emits `h`, which is not native on a CZ-shaped basis; without
+    // `h-to-rz-sx` the expansion is stuck, and the rule set must say which
+    // rule gets stuck on what.
+    let rules: Vec<&str> = builtin::CZ_BASIS_RULES
+        .iter()
+        .copied()
+        .filter(|rule| *rule != "h-to-rz-sx")
+        .collect();
+    let err = RuleSet::new(&cz_profile(&rules)).unwrap_err();
+    assert!(
+        matches!(&err, RuleSetError::NotClosed { mnemonic, .. } if mnemonic == "h"),
+        "got {err}"
+    );
 }
 
 #[test]
