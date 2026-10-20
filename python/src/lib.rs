@@ -105,7 +105,7 @@ fn read_bindings(
     let mut map = std::collections::HashMap::new();
     if let Some(dict) = bindings {
         for (key, value) in dict.iter() {
-            let name: String = if let Ok(text) = key.downcast::<PyString>() {
+            let name: String = if let Ok(text) = key.cast::<PyString>() {
                 text.extract()?
             } else {
                 // Accept a Qiskit `Parameter` object as a key, which is how
@@ -400,7 +400,7 @@ fn compile_source<'py>(
     verify: bool,
     verify_max_qubits: u32,
     lint: bool,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     use oqci::compile::{Frontend, compile_named};
 
     let selected = Frontend::from_id(frontend).ok_or_else(|| {
@@ -450,7 +450,7 @@ fn compile_qasm3<'py>(
     layout: &'py str,
     passes: Option<Vec<String>>,
     disable: Option<Vec<String>>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     compile_source(
         py,
         source,
@@ -502,7 +502,7 @@ fn compile_qiskit<'py>(
     verify: bool,
     verify_max_qubits: u32,
     lint: bool,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let mut ir = read_circuit(circuit)?;
     if let Some(name) = name {
         ir.name = name;
@@ -543,7 +543,7 @@ fn artifacts_to_dict(
     py: Python<'_>,
     frontend: &str,
     artifacts: &oqci::compile::CompilationArtifacts,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     use oqci::cli::snapshot::{PassRecordView, TimingsView, instructions_of, lowering_view};
 
     let mut body = serde_json::Map::new();
@@ -643,7 +643,7 @@ fn artifacts_to_dict(
 /// same validation compiling for it would apply (rule closure, cost model).
 #[pyfunction]
 #[pyo3(signature = (json, kind = None))]
-fn load_target(py: Python<'_>, json: &str, kind: Option<&str>) -> PyResult<PyObject> {
+fn load_target(py: Python<'_>, json: &str, kind: Option<&str>) -> PyResult<Py<PyAny>> {
     let backend = oqci::backend::from_target_json(json, kind, None).map_err(|e| to_py_err(&e))?;
     let value = serde_json::json!({
         "id": backend.id(),
@@ -657,7 +657,7 @@ fn load_target(py: Python<'_>, json: &str, kind: Option<&str>) -> PyResult<PyObj
 /// The named, complete decomposition-rule sets for the two supported
 /// superconducting bases: `{"cx": [...], "cz": [...]}`.
 #[pyfunction]
-fn basis_rule_sets(py: Python<'_>) -> PyResult<PyObject> {
+fn basis_rule_sets(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let value = serde_json::json!({
         "cx": oqci::target::builtin::CX_BASIS_RULES,
         "cz": oqci::target::builtin::CZ_BASIS_RULES,
@@ -679,7 +679,7 @@ fn lint_program(
     target_kind: Option<String>,
     bindings: Option<&Bound<'_, PyDict>>,
     optimized: bool,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     use oqci::compile::{CompilerConfig, Frontend, Stop};
     use oqci::pass::PassSelection;
 
@@ -760,7 +760,7 @@ fn execution_result(
     py: Python<'_>,
     run_json: &str,
     compilation_duration_ms: Option<f64>,
-) -> PyResult<PyObject> {
+) -> PyResult<Py<PyAny>> {
     let result = oqci::backend::ExecutionResult::from_adapter(run_json, compilation_duration_ms)
         .map_err(|e| to_py_err(&e))?;
     json_to_py(py, &serde_json::to_value(result).map_err(json_err)?)
@@ -779,7 +779,7 @@ fn backends() -> Vec<(String, String)> {
 /// implementation of gate semantics. Enumerating the real registry rather
 /// than a hand-copied list is what stops the two drifting apart.
 #[pyfunction]
-fn decomposition_rules(py: Python<'_>) -> PyResult<PyObject> {
+fn decomposition_rules(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let rules: Vec<serde_json::Value> = oqci::lowering::rules::all_builtin()
         .iter()
         .map(|rule| {
@@ -824,7 +824,7 @@ fn json_err(error: serde_json::Error) -> PyErr {
 /// Written out rather than pulled in as a dependency: the conversion is
 /// twenty lines, and a serde-to-Python crate would be a new dependency on the
 /// boundary this crate exists to keep thin.
-fn json_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<PyObject> {
+fn json_to_py(py: Python<'_>, value: &serde_json::Value) -> PyResult<Py<PyAny>> {
     use pyo3::types::{PyList, PyNone};
     Ok(match value {
         serde_json::Value::Null => PyNone::get(py).to_owned().into_any().unbind(),

@@ -13,7 +13,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 oqci = { path = ".." }
-pyo3 = { version = "0.24", features = ["extension-module"] }
+# 0.29: RUSTSEC-2026-0176 and -0177 affect every earlier release.
+pyo3 = { version = "0.29", features = ["extension-module"] }
 # The compiler already speaks JSON; reusing that schema for the Python view
 # keeps it identical to the CLI's `--json` output by construction.
 serde_json = "1"
