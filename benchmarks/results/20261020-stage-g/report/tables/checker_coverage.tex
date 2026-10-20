@@ -1,0 +1,25 @@
+% generated from serialized data; do not edit
+\begin{table}[ht]
+\centering
+\caption{Checker coverage: number of checkers of each kind per transformation}
+\begin{tabular}{lllllll}
+\hline
+transformation & stage & structural & semantic-test & semantic-in-compiler & external & strongest \\
+\hline
+binding & parameters & 1 & 1 & 1 & 0 & semantic-in-compiler \\
+pass:canonicalize & optimization & 1 & 1 & 1 & 0 & semantic-in-compiler \\
+pass:gate-cancellation & optimization & 1 & 1 & 1 & 0 & semantic-in-compiler \\
+pass:rotation-merge & optimization & 1 & 1 & 1 & 0 & semantic-in-compiler \\
+pass:single-qubit-fusion & optimization & 1 & 1 & 1 & 0 & semantic-in-compiler \\
+pass:schedule & optimization & 0 & 0 & 1 & 0 & semantic-in-compiler \\
+lowering:arity-reduction & lowering & 1 & 1 & 1 & 0 & semantic-in-compiler \\
+lowering:layout & lowering & 1 & 1 & 1 & 0 & semantic-in-compiler \\
+lowering:routing & lowering & 1 & 2 & 1 & 0 & semantic-in-compiler \\
+lowering:basis-decomposition & lowering & 1 & 3 & 1 & 0 & semantic-in-compiler \\
+lowering:orientation-repair & lowering & 1 & 2 & 1 & 0 & semantic-in-compiler \\
+lowering:single-qubit-cleanup & lowering & 1 & 1 & 1 & 0 & semantic-in-compiler \\
+qir-emission & interop & 1 & 0 & 0 & 1 & structural \\
+execution:aer & execution & 0 & 0 & 0 & 1 & external \\
+\hline
+\end{tabular}
+\end{table}

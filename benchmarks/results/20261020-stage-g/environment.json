@@ -1,0 +1,35 @@
+{
+  "repository_commit": "d42b413d5df808586479f3d6e0216add0449974e",
+  "repository_dirty": false,
+  "oqci": {
+    "version": "0.7.1",
+    "compiled_from_commit": "d42b413d5df808586479f3d6e0216add0449974e"
+  },
+  "python": "3.12.6 (tags/v3.12.6:a4a2d2b, Sep  6 2024, 20:11:23) [MSC v.1940 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "machine": "AMD64",
+  "processor": "Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
+  "cpu_count": 16,
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "packages": {
+    "oqci": "0.7.1",
+    "qiskit": "2.5.1",
+    "qiskit-aer": "0.17.2",
+    "qiskit-ibm-runtime": "0.50.0",
+    "pytket": "2.18.5",
+    "pytket-qiskit": "0.79.0",
+    "pyqir": "0.12.5",
+    "numpy": "2.5.1",
+    "scipy": "1.18.0",
+    "matplotlib": "3.11.1",
+    "cudaq": null
+  },
+  "thread_environment": {
+    "RAYON_NUM_THREADS": null,
+    "OMP_NUM_THREADS": null,
+    "QISKIT_PARALLEL": null,
+    "QISKIT_NUM_PROCS": null,
+    "MKL_NUM_THREADS": null,
+    "OPENBLAS_NUM_THREADS": null
+  }
+}

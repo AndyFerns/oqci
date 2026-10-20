@@ -1,0 +1,97 @@
+circuit,consumer,status,p_value,tvd,bins
+qft_4,aer,agrees,0.8528833029392142,0.013305664062499972,16
+qft_4,cudaq,not run,,,
+qft_6,aer,agrees,0.8360920665890702,0.03173828125,64
+qft_6,cudaq,not run,,,
+qft_8,aer,agrees,0.619053980516985,0.06970214843750001,256
+qft_8,cudaq,not run,,,
+qft_10,aer,agrees,0.7043236852091111,0.13720703125000006,1024
+qft_10,cudaq,not run,,,
+qft_12,aer,agrees,1.0,0.26989746093750006,1
+qft_12,cudaq,not run,,,
+grover_3,aer,agrees,0.2258052290323088,0.003540039062498232,8
+grover_3,cudaq,not run,,,
+grover_4,aer,agrees,0.10658782757430389,0.0039367675781215965,16
+grover_4,cudaq,not run,,,
+grover_5,aer,agrees,0.7871724755617038,0.000712176784878496,2
+grover_5,cudaq,not run,,,
+grover_6,aer,agrees,0.5737360304347345,0.0022762128088096973,2
+grover_6,cudaq,not run,,,
+vqe_4_r1,aer,agrees,0.10487804973658188,0.01855676573123289,16
+vqe_4_r1,cudaq,not run,,,
+vqe_4_r2,aer,agrees,0.6938159547005806,0.014067238764032255,16
+vqe_4_r2,cudaq,not run,,,
+vqe_4_r3,aer,agrees,0.7257107018404754,0.010751192805513201,14
+vqe_4_r3,cudaq,not run,,,
+vqe_8_r1,aer,agrees,0.8376916590250659,0.05960565556579434,215
+vqe_8_r1,cudaq,not run,,,
+vqe_8_r2,aer,agrees,0.38976212994705384,0.06337775135658248,217
+vqe_8_r2,cudaq,not run,,,
+vqe_8_r3,aer,agrees,0.15014266214242725,0.0613059565880019,210
+vqe_8_r3,cudaq,not run,,,
+vqe_12_r1,aer,agrees,0.35017968963044793,0.1185630768673857,289
+vqe_12_r1,cudaq,not run,,,
+vqe_12_r2,aer,agrees,0.1465157361846552,0.19423315132518024,385
+vqe_12_r2,cudaq,not run,,,
+vqe_12_r3,aer,agrees,0.4261670481337073,0.19454209554064839,379
+vqe_12_r3,cudaq,not run,,,
+random_4_i0,aer,agrees,0.5739593807619123,0.016967773437499944,16
+random_4_i0,cudaq,not run,,,
+random_4_i1,aer,agrees,0.48314782688934355,0.01624757974591022,16
+random_4_i1,cudaq,not run,,,
+random_4_i2,aer,agrees,0.6294930816005169,0.015747879119012043,16
+random_4_i2,cudaq,not run,,,
+random_4_i3,aer,agrees,0.9410208197686099,0.0060706500847999365,8
+random_4_i3,cudaq,not run,,,
+random_4_i4,aer,agrees,0.6642659526460666,0.011872386291553126,16
+random_4_i4,cudaq,not run,,,
+random_4_i5,aer,agrees,0.34436097233630325,0.004737545361019344,4
+random_4_i5,cudaq,not run,,,
+random_4_i6,aer,agrees,0.8541270471367944,0.007921124958117646,14
+random_4_i6,cudaq,not run,,,
+random_4_i7,aer,agrees,0.8596975175587347,0.012340218153675905,14
+random_4_i7,cudaq,not run,,,
+random_4_i8,aer,agrees,0.4040498353313875,0.013551918373914779,15
+random_4_i8,cudaq,not run,,,
+random_4_i9,aer,agrees,0.8842785715312529,0.007812499999999972,8
+random_4_i9,cudaq,not run,,,
+random_8_i0,aer,agrees,0.45169517157887284,0.034943467780051835,73
+random_8_i0,cudaq,not run,,,
+random_8_i1,aer,agrees,0.48983103102302594,0.02756437232701457,64
+random_8_i1,cudaq,not run,,,
+random_8_i2,aer,agrees,0.679368324928286,0.038973994503745536,92
+random_8_i2,cudaq,not run,,,
+random_8_i3,aer,agrees,0.5542751984652688,0.04120319007811206,107
+random_8_i3,cudaq,not run,,,
+random_8_i4,aer,agrees,0.06746137372115335,0.034704079398219824,57
+random_8_i4,cudaq,not run,,,
+random_8_i5,aer,agrees,0.38692003912623124,0.04141960580896601,115
+random_8_i5,cudaq,not run,,,
+random_8_i6,aer,agrees,0.7803832425558074,0.022040915242726805,41
+random_8_i6,cudaq,not run,,,
+random_8_i7,aer,agrees,0.7438904678093047,0.027126439284284366,63
+random_8_i7,cudaq,not run,,,
+random_8_i8,aer,agrees,0.46337081982205774,0.04596965579974553,115
+random_8_i8,cudaq,not run,,,
+random_8_i9,aer,agrees,0.18710218293193032,0.025739464204620893,32
+random_8_i9,cudaq,not run,,,
+random_12_i0,aer,agrees,0.6249919292492976,0.07386188291409557,194
+random_12_i0,cudaq,not run,,,
+random_12_i1,aer,agrees,0.8716935659301526,0.153898151788258,406
+random_12_i1,cudaq,not run,,,
+random_12_i2,aer,agrees,0.26683599810582753,0.14061533829660902,425
+random_12_i2,cudaq,not run,,,
+random_12_i3,aer,agrees,0.4552707992676028,0.08263341237797951,225
+random_12_i3,cudaq,not run,,,
+random_12_i4,aer,agrees,0.06874941142861159,0.09699051571458207,241
+random_12_i4,cudaq,not run,,,
+random_12_i5,aer,agrees,0.7729502671316091,0.13488021680820864,343
+random_12_i5,cudaq,not run,,,
+random_12_i6,aer,agrees,0.7003908176206227,0.10897616014641354,393
+random_12_i6,cudaq,not run,,,
+random_12_i7,aer,agrees,0.8795760354598207,0.09924880541146613,271
+random_12_i7,cudaq,not run,,,
+random_12_i8,aer,agrees,0.6316341160043679,0.16762566436678222,513
+random_12_i8,cudaq,not run,,,
+random_12_i9,aer,agrees,0.715119796346258,0.15180072979347356,641
+random_12_i9,cudaq,not run,,,

@@ -1,0 +1,3373 @@
+{
+  "acceptance": {
+    "consumers": {
+      "pyqir-0.12.5": "True",
+      "llvm-as-18": null,
+      "llvm-as-14": null
+    },
+    "summary": {
+      "pyqir-0.12.5": {
+        "accepted": 256,
+        "rejected": 0,
+        "not_run": 0,
+        "not_applicable": 0
+      },
+      "llvm-as-18": {
+        "accepted": 0,
+        "rejected": 0,
+        "not_run": 256,
+        "not_applicable": 0
+      },
+      "llvm-as-14": {
+        "accepted": 0,
+        "rejected": 0,
+        "not_run": 128,
+        "not_applicable": 128
+      }
+    },
+    "modules": [
+      {
+        "module": "qft_4.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_4.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_4.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_4.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_6.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_6.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_6.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_6.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_8.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_8.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_8.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_8.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_10.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_10.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_10.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_10.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_12.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_12.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_12.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_12.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_14.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_14.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_14.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_14.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_16.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_16.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_16.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_16.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_20.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_20.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "qft_20.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "qft_20.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "grover_3.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "grover_3.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "grover_3.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "grover_3.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "grover_4.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "grover_4.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "grover_4.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "grover_4.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "grover_5.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "grover_5.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "grover_5.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "grover_5.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "grover_6.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "grover_6.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "grover_6.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "grover_6.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_4_r1.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_4_r1.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_4_r1.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_4_r1.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_4_r2.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_4_r2.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_4_r2.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_4_r2.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_4_r3.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_4_r3.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_4_r3.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_4_r3.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_8_r1.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_8_r1.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_8_r1.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_8_r1.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_8_r2.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_8_r2.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_8_r2.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_8_r2.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_8_r3.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_8_r3.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_8_r3.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_8_r3.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_12_r1.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_12_r1.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_12_r1.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_12_r1.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_12_r2.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_12_r2.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_12_r2.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_12_r2.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_12_r3.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_12_r3.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_12_r3.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_12_r3.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_16_r1.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_16_r1.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_16_r1.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_16_r1.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_16_r2.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_16_r2.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_16_r2.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_16_r2.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_16_r3.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_16_r3.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "vqe_16_r3.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "vqe_16_r3.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i0.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i0.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i0.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i0.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i1.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i1.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i1.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i1.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i2.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i2.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i2.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i2.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i3.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i3.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i3.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i3.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i4.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i4.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i4.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i4.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i5.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i5.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i5.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i5.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i6.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i6.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i6.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i6.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i7.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i7.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i7.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i7.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i8.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i8.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i8.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i8.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i9.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i9.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_4_i9.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_4_i9.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i0.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i0.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i0.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i0.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i1.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i1.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i1.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i1.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i2.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i2.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i2.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i2.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i3.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i3.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i3.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i3.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i4.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i4.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i4.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i4.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i5.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i5.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i5.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i5.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i6.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i6.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i6.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i6.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i7.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i7.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i7.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i7.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i8.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i8.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i8.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i8.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i9.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i9.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_8_i9.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_8_i9.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i0.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i0.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i0.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i0.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i1.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i1.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i1.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i1.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i2.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i2.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i2.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i2.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i3.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i3.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i3.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i3.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i4.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i4.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i4.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i4.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i5.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i5.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i5.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i5.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i6.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i6.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i6.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i6.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i7.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i7.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i7.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i7.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i8.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i8.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i8.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i8.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i9.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i9.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_12_i9.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_12_i9.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i0.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i0.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i0.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i0.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i1.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i1.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i1.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i1.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i2.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i2.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i2.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i2.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i3.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i3.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i3.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i3.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i4.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i4.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i4.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i4.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i5.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i5.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i5.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i5.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i6.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i6.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i6.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i6.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i7.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i7.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i7.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i7.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i8.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i8.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i8.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i8.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i9.custom.opaque.ll",
+        "label": "custom",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i9.base_profile.opaque.ll",
+        "label": "base_profile",
+        "pointers": "opaque",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not applicable (LLVM 14 predates opaque pointers)"
+        }
+      },
+      {
+        "module": "random_16_i9.custom.typed.ll",
+        "label": "custom",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      },
+      {
+        "module": "random_16_i9.base_profile.typed.ll",
+        "label": "base_profile",
+        "pointers": "typed",
+        "results": {
+          "pyqir-0.12.5": "accepted",
+          "llvm-as-18": "not run",
+          "llvm-as-14": "not run"
+        }
+      }
+    ]
+  },
+  "agreement": {
+    "alpha": 0.001,
+    "shots": 8192,
+    "summary": {
+      "aer": {
+        "agrees": 48
+      },
+      "cudaq": {
+        "not run": 48
+      }
+    },
+    "circuits": [
+      {
+        "circuit_id": "qft_4",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.013305664062499972,
+            "statistic": 9.449218749999993,
+            "p_value": 0.8528833029392142,
+            "dof": 15,
+            "bins": 16
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "qft_6",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.03173828125,
+            "statistic": 52.04687499999997,
+            "p_value": 0.8360920665890702,
+            "dof": 63,
+            "bins": 64
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "qft_8",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.06970214843750001,
+            "statistic": 247.56250000000003,
+            "p_value": 0.619053980516985,
+            "dof": 255,
+            "bins": 256
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "qft_10",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.13720703125000006,
+            "statistic": 998.25,
+            "p_value": 0.7043236852091111,
+            "dof": 1023,
+            "bins": 1024
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "qft_12",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.26989746093750006,
+            "statistic": 0.0,
+            "p_value": 1.0,
+            "dof": 0,
+            "bins": 1
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "grover_3",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.003540039062498232,
+            "statistic": 9.390754132231361,
+            "p_value": 0.2258052290323088,
+            "dof": 7,
+            "bins": 8
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "grover_4",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.0039367675781215965,
+            "statistic": 22.046599617231667,
+            "p_value": 0.10658782757430389,
+            "dof": 15,
+            "bins": 16
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "grover_5",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.000712176784878496,
+            "statistic": 0.07289142151091332,
+            "p_value": 0.7871724755617038,
+            "dof": 1,
+            "bins": 2
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "grover_6",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.0022762128088096973,
+            "statistic": 0.3164712853185538,
+            "p_value": 0.5737360304347345,
+            "dof": 1,
+            "bins": 2
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "vqe_4_r1",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.01855676573123289,
+            "statistic": 22.112880622625433,
+            "p_value": 0.10487804973658188,
+            "dof": 15,
+            "bins": 16
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "vqe_4_r2",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.014067238764032255,
+            "statistic": 11.80378858914806,
+            "p_value": 0.6938159547005806,
+            "dof": 15,
+            "bins": 16
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "vqe_4_r3",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.010751192805513201,
+            "statistic": 9.607016664595772,
+            "p_value": 0.7257107018404754,
+            "dof": 13,
+            "bins": 14
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "vqe_8_r1",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.05960565556579434,
+            "statistic": 193.6340747442402,
+            "p_value": 0.8376916590250659,
+            "dof": 214,
+            "bins": 215
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "vqe_8_r2",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.06337775135658248,
+            "statistic": 221.1939917728762,
+            "p_value": 0.38976212994705384,
+            "dof": 216,
+            "bins": 217
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "vqe_8_r3",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.0613059565880019,
+            "statistic": 230.19278938137737,
+            "p_value": 0.15014266214242725,
+            "dof": 209,
+            "bins": 210
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "vqe_12_r1",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.1185630768673857,
+            "statistic": 296.6561587079217,
+            "p_value": 0.35017968963044793,
+            "dof": 288,
+            "bins": 289
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "vqe_12_r2",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.19423315132518024,
+            "statistic": 413.18550804655206,
+            "p_value": 0.1465157361846552,
+            "dof": 384,
+            "bins": 385
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "vqe_12_r3",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.19454209554064839,
+            "statistic": 382.4694322193182,
+            "p_value": 0.4261670481337073,
+            "dof": 378,
+            "bins": 379
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_4_i0",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.016967773437499944,
+            "statistic": 13.367187499999947,
+            "p_value": 0.5739593807619123,
+            "dof": 15,
+            "bins": 16
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_4_i1",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.01624757974591022,
+            "statistic": 14.565440655203094,
+            "p_value": 0.48314782688934355,
+            "dof": 15,
+            "bins": 16
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_4_i2",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.015747879119012043,
+            "statistic": 12.64764393874813,
+            "p_value": 0.6294930816005169,
+            "dof": 15,
+            "bins": 16
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_4_i3",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.0060706500847999365,
+            "statistic": 2.30545580997877,
+            "p_value": 0.9410208197686099,
+            "dof": 7,
+            "bins": 8
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_4_i4",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.011872386291553126,
+            "statistic": 12.194306634981594,
+            "p_value": 0.6642659526460666,
+            "dof": 15,
+            "bins": 16
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_4_i5",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.004737545361019344,
+            "statistic": 3.323675890258462,
+            "p_value": 0.34436097233630325,
+            "dof": 3,
+            "bins": 4
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_4_i6",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.007921124958117646,
+            "statistic": 7.83585537237949,
+            "p_value": 0.8541270471367944,
+            "dof": 13,
+            "bins": 14
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_4_i7",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.012340218153675905,
+            "statistic": 7.746767849212034,
+            "p_value": 0.8596975175587347,
+            "dof": 13,
+            "bins": 14
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_4_i8",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.013551918373914779,
+            "statistic": 14.627958850851961,
+            "p_value": 0.4040498353313875,
+            "dof": 14,
+            "bins": 15
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_4_i9",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.007812499999999972,
+            "statistic": 3.0078125000000075,
+            "p_value": 0.8842785715312529,
+            "dof": 7,
+            "bins": 8
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_8_i0",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.034943467780051835,
+            "statistic": 72.79294935786054,
+            "p_value": 0.45169517157887284,
+            "dof": 72,
+            "bins": 73
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_8_i1",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.02756437232701457,
+            "statistic": 62.61941911824415,
+            "p_value": 0.48983103102302594,
+            "dof": 63,
+            "bins": 64
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_8_i2",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.038973994503745536,
+            "statistic": 84.21912318783644,
+            "p_value": 0.679368324928286,
+            "dof": 91,
+            "bins": 92
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_8_i3",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.04120319007811206,
+            "statistic": 103.36673639643776,
+            "p_value": 0.5542751984652688,
+            "dof": 106,
+            "bins": 107
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_8_i4",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.034704079398219824,
+            "statistic": 72.56854019003482,
+            "p_value": 0.06746137372115335,
+            "dof": 56,
+            "bins": 57
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_8_i5",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.04141960580896601,
+            "statistic": 117.71338639802667,
+            "p_value": 0.38692003912623124,
+            "dof": 114,
+            "bins": 115
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_8_i6",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.022040915242726805,
+            "statistic": 32.876879284693345,
+            "p_value": 0.7803832425558074,
+            "dof": 40,
+            "bins": 41
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_8_i7",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.027126439284284366,
+            "statistic": 54.36564533574836,
+            "p_value": 0.7438904678093047,
+            "dof": 62,
+            "bins": 63
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_8_i8",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.04596965579974553,
+            "statistic": 114.72327007886578,
+            "p_value": 0.46337081982205774,
+            "dof": 114,
+            "bins": 115
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_8_i9",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.025739464204620893,
+            "statistic": 37.78017214816543,
+            "p_value": 0.18710218293193032,
+            "dof": 31,
+            "bins": 32
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_12_i0",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.07386188291409557,
+            "statistic": 186.15398896917426,
+            "p_value": 0.6249919292492976,
+            "dof": 193,
+            "bins": 194
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_12_i1",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.153898151788258,
+            "statistic": 372.9300857318589,
+            "p_value": 0.8716935659301526,
+            "dof": 405,
+            "bins": 406
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_12_i2",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.14061533829660902,
+            "statistic": 441.70090542340154,
+            "p_value": 0.26683599810582753,
+            "dof": 424,
+            "bins": 425
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_12_i3",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.08263341237797951,
+            "statistic": 225.71609382445592,
+            "p_value": 0.4552707992676028,
+            "dof": 224,
+            "bins": 225
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_12_i4",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.09699051571458207,
+            "statistic": 273.3058717662083,
+            "p_value": 0.06874941142861159,
+            "dof": 240,
+            "bins": 241
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_12_i5",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.13488021680820864,
+            "statistic": 322.1491977854824,
+            "p_value": 0.7729502671316091,
+            "dof": 342,
+            "bins": 343
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_12_i6",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.10897616014641354,
+            "statistic": 376.8169545521197,
+            "p_value": 0.7003908176206227,
+            "dof": 392,
+            "bins": 393
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_12_i7",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.09924880541146613,
+            "statistic": 243.02693612931245,
+            "p_value": 0.8795760354598207,
+            "dof": 270,
+            "bins": 271
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_12_i8",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.16762566436678222,
+            "statistic": 500.65896460837905,
+            "p_value": 0.6316341160043679,
+            "dof": 512,
+            "bins": 513
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      },
+      {
+        "circuit_id": "random_12_i9",
+        "results": {
+          "aer": {
+            "status": "agrees",
+            "tvd": 0.15180072979347356,
+            "statistic": 619.2247605515055,
+            "p_value": 0.715119796346258,
+            "dof": 640,
+            "bins": 641
+          },
+          "cudaq": {
+            "status": "not run"
+          }
+        }
+      }
+    ]
+  }
+}

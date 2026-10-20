@@ -1,0 +1,15 @@
+config,target,items,mean_delta_2q,mean_delta_gates,mean_delta_depth,items_worse_in_gates
+oqci-no-canonicalize,linear,64,0,0,0,0
+oqci-no-canonicalize,heron,64,0,0,0,0
+oqci-no-gate-cancellation,linear,64,4.484375,5.59375,3.46875,18
+oqci-no-gate-cancellation,heron,64,-0.4375,-2.328125,-0.4375,15
+oqci-no-passes,linear,64,4.484375,29.875,6.796875,44
+oqci-no-passes,heron,64,-0.4375,21.953125,2.0625,39
+oqci-no-rotation-merge,linear,64,0,0.09375,0.046875,6
+oqci-no-rotation-merge,heron,64,0,0.09375,0.015625,6
+oqci-no-schedule,linear,64,0,0,0,0
+oqci-no-schedule,heron,64,0,0,0,0
+oqci-no-single-qubit-fusion,linear,64,0,17.890625,2.34375,44
+oqci-no-single-qubit-fusion,heron,64,0,17.890625,1.9375,44
+oqci-trivial-layout,linear,64,2.71875,2.71875,2.125,21
+oqci-trivial-layout,heron,64,82.546875,577.828125,75.109375,40

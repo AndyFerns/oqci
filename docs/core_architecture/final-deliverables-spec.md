@@ -1276,14 +1276,14 @@ that backs it. An item that is out of scope says so, and by whose decision.
 - [x] documentation build — `.github/workflows/docs.yml` (mdBook).
 
 ### Research package
-- [ ] raw benchmark data — `records.jsonl` of the reference run. *Status 2026-10-21:* the `0.6.0` run stopped on a t\|ket⟩ defect and was dropped (`d42b413`). It is being rerun in full on `0.7.1`, and this box and the three below are re-ticked when it is committed.
+- [x] raw benchmark data — `records.jsonl` of the reference run `benchmarks/results/20261020-stage-g/` (1664 records, built from `d42b413` at `0.7.1`; the `0.6.0` attempt stopped on a t\|ket⟩ defect and was dropped).
 - [x] machine-readable result schema — `benchmarks/schema/result.schema.json`.
-- [ ] generated figures — `report/figures/` of the reference run (the generator is tested by the `benchmarks (smoke)` CI job).
-- [ ] generated tables — `report/tables/` (CSV, Markdown, LaTeX) of the reference run.
+- [x] generated figures — `report/figures/`.
+- [x] generated tables — `report/tables/` (CSV, Markdown, LaTeX).
 - [x] experiment configurations — `benchmarks/configs/stage_g.toml`.
 - [x] ablation framework — the OQCI ablation configurations.
 - [x] reproducibility instructions — `docs/benchmarks.md`, `Dockerfile`.
-- [ ] paper-supporting artifacts — the reference run's `report/`.
+- [x] paper-supporting artifacts — the reference run's `report/`.
 
 ---
 

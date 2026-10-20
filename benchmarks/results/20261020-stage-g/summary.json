@@ -1,0 +1,14 @@
+{
+  "benchmark_id": "20261020-stage-g",
+  "config": {
+    "name": "stage-g",
+    "version": "1.0",
+    "locked": "2026-10-20"
+  },
+  "records": 1664,
+  "correctness": {
+    "pass": 1662,
+    "not-checked": 2
+  },
+  "finished_at": "2026-10-20T20:13:06Z"
+}

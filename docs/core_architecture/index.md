@@ -140,9 +140,8 @@ implemented. In detail:
   - an exhaustive correctness check of every compiled output;
   - determinism across fresh processes, interop and mutation evidence;
   - a validated checker coverage matrix;
-  - a report generated only from serialized data, and a reference run
-    (`docs/benchmarks.md`), being regenerated on `0.7.1` as of 2026-10-21:
-    the `0.6.0` run stopped on a t|ket⟩ defect and was dropped.
+  - a report generated only from serialized data, and a committed
+    reference run at `0.7.1` (`docs/benchmarks.md`).
 - **Determinism contract**, specified in `docs/determinism.md` and checked
   across processes on ubuntu and windows.
 - **Engineering.**

@@ -1,0 +1,256 @@
+{
+  "kinds": [
+    "structural",
+    "semantic-test",
+    "semantic-in-compiler",
+    "external"
+  ],
+  "rows": [
+    {
+      "transformation": "binding",
+      "stage": "parameters",
+      "note": "",
+      "checkers": {
+        "structural": [
+          "src/ir/bind.rs::bind_parameters"
+        ],
+        "semantic-test": [
+          "src/ir/bind.rs::binding_matches_a_directly_built_concrete_circuit"
+        ],
+        "semantic-in-compiler": [
+          "src/verify/mod.rs::check_binding"
+        ],
+        "external": []
+      },
+      "strongest": "semantic-in-compiler"
+    },
+    {
+      "transformation": "pass:canonicalize",
+      "stage": "optimization",
+      "note": "",
+      "checkers": {
+        "structural": [
+          "src/pass/mod.rs::rebuild"
+        ],
+        "semantic-test": [
+          "tests/pass_equivalence.rs::canonicalize_preserves_semantics"
+        ],
+        "semantic-in-compiler": [
+          "src/verify/mod.rs::check_pass"
+        ],
+        "external": []
+      },
+      "strongest": "semantic-in-compiler"
+    },
+    {
+      "transformation": "pass:gate-cancellation",
+      "stage": "optimization",
+      "note": "",
+      "checkers": {
+        "structural": [
+          "src/pass/mod.rs::rebuild"
+        ],
+        "semantic-test": [
+          "tests/pass_equivalence.rs::gate_cancellation_preserves_semantics"
+        ],
+        "semantic-in-compiler": [
+          "src/verify/mod.rs::check_pass"
+        ],
+        "external": []
+      },
+      "strongest": "semantic-in-compiler"
+    },
+    {
+      "transformation": "pass:rotation-merge",
+      "stage": "optimization",
+      "note": "",
+      "checkers": {
+        "structural": [
+          "src/pass/mod.rs::rebuild"
+        ],
+        "semantic-test": [
+          "tests/pass_equivalence.rs::rotation_merge_preserves_semantics"
+        ],
+        "semantic-in-compiler": [
+          "src/verify/mod.rs::check_pass"
+        ],
+        "external": []
+      },
+      "strongest": "semantic-in-compiler"
+    },
+    {
+      "transformation": "pass:single-qubit-fusion",
+      "stage": "optimization",
+      "note": "",
+      "checkers": {
+        "structural": [
+          "src/pass/mod.rs::rebuild"
+        ],
+        "semantic-test": [
+          "tests/pass_equivalence.rs::single_qubit_fusion_preserves_semantics"
+        ],
+        "semantic-in-compiler": [
+          "src/verify/mod.rs::check_pass"
+        ],
+        "external": []
+      },
+      "strongest": "semantic-in-compiler"
+    },
+    {
+      "transformation": "pass:schedule",
+      "stage": "optimization",
+      "note": "analysis only: never changes the circuit",
+      "checkers": {
+        "structural": [],
+        "semantic-test": [],
+        "semantic-in-compiler": [
+          "src/verify/mod.rs::check_pass"
+        ],
+        "external": []
+      },
+      "strongest": "semantic-in-compiler"
+    },
+    {
+      "transformation": "lowering:arity-reduction",
+      "stage": "lowering",
+      "note": "",
+      "checkers": {
+        "structural": [
+          "src/lowering/mod.rs::verify"
+        ],
+        "semantic-test": [
+          "tests/lowering_equivalence.rs::lowering_is_equivalent_legal_and_deterministic"
+        ],
+        "semantic-in-compiler": [
+          "src/verify/mod.rs::check_lowering"
+        ],
+        "external": []
+      },
+      "strongest": "semantic-in-compiler"
+    },
+    {
+      "transformation": "lowering:layout",
+      "stage": "lowering",
+      "note": "",
+      "checkers": {
+        "structural": [
+          "src/lowering/mod.rs::verify"
+        ],
+        "semantic-test": [
+          "tests/lowering_equivalence.rs::lowering_is_equivalent_legal_and_deterministic"
+        ],
+        "semantic-in-compiler": [
+          "src/verify/mod.rs::check_lowering"
+        ],
+        "external": []
+      },
+      "strongest": "semantic-in-compiler"
+    },
+    {
+      "transformation": "lowering:routing",
+      "stage": "lowering",
+      "note": "",
+      "checkers": {
+        "structural": [
+          "src/lowering/mod.rs::verify"
+        ],
+        "semantic-test": [
+          "tests/lowering_equivalence.rs::lowering_is_equivalent_legal_and_deterministic",
+          "tests/lowering_equivalence.rs::the_reported_final_layout_matches_the_emitted_swaps"
+        ],
+        "semantic-in-compiler": [
+          "src/verify/mod.rs::check_lowering"
+        ],
+        "external": []
+      },
+      "strongest": "semantic-in-compiler"
+    },
+    {
+      "transformation": "lowering:basis-decomposition",
+      "stage": "lowering",
+      "note": "",
+      "checkers": {
+        "structural": [
+          "src/lowering/mod.rs::verify"
+        ],
+        "semantic-test": [
+          "tests/decomposition.rs::every_builtin_rule_reproduces_its_source_operator",
+          "python/tests/test_rules.py::test_every_rule_reproduces_its_source",
+          "tests/lowering_equivalence.rs::lowering_is_equivalent_legal_and_deterministic"
+        ],
+        "semantic-in-compiler": [
+          "src/verify/mod.rs::check_lowering"
+        ],
+        "external": []
+      },
+      "strongest": "semantic-in-compiler"
+    },
+    {
+      "transformation": "lowering:orientation-repair",
+      "stage": "lowering",
+      "note": "",
+      "checkers": {
+        "structural": [
+          "src/lowering/mod.rs::verify"
+        ],
+        "semantic-test": [
+          "python/tests/test_rules.py::test_the_orientation_repair_identity_holds",
+          "tests/lowering_equivalence.rs::lowering_is_equivalent_legal_and_deterministic"
+        ],
+        "semantic-in-compiler": [
+          "src/verify/mod.rs::check_lowering"
+        ],
+        "external": []
+      },
+      "strongest": "semantic-in-compiler"
+    },
+    {
+      "transformation": "lowering:single-qubit-cleanup",
+      "stage": "lowering",
+      "note": "",
+      "checkers": {
+        "structural": [
+          "src/lowering/mod.rs::verify"
+        ],
+        "semantic-test": [
+          "tests/lowering_equivalence.rs::lowering_is_equivalent_legal_and_deterministic"
+        ],
+        "semantic-in-compiler": [
+          "src/verify/mod.rs::check_lowering"
+        ],
+        "external": []
+      },
+      "strongest": "semantic-in-compiler"
+    },
+    {
+      "transformation": "qir-emission",
+      "stage": "interop",
+      "note": "no semantic checker: nothing in the toolchain executes OQCI's QIR",
+      "checkers": {
+        "structural": [
+          "tests/qir_conformance.rs::every_emitted_module_follows_the_qir_1_0_structure"
+        ],
+        "semantic-test": [],
+        "semantic-in-compiler": [],
+        "external": [
+          "scripts/validate_qir.py::check"
+        ]
+      },
+      "strongest": "structural"
+    },
+    {
+      "transformation": "execution:aer",
+      "stage": "execution",
+      "note": "the compiler's output checked against an implementation other than its own",
+      "checkers": {
+        "structural": [],
+        "semantic-test": [],
+        "semantic-in-compiler": [],
+        "external": [
+          "python/tests/test_aer.py::test_a_distant_bell_pair_survives_routing"
+        ]
+      },
+      "strongest": "external"
+    }
+  ]
+}

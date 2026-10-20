@@ -1,0 +1,7 @@
+position:pass,records,mean_ops_removed,records_changed
+0:canonicalize,192,0,0
+1:gate-cancellation,192,3.25,105
+2:rotation-merge,192,0.453125,57
+3:single-qubit-fusion,192,13.984375,132
+4:canonicalize,192,0,0
+5:schedule,192,0,0

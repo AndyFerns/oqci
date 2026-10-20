@@ -1,0 +1,450 @@
+{
+  "summary": {
+    "commit": "80827f93915fb188395e5be68ebb873c0863e495",
+    "baseline_clean": true,
+    "mutants": 10,
+    "caught": 8,
+    "survived": [
+      "canonicalize-commutes-h-x",
+      "qir-cx-operands-swapped"
+    ],
+    "broken": [],
+    "checkers": [
+      {
+        "id": "pass-equivalence",
+        "kind": "semantic-test"
+      },
+      {
+        "id": "lowering-equivalence",
+        "kind": "semantic-test"
+      },
+      {
+        "id": "decomposition",
+        "kind": "semantic-test"
+      },
+      {
+        "id": "in-compiler-verifier",
+        "kind": "semantic-in-compiler"
+      },
+      {
+        "id": "qir-structure",
+        "kind": "structural"
+      },
+      {
+        "id": "unit-tests",
+        "kind": "example-based"
+      }
+    ]
+  },
+  "results": [
+    {
+      "id": "(unmutated baseline)",
+      "description": "the compiler as committed",
+      "file": null,
+      "builds": true,
+      "checkers": {
+        "pass-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "lowering-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "decomposition": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "in-compiler-verifier": {
+          "kind": "semantic-in-compiler",
+          "caught": false,
+          "evidence": []
+        },
+        "qir-structure": {
+          "kind": "structural",
+          "caught": false
+        },
+        "unit-tests": {
+          "kind": "example-based",
+          "caught": false
+        }
+      },
+      "caught_by": []
+    },
+    {
+      "id": "rotation-merge-sign-flip",
+      "description": "rotation merging subtracts the second angle instead of adding it",
+      "file": "src/pass/rotation_merge.rs",
+      "builds": true,
+      "checkers": {
+        "pass-equivalence": {
+          "kind": "semantic-test",
+          "caught": true
+        },
+        "lowering-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "decomposition": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "in-compiler-verifier": {
+          "kind": "semantic-in-compiler",
+          "caught": true,
+          "evidence": [
+            "p1_rotation_merge.qasm@simulator",
+            "p1_rotation_merge.qasm@simulator-nisq"
+          ]
+        },
+        "qir-structure": {
+          "kind": "structural",
+          "caught": false
+        },
+        "unit-tests": {
+          "kind": "example-based",
+          "caught": true
+        }
+      },
+      "caught_by": [
+        "pass-equivalence",
+        "in-compiler-verifier",
+        "unit-tests"
+      ]
+    },
+    {
+      "id": "cancel-non-inverse-pair",
+      "description": "gate cancellation treats S;S as an inverse pair (it is Z)",
+      "file": "src/pass/cancellation.rs",
+      "builds": true,
+      "checkers": {
+        "pass-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "lowering-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "decomposition": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "in-compiler-verifier": {
+          "kind": "semantic-in-compiler",
+          "caught": true,
+          "evidence": [
+            "p2_s_s.qasm@simulator",
+            "p2_s_s.qasm@simulator-nisq"
+          ]
+        },
+        "qir-structure": {
+          "kind": "structural",
+          "caught": false
+        },
+        "unit-tests": {
+          "kind": "example-based",
+          "caught": false
+        }
+      },
+      "caught_by": [
+        "in-compiler-verifier"
+      ]
+    },
+    {
+      "id": "cancel-across-measurement",
+      "description": "gate cancellation looks through a measurement to pair the gates around it",
+      "file": "src/pass/adjacency.rs",
+      "builds": true,
+      "checkers": {
+        "pass-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "lowering-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "decomposition": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "in-compiler-verifier": {
+          "kind": "semantic-in-compiler",
+          "caught": false,
+          "evidence": []
+        },
+        "qir-structure": {
+          "kind": "structural",
+          "caught": false
+        },
+        "unit-tests": {
+          "kind": "example-based",
+          "caught": true
+        }
+      },
+      "caught_by": [
+        "unit-tests"
+      ]
+    },
+    {
+      "id": "canonicalize-commutes-h-x",
+      "description": "canonicalization swaps an adjacent H;X pair on one qubit, which do not commute",
+      "file": "src/pass/canonicalize.rs",
+      "builds": true,
+      "checkers": {
+        "pass-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "lowering-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "decomposition": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "in-compiler-verifier": {
+          "kind": "semantic-in-compiler",
+          "caught": false,
+          "evidence": []
+        },
+        "qir-structure": {
+          "kind": "structural",
+          "caught": false
+        },
+        "unit-tests": {
+          "kind": "example-based",
+          "caught": false
+        }
+      },
+      "caught_by": []
+    },
+    {
+      "id": "fusion-wrong-euler-angle",
+      "description": "single-qubit fusion negates phi when synthesizing the U",
+      "file": "src/pass/fusion.rs",
+      "builds": true,
+      "checkers": {
+        "pass-equivalence": {
+          "kind": "semantic-test",
+          "caught": true
+        },
+        "lowering-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "decomposition": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "in-compiler-verifier": {
+          "kind": "semantic-in-compiler",
+          "caught": false,
+          "evidence": []
+        },
+        "qir-structure": {
+          "kind": "structural",
+          "caught": false
+        },
+        "unit-tests": {
+          "kind": "example-based",
+          "caught": false
+        }
+      },
+      "caught_by": [
+        "pass-equivalence"
+      ]
+    },
+    {
+      "id": "h-to-rz-sx-drops-a-step",
+      "description": "the h-to-rz-sx rule loses its final Rz(pi/2)",
+      "file": "src/lowering/rules.rs",
+      "builds": true,
+      "checkers": {
+        "pass-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "lowering-equivalence": {
+          "kind": "semantic-test",
+          "caught": true
+        },
+        "decomposition": {
+          "kind": "semantic-test",
+          "caught": true
+        },
+        "in-compiler-verifier": {
+          "kind": "semantic-in-compiler",
+          "caught": true,
+          "evidence": [
+            "p1_rotation_merge.qasm@simulator-nisq"
+          ]
+        },
+        "qir-structure": {
+          "kind": "structural",
+          "caught": false
+        },
+        "unit-tests": {
+          "kind": "example-based",
+          "caught": true
+        }
+      },
+      "caught_by": [
+        "lowering-equivalence",
+        "decomposition",
+        "in-compiler-verifier",
+        "unit-tests"
+      ]
+    },
+    {
+      "id": "rx-to-rz-sx-wrong-angle",
+      "description": "the rx-to-rz-sx rule's last rotation is -pi/2 instead of 5pi/2",
+      "file": "src/lowering/rules.rs",
+      "builds": true,
+      "checkers": {
+        "pass-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "lowering-equivalence": {
+          "kind": "semantic-test",
+          "caught": true
+        },
+        "decomposition": {
+          "kind": "semantic-test",
+          "caught": true
+        },
+        "in-compiler-verifier": {
+          "kind": "semantic-in-compiler",
+          "caught": false,
+          "evidence": []
+        },
+        "qir-structure": {
+          "kind": "structural",
+          "caught": false
+        },
+        "unit-tests": {
+          "kind": "example-based",
+          "caught": false
+        }
+      },
+      "caught_by": [
+        "lowering-equivalence",
+        "decomposition"
+      ]
+    },
+    {
+      "id": "swap-to-cx-wrong-orientation",
+      "description": "swap-to-cx emits three CNOTs in the same direction (that is one CNOT, not a SWAP)",
+      "file": "src/lowering/rules.rs",
+      "builds": true,
+      "checkers": {
+        "pass-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "lowering-equivalence": {
+          "kind": "semantic-test",
+          "caught": true
+        },
+        "decomposition": {
+          "kind": "semantic-test",
+          "caught": true
+        },
+        "in-compiler-verifier": {
+          "kind": "semantic-in-compiler",
+          "caught": true,
+          "evidence": [
+            "p8_swap.qasm@simulator-nisq",
+            "p9_routing.qasm@simulator-nisq"
+          ]
+        },
+        "qir-structure": {
+          "kind": "structural",
+          "caught": false
+        },
+        "unit-tests": {
+          "kind": "example-based",
+          "caught": false
+        }
+      },
+      "caught_by": [
+        "lowering-equivalence",
+        "decomposition",
+        "in-compiler-verifier"
+      ]
+    },
+    {
+      "id": "routing-forged-final-layout",
+      "description": "lowering reports the initial layout as the final one, ignoring the SWAPs it inserted",
+      "file": "src/lowering/mod.rs",
+      "builds": true,
+      "checkers": {
+        "pass-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "lowering-equivalence": {
+          "kind": "semantic-test",
+          "caught": true
+        },
+        "decomposition": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "in-compiler-verifier": {
+          "kind": "semantic-in-compiler",
+          "caught": false,
+          "evidence": []
+        },
+        "qir-structure": {
+          "kind": "structural",
+          "caught": false
+        },
+        "unit-tests": {
+          "kind": "example-based",
+          "caught": false
+        }
+      },
+      "caught_by": [
+        "lowering-equivalence"
+      ]
+    },
+    {
+      "id": "qir-cx-operands-swapped",
+      "description": "QIR emission writes a CX's target before its control",
+      "file": "src/ir/qir.rs",
+      "builds": true,
+      "checkers": {
+        "pass-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "lowering-equivalence": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "decomposition": {
+          "kind": "semantic-test",
+          "caught": false
+        },
+        "in-compiler-verifier": {
+          "kind": "semantic-in-compiler",
+          "caught": false,
+          "evidence": []
+        },
+        "qir-structure": {
+          "kind": "structural",
+          "caught": false
+        },
+        "unit-tests": {
+          "kind": "example-based",
+          "caught": false
+        }
+      },
+      "caught_by": []
+    }
+  ]
+}

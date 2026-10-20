@@ -74,6 +74,10 @@ Also fixed:
     bundle a `libgomp`, and the default reserve fits only the first one
     loaded.
 - **A double-encoded comment in `fuzz/src/lib.rs`.**
+- **A stale mutant.** The rotation-merge sign-flip mutant still targeted the
+  pre-`exact_affine` code, and stopped the reference run's mutation step. A
+  harness test now applies every mutant to the current source.
+- **The Stage G reference run** is regenerated in full at `0.7.1`.
 
 ### Added
 
