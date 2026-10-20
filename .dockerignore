@@ -1,0 +1,10 @@
+target
+.venv
+**/__pycache__
+**/*.pyd
+**/*.so
+fuzz/target
+fuzz/artifacts
+benchmarks/results
+frontend/node_modules
+.git

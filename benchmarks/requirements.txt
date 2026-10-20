@@ -1,0 +1,13 @@
+# The benchmark harness's dependencies, pinned to the versions the reference
+# run used (recorded per run in environment.json). OQCI itself is installed
+# from this repository (`maturin develop --manifest-path python/Cargo.toml`).
+qiskit==2.5.1
+qiskit-aer==0.17.2
+qiskit-ibm-runtime==0.50.0
+pytket==2.18.5
+pytket-qiskit==0.79.0
+pyqir==0.12.5
+numpy>=2.0
+scipy>=1.13
+matplotlib>=3.9
+pytest>=8.0
