@@ -226,11 +226,11 @@ jobs:
         working-directory: fuzz
         env:
           OQCI_MUTATION_ONLY: ${{ matrix.target }}
-        run: ../scripts/ci_annotate.sh "mutation smoke ${{ matrix.target }}" cargo test --no-default-features --release --test mutate -- --ignored --nocapture
+        run: bash ../scripts/ci_annotate.sh "mutation smoke ${{ matrix.target }}" cargo test --no-default-features --release --test mutate -- --ignored --nocapture
       - name: Fuzz for 60 seconds
         run: |
           mkdir -p fuzz/corpus/${{ matrix.target }}
-          scripts/ci_annotate.sh "cargo fuzz ${{ matrix.target }}"             cargo +nightly fuzz run --fuzz-dir fuzz ${{ matrix.target }} fuzz/corpus/${{ matrix.target }} -- -max_total_time=60
+          bash scripts/ci_annotate.sh "cargo fuzz ${{ matrix.target }}" cargo +nightly fuzz run --fuzz-dir fuzz ${{ matrix.target }} fuzz/corpus/${{ matrix.target }} -- -max_total_time=60
       - name: Keep crashing inputs
         if: failure()
         uses: actions/upload-artifact@v4
@@ -255,19 +255,19 @@ jobs:
         run: |
           python -m venv .venv
           source .venv/bin/activate
-          scripts/ci_annotate.sh "pip install cudaq" pip install -r python/requirements-dev.txt cudaq==0.16.0.post1
-          scripts/ci_annotate.sh "maturin develop" maturin develop --manifest-path python/Cargo.toml
+          bash scripts/ci_annotate.sh "pip install cudaq" pip install -r python/requirements-dev.txt cudaq==0.16.0.post1
+          bash scripts/ci_annotate.sh "maturin develop" maturin develop --manifest-path python/Cargo.toml
       - name: CUDA-Q imports and runs on the CPU target
         run: |
           source .venv/bin/activate
-          scripts/ci_annotate.sh "import cudaq" python -c "import cudaq; print(cudaq.__version__); print(cudaq.get_target())"
+          bash scripts/ci_annotate.sh "import cudaq" python -c "import cudaq; print(cudaq.__version__); print(cudaq.get_target())"
       - name: Run the CUDA-Q adapter tests against CUDA-Q
         env:
           # A missing or broken CUDA-Q fails this job instead of skipping it.
           OQCI_REQUIRE_CUDAQ: "1"
         run: |
           source .venv/bin/activate
-          scripts/ci_annotate.sh "cudaq tests" pytest python/tests/test_backend_cudaq.py python/tests/test_backend_cudaq_live.py -v -rs
+          bash scripts/ci_annotate.sh "cudaq tests" pytest python/tests/test_backend_cudaq.py python/tests/test_backend_cudaq_live.py -v -rs
 
   # The benchmark harness end to end on the smoke profile (never reported as
   # results), plus its own tests.

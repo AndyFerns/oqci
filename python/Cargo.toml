@@ -3,6 +3,9 @@ name = "oqci-python"
 description = "Python bindings for the Open Quantum Compiler Infrastructure"
 version = "0.7.1"
 edition = "2024"
+# Not a crates.io crate (it ships as a Python wheel), so its
+# version-less path dependency on `oqci` is allowed by cargo-deny.
+publish = false
 
 license = "Apache-2.0"
 repository = "https://github.com/AndyFerns/oqci"

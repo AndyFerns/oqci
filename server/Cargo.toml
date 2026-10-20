@@ -3,6 +3,9 @@ name = "oqci-server"
 description = "Local live-visualization server for OQCI — a read-only observer of the compiler"
 version = "0.7.1"
 edition = "2024"
+# Not a crates.io crate (it is a local binary), so its
+# version-less path dependency on `oqci` is allowed by cargo-deny.
+publish = false
 
 license = "Apache-2.0"
 repository = "https://github.com/AndyFerns/oqci"

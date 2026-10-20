@@ -33,7 +33,8 @@ confidence-threshold = 0.9
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
-# Path dependencies inside this workspace (examples, fuzz) carry no version.
+# Path dependencies inside this workspace carry no version; cargo-deny allows
+# that only for crates marked `publish = false` (python, server, examples).
 allow-wildcard-paths = true
 
 [sources]
