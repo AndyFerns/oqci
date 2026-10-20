@@ -160,7 +160,15 @@ mutant that no checker catches is reported as **surviving**, not hidden.
 
 ## The reference run
 
-The committed reference run is `benchmarks/results/20261020-stage-g/`. It
+The reference run is `benchmarks/results/20261020-stage-g/`.
+
+*Status 2026-10-21:* it is being regenerated. The first run, built at
+`0.6.0`, stopped at `random_4_i6` on the t\|ket⟩ permutation that the
+fallback now handles. It was dropped (`d42b413`) rather than mixed with a
+second build, and the full run is being repeated on `0.7.1`. Until that run
+is committed, the directory is not in the repository.
+
+When committed, it
 holds:
 
 - the records, the configuration and the environment;

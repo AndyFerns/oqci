@@ -311,7 +311,7 @@ oqci prepare examples/bell.qasm --backend simulator-nisq --shots 512 --seed 7
 }
 ```
 
-`-o FILE` writes it to a file instead of stdout. The artifact is what
+`-o FILE` (`--output FILE`) writes it to a file instead of stdout. The artifact is what
 `oqci.backends.aer.run` consumes — see [`../python/README.md`](../python/README.md).
 
 Two things about this output are deliberate. It is **not QIR**: Stage C §5
