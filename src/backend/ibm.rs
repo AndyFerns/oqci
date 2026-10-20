@@ -163,25 +163,7 @@ impl IbmBackend {
                 mid_circuit_measurement: false,
                 reset: false,
             })
-            .decomposition_rules([
-                "id-to-nothing",
-                "y-to-rz-x",
-                "z-to-rz",
-                "h-to-rz-sx",
-                "s-to-rz",
-                "sdg-to-rz",
-                "t-to-rz",
-                "tdg-to-rz",
-                "sxdg-to-sx",
-                "rx-to-rz-sx",
-                "ry-to-rz-sx",
-                "p-to-rz",
-                "u-to-rz-sx",
-                "cy-to-cx",
-                "cz-to-cx",
-                "swap-to-cx",
-                "ccx-to-cx",
-            ])
+            .decomposition_rules(crate::target::builtin::CX_BASIS_RULES.iter().copied())
             .capability("directed-coupling")
             .capability("synthetic-not-a-real-device")
             .cost_model("nisq-weighted")

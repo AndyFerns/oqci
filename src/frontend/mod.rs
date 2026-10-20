@@ -34,8 +34,22 @@ pub mod gate_map;
 pub mod openqasm;
 pub mod qiskit;
 
-pub use cudaq::{parse_cudaq, parse_cudaq_named};
+pub use cudaq::{parse_cudaq, parse_cudaq_named, parse_cudaq_timed};
 pub use error::FrontendError;
 pub use gate_map::map_gate;
-pub use openqasm::{parse_openqasm3, parse_openqasm3_named};
+pub use openqasm::{parse_openqasm3, parse_openqasm3_named, parse_openqasm3_timed};
 pub use qiskit::{QiskitCircuitIr, QiskitInstruction, QiskitParam};
+
+/// How long a frontend took, split where the frontend can split it.
+///
+/// Both built-in frontends run in two stages — source text to a syntax tree,
+/// then the tree to validated QC-IR — and are timed per stage. A frontend
+/// that cannot split reports its whole time as `parse` and no
+/// `ir_construction`, rather than inventing a division.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct FrontendTiming {
+    /// Reading the source into the frontend's own representation.
+    pub parse: std::time::Duration,
+    /// Building validated QC-IR from it, when measured separately.
+    pub ir_construction: Option<std::time::Duration>,
+}

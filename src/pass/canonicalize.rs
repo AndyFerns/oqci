@@ -61,7 +61,7 @@ impl Pass for Canonicalize {
 }
 
 /// `true` if this instruction provably does nothing at all.
-fn is_identity(inst: &Instruction) -> bool {
+pub(crate) fn is_identity(inst: &Instruction) -> bool {
     let Instruction::Gate { kind, .. } = inst else {
         // Measurement and reset always do something.
         return false;

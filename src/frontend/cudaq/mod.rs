@@ -71,3 +71,26 @@ pub fn parse_cudaq_named(source: &str, name: &str) -> Result<Circuit, FrontendEr
     let kernel = parser::parse(source)?;
     translate::translate(&kernel, name)
 }
+
+/// As [`parse_cudaq_named`], timing parsing and IR construction separately
+/// (`final-deliverables-spec.md` §24).
+///
+/// # Errors
+///
+/// As [`parse_cudaq_named`].
+pub fn parse_cudaq_timed(
+    source: &str,
+    name: &str,
+) -> Result<(Circuit, super::FrontendTiming), FrontendError> {
+    let started = std::time::Instant::now();
+    let kernel = parser::parse(source)?;
+    let parsed = std::time::Instant::now();
+    let circuit = translate::translate(&kernel, name)?;
+    Ok((
+        circuit,
+        super::FrontendTiming {
+            parse: parsed - started,
+            ir_construction: Some(parsed.elapsed()),
+        },
+    ))
+}

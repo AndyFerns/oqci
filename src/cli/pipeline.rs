@@ -26,12 +26,11 @@ use crate::analysis::{analyze, diff_circuits};
 use crate::backend::ExecutionSettings;
 use crate::cli::CliError;
 use crate::cli::snapshot::{
-    PassRecordView, PipelineReport, QirInfoView, StageSnapshot, diff_view, executable_view,
-    graph_of, instructions_of, lowering_view, target_report,
+    PassRecordView, PipelineReport, QirInfoView, StageSnapshot, TimingsView, diff_view,
+    executable_view, graph_of, instructions_of, lowering_view, target_report,
 };
-use crate::compile::{
-    CompilationArtifacts, CompilerConfig, Frontend, QirArtifact, QirRequest, Stop,
-};
+use crate::compile::{CompilationArtifacts, CompilerConfig, QirArtifact, QirRequest, Stop};
+use crate::extension::Registry;
 use crate::ir::{Circuit, qc_to_qco};
 use crate::lowering::LoweringConfig;
 use crate::pass::PassSelection;
@@ -63,6 +62,23 @@ impl Stage {
     }
 }
 
+/// What every command shares beyond its own arguments: the extensions it may
+/// use and the optional report sections it asked for.
+#[derive(Debug, Clone, Default)]
+pub struct Session {
+    /// Extension frontends, passes, backends and lint rules, plus any target
+    /// file loaded for this run.
+    pub registry: Registry,
+    /// The frontend named with `--frontend`, overriding the file extension.
+    pub frontend: Option<String>,
+    /// Whether to include lint findings (`--lint`).
+    pub lint: bool,
+    /// Whether to include per-stage timings (`--timings`).
+    pub timings: bool,
+    /// Semantic verification (`--verify`).
+    pub verify: crate::verify::VerifyConfig,
+}
+
 /// Runs frontend → QC-IR → QCO-IR → QIR, recording each requested stage.
 ///
 /// # Errors
@@ -70,6 +86,7 @@ impl Stage {
 /// [`CliError`] from any stage. A circuit with unbound parameters is **not**
 /// an error: the QIR stage records why it could not run, so `watch` stays
 /// useful while an ansatz is being written.
+#[cfg(test)]
 pub fn run_compile(
     path: &Path,
     source: &str,
@@ -77,7 +94,15 @@ pub fn run_compile(
     emit: &[Stage],
     target: Option<&BasisProfile>,
 ) -> Result<PipelineReport, CliError> {
-    run_compile_with(path, source, bindings, emit, target, &QirRequest::default())
+    run_compile_with(
+        path,
+        source,
+        bindings,
+        emit,
+        target,
+        &QirRequest::default(),
+        &Session::default(),
+    )
 }
 
 /// As [`run_compile`], with an explicit request for the QIR output.
@@ -97,6 +122,7 @@ pub fn run_compile_with(
     emit: &[Stage],
     target: Option<&BasisProfile>,
     qir: &QirRequest,
+    session: &Session,
 ) -> Result<PipelineReport, CliError> {
     // Everything before rendering comes from the orchestrator, so the CLI
     // cannot drift from the library (spec 19: the CLI "must not duplicate
@@ -107,10 +133,57 @@ pub fn run_compile_with(
         bindings,
         &PassSelection::only::<[&str; 0], &str>([]),
         qir,
+        session,
     )?;
-    let mut report = new_report(path, &artifacts.source_circuit);
+    let mut report = new_report(path, &artifacts, &artifacts.source_circuit, session);
     report.stages = stages_for(&artifacts.source_circuit, emit, artifacts.qir.as_ref())?;
     report.target = target_for(&artifacts.source_circuit, target)?;
+    if session.lint {
+        report.lint = Some(
+            session
+                .registry
+                .linter()
+                .lint(&artifacts.source_circuit, target),
+        );
+    }
+    Ok(report)
+}
+
+/// Lints a program: the source circuit, or the optimized one, against a
+/// target profile when one is given.
+///
+/// # Errors
+///
+/// [`CliError`] from the frontend or the pass pipeline.
+pub fn run_lint(
+    path: &Path,
+    source: &str,
+    bindings: &HashMap<String, f64>,
+    optimized: bool,
+    target: Option<&BasisProfile>,
+    session: &Session,
+) -> Result<PipelineReport, CliError> {
+    let passes = if optimized {
+        PassSelection::All
+    } else {
+        PassSelection::only::<[&str; 0], &str>([])
+    };
+    let artifacts = orchestrate(
+        path,
+        source,
+        bindings,
+        &passes,
+        &QirRequest::default(),
+        session,
+    )?;
+    let circuit = if optimized {
+        &artifacts.optimized
+    } else {
+        &artifacts.source_circuit
+    };
+    let mut report = new_report(path, &artifacts, circuit, session);
+    report.lint = Some(session.registry.linter().lint(circuit, target));
+    report.target = target_for(circuit, target)?;
     Ok(report)
 }
 
@@ -126,17 +199,32 @@ fn orchestrate(
     bindings: &HashMap<String, f64>,
     passes: &PassSelection,
     qir: &QirRequest,
+    session: &Session,
 ) -> Result<CompilationArtifacts, CliError> {
     let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("main");
     let config = CompilerConfig {
-        frontend: Frontend::for_path(path),
         bindings: bindings.clone(),
         passes: passes.clone(),
         stop: Stop::Optimized,
         qir: *qir,
+        extensions: session.registry.clone(),
+        verify: session.verify,
         ..CompilerConfig::default()
     };
-    Ok(crate::compile::compile_named(source, name, &config)?)
+    let frontend = frontend_id(path, session);
+    Ok(crate::compile::compile_with_frontend(
+        source, name, &frontend, &config,
+    )?)
+}
+
+/// The frontend to read `path` with: `--frontend` when given, otherwise the
+/// one the file extension implies (an extension's claim first, then the
+/// built-in rule: `.py` is CUDA-Q, anything else OpenQASM 3).
+fn frontend_id(path: &Path, session: &Session) -> String {
+    session
+        .frontend
+        .clone()
+        .unwrap_or_else(|| session.registry.frontend_for_path(path).id().to_string())
 }
 
 /// Evaluates a circuit against a target profile, when one was selected.
@@ -174,6 +262,7 @@ fn cost_model_for(profile: &BasisProfile) -> Result<WeightedCostModel, CliError>
 /// # Errors
 ///
 /// [`CliError`] from the frontend, a pass, or lowering.
+#[cfg(test)]
 pub fn run_optimize(
     path: &Path,
     source: &str,
@@ -192,6 +281,7 @@ pub fn run_optimize(
         want_diff,
         target,
         &QirRequest::default(),
+        &Session::default(),
     )
 }
 
@@ -211,12 +301,16 @@ pub fn run_optimize_with(
     want_diff: bool,
     target: Option<&BasisProfile>,
     qir: &QirRequest,
+    session: &Session,
 ) -> Result<PipelineReport, CliError> {
-    let artifacts = orchestrate(path, source, bindings, selection, qir)?;
+    let artifacts = orchestrate(path, source, bindings, selection, qir, session)?;
     let original = artifacts.source_circuit.clone();
     let optimized = artifacts.optimized.clone();
 
-    let mut report = new_report(path, &optimized);
+    let mut report = new_report(path, &artifacts, &optimized, session);
+    if session.lint {
+        report.lint = Some(session.registry.linter().lint(&original, target));
+    }
     report.passes = Some(
         artifacts
             .pass_records
@@ -297,13 +391,13 @@ pub fn run_lower(
     path: &Path,
     source: &str,
     request: &LowerRequest<'_>,
+    session: &Session,
 ) -> Result<PipelineReport, CliError> {
     let backend = request.backend;
     let emit = request.emit;
 
     let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("main");
     let config = CompilerConfig {
-        frontend: Frontend::for_path(path),
         bindings: request.bindings.clone(),
         backend: Some(backend.to_string()),
         lowering: request.lowering.clone(),
@@ -314,16 +408,21 @@ pub fn run_lower(
             Stop::Lowered
         },
         qir: request.qir,
+        extensions: session.registry.clone(),
+        lint: session.lint,
+        verify: session.verify,
         ..CompilerConfig::default()
     };
-    let artifacts = crate::compile::compile_named(source, name, &config)?;
+    let frontend = frontend_id(path, session);
+    let artifacts = crate::compile::compile_with_frontend(source, name, &frontend, &config)?;
 
     let lowered = artifacts
         .lowered
         .as_ref()
         .expect("lowering ran, so there is a lowered circuit");
 
-    let mut report = new_report(path, &lowered.circuit);
+    let mut report = new_report(path, &artifacts, &lowered.circuit, session);
+    report.lint.clone_from(&artifacts.lint);
     report.passes = Some(
         artifacts
             .pass_records
@@ -362,8 +461,9 @@ pub fn run_lower(
     // Asked of the backend rather than looked up in `builtin`, which only
     // knows the profiles it enumerates: resolving by id meant a backend with
     // its own profile — `ibm-illustrative` — silently printed no target or
-    // cost section at all, with nothing to say why.
-    if let Some(backend) = crate::backend::by_id(backend) {
+    // cost section at all, with nothing to say why. Asked of the session's
+    // registry, so an extension or a loaded target file reports too.
+    if let Some(backend) = session.registry.backend(backend) {
         report.target = Some(target_report(
             &lowered.circuit,
             backend.profile(),
@@ -380,18 +480,26 @@ pub fn run_lower(
     Ok(report)
 }
 
-fn new_report(path: &Path, circuit: &Circuit) -> PipelineReport {
+fn new_report(
+    path: &Path,
+    artifacts: &CompilationArtifacts,
+    circuit: &Circuit,
+    session: &Session,
+) -> PipelineReport {
     PipelineReport {
         source_path: path.display().to_string(),
-        frontend: Frontend::for_path(path).id().into(),
+        frontend: artifacts
+            .frontend_id
+            .clone()
+            .unwrap_or_else(|| frontend_id(path, session)),
         circuit_name: circuit.name().to_string(),
         unbound_parameters: circuit.parameters(),
-        stages: Vec::new(),
-        passes: None,
-        diff: None,
-        target: None,
-        lowering: None,
-        executable: None,
+        extensions: artifacts.extensions.clone(),
+        timings: session
+            .timings
+            .then(|| TimingsView::new(&artifacts.timings)),
+        verification: artifacts.verification.clone(),
+        ..PipelineReport::default()
     }
 }
 

@@ -1,0 +1,44 @@
+{
+  "id": "heron-style-synthetic",
+  "version": "1",
+  "backend_id": "ibm",
+  "topology": {
+    "qubit_count": 6,
+    "edges": [
+      [0, 1], [1, 0],
+      [1, 2], [2, 1],
+      [2, 3], [3, 2],
+      [3, 4], [4, 3],
+      [4, 5], [5, 4],
+      [5, 0], [0, 5]
+    ]
+  },
+  "supported_operations": ["cz", "rz", "sx", "x", "measure", "reset"],
+  "parameter_constraints": {},
+  "decomposition_rules": [
+    "id-to-nothing",
+    "y-to-rz-x",
+    "z-to-rz",
+    "h-to-rz-sx",
+    "s-to-rz",
+    "sdg-to-rz",
+    "t-to-rz",
+    "tdg-to-rz",
+    "sxdg-to-sx",
+    "rx-to-rz-sx",
+    "ry-to-rz-sx",
+    "p-to-rz",
+    "u-to-rz-sx",
+    "cx-to-cz",
+    "cy-to-cx",
+    "swap-to-cx",
+    "ccx-to-cx"
+  ],
+  "measurement": {
+    "measurement": true,
+    "mid_circuit_measurement": true,
+    "reset": true
+  },
+  "capabilities": ["synthetic-not-a-real-device", "cz-native"],
+  "cost_model_id": "nisq-weighted"
+}

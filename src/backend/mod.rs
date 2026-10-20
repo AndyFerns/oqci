@@ -57,7 +57,7 @@ use crate::target::{BasisProfile, CostModel, LegalityReport};
 
 pub use executable::{Executable, ExecutableOp};
 pub use ibm::IbmBackend;
-pub use result::{ExecutionResult, ExecutionSettings, Provenance};
+pub use result::{AdapterRunResult, ExecutionResult, ExecutionSettings, Provenance, ResultError};
 pub use simulator::SimulatorBackend;
 
 /// Why a backend could not do what was asked.
@@ -287,6 +287,96 @@ pub fn all() -> Vec<Box<dyn Backend>> {
 #[must_use]
 pub fn by_id(id: &str) -> Option<Box<dyn Backend>> {
     all().into_iter().find(|backend| backend.id() == id)
+}
+
+/// Builds a backend of one kind from a profile supplied at runtime.
+pub type TargetLoader = fn(
+    id: &str,
+    description: &str,
+    profile: BasisProfile,
+) -> Result<Box<dyn Backend>, BackendError>;
+
+/// The backend kinds a serialized target description can be loaded as.
+///
+/// Vendor names are allowed here, in the backend layer; the compiler core
+/// only ever sees the `Box<dyn Backend>` a loader returns (Stage C §6). Each
+/// kind differs only in what it says about execution, not in how it lowers:
+/// lowering, validation and preparation are the shared contract.
+#[must_use]
+pub fn target_loaders() -> &'static [(&'static str, TargetLoader)] {
+    fn ibm(
+        id: &str,
+        description: &str,
+        profile: BasisProfile,
+    ) -> Result<Box<dyn Backend>, BackendError> {
+        Ok(Box::new(IbmBackend::from_profile(
+            id,
+            description,
+            profile,
+        )?))
+    }
+    fn simulator(
+        id: &str,
+        description: &str,
+        profile: BasisProfile,
+    ) -> Result<Box<dyn Backend>, BackendError> {
+        Ok(Box::new(SimulatorBackend::try_from_profile(
+            id,
+            description,
+            profile,
+        )?))
+    }
+    &[("ibm", ibm), ("simulator", simulator)]
+}
+
+/// Builds a backend from a serialized [`BasisProfile`] supplied at runtime.
+///
+/// This is how a real device reaches the compiler (§9.2: "the selected IBM
+/// backend must be determined by configuration/runtime availability"): its
+/// description is retrieved outside the crate, converted to a profile, and
+/// loaded here. The profile is validated on deserialization and its rule set
+/// is checked on construction, so a malformed target is refused before any
+/// circuit is compiled for it.
+///
+/// - `kind` selects a [`target_loaders`] entry; `None` uses the profile's own
+///   `backend_id`, and fails if that names no loader.
+/// - `id` names the backend; `None` uses the profile's id.
+///
+/// # Errors
+///
+/// [`BackendError::InvalidTarget`] if the JSON is not a well-formed profile,
+/// names an unknown kind or cost model, or has a rule set that does not reach
+/// its own basis.
+pub fn from_target_json(
+    json: &str,
+    kind: Option<&str>,
+    id: Option<&str>,
+) -> Result<Box<dyn Backend>, BackendError> {
+    let profile: BasisProfile =
+        serde_json::from_str(json).map_err(|error| BackendError::InvalidTarget {
+            backend: id.unwrap_or("<target file>").to_string(),
+            detail: format!("could not read target description: {error}"),
+        })?;
+    let id = id.unwrap_or(profile.id()).to_string();
+    let kind = kind.unwrap_or(profile.backend_id()).to_string();
+    let Some((_, loader)) = target_loaders().iter().find(|(name, _)| *name == kind) else {
+        return Err(BackendError::InvalidTarget {
+            backend: id,
+            detail: format!(
+                "unknown target kind `{kind}`; available: {}",
+                target_loaders()
+                    .iter()
+                    .map(|(name, _)| *name)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        });
+    };
+    let description = format!(
+        "{kind} target `{}` loaded at runtime; lowered and validated against the supplied          description, with no claim beyond it",
+        profile.qualified_id()
+    );
+    loader(&id, &description, profile)
 }
 
 #[cfg(test)]

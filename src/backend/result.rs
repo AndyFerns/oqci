@@ -70,6 +70,14 @@ pub struct Provenance {
     /// repetition counts in Stage G, and inventing one here would be
     /// fabricating an experimental parameter.
     pub seed: Option<u64>,
+    /// Every extension that took part, as `crate@version kind:id` (§18).
+    ///
+    /// Omitted from serialized output when empty, so a compilation that used
+    /// no extension produces exactly the record it always did; present
+    /// whenever one did, so a result can never hide that part of it came from
+    /// outside the compiler core.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extensions: Vec<String>,
 }
 
 impl Provenance {
@@ -135,7 +143,101 @@ pub struct ExecutionResult {
     pub provenance: Provenance,
 }
 
+/// What an execution adapter returned, as it serializes it.
+///
+/// The Python execution adapters (`python/oqci/backends/`) return a
+/// `RunResult`; this is its wire form, and [`ExecutionResult::from_adapter`]
+/// turns it into the crate's own result type. That conversion is the §10
+/// "result retrieval" step: a run that happened outside the compiler process
+/// comes back as a structured, provenance-carrying [`ExecutionResult`].
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct AdapterRunResult {
+    /// Bitstring counts, one character per classical bit, clbit 0 rightmost.
+    pub counts: BTreeMap<String, u64>,
+    /// Per-shot outcomes, when requested.
+    #[serde(default)]
+    pub memory: Option<Vec<String>>,
+    /// The runtime's own metadata, verbatim and of any JSON shape.
+    #[serde(default)]
+    pub backend_metadata: BTreeMap<String, serde_json::Value>,
+    /// Time the runtime spent executing, in milliseconds.
+    #[serde(default)]
+    pub execution_duration_ms: Option<f64>,
+    /// Time the job waited before running (a hardware queue), in
+    /// milliseconds. Local simulators have none and leave it out.
+    #[serde(default)]
+    pub queue_duration_ms: Option<f64>,
+    /// The provenance carried from the executable that ran.
+    pub provenance: Provenance,
+}
+
+/// Why an adapter's result could not be accepted.
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+pub enum ResultError {
+    /// The JSON did not have the shape of an adapter result.
+    #[error("not an execution adapter result: {0}")]
+    Malformed(String),
+    /// A count key is not a bitstring, or keys disagree in width.
+    #[error("count key `{key}` is not a {width}-bit bitstring of 0s and 1s")]
+    BadBitstring {
+        /// The offending key.
+        key: String,
+        /// The width the other keys have.
+        width: usize,
+    },
+}
+
 impl ExecutionResult {
+    /// Builds a result from an execution adapter's output.
+    ///
+    /// `compilation_duration_ms` is the orchestrator's own measurement of the
+    /// compilation that produced the executable, when the caller has it; it is
+    /// never derived from the adapter's numbers. Queue time and execution time
+    /// come from the adapter, separately (Stage C §8). Metadata values that
+    /// are not strings are kept as their compact JSON text, so nothing the
+    /// runtime reported is dropped.
+    ///
+    /// # Errors
+    ///
+    /// [`ResultError`] if the JSON is not an adapter result, or a count key is
+    /// not a bitstring of the same width as the others.
+    pub fn from_adapter(
+        json: &str,
+        compilation_duration_ms: Option<f64>,
+    ) -> Result<Self, ResultError> {
+        let run: AdapterRunResult =
+            serde_json::from_str(json).map_err(|e| ResultError::Malformed(e.to_string()))?;
+        let width = run.counts.keys().next().map_or(0, String::len);
+        for key in run.counts.keys() {
+            if key.len() != width || !key.bytes().all(|b| b == b'0' || b == b'1') {
+                return Err(ResultError::BadBitstring {
+                    key: key.clone(),
+                    width,
+                });
+            }
+        }
+        let backend_metadata = run
+            .backend_metadata
+            .into_iter()
+            .map(|(key, value)| {
+                let text = match value {
+                    serde_json::Value::String(text) => text,
+                    other => other.to_string(),
+                };
+                (key, text)
+            })
+            .collect();
+        Ok(ExecutionResult {
+            counts: run.counts,
+            memory: run.memory,
+            backend_metadata,
+            compilation_duration_ms,
+            submission_duration_ms: run.queue_duration_ms,
+            execution_duration_ms: run.execution_duration_ms,
+            provenance: run.provenance,
+        })
+    }
+
     /// Total shots actually observed, summed from the counts.
     ///
     /// Derived from the data rather than echoed from the request, so a
@@ -181,6 +283,7 @@ mod tests {
             swaps_inserted: 0,
             shots: 100,
             seed: Some(7),
+            extensions: Vec::new(),
         }
     }
 
@@ -240,16 +343,69 @@ mod tests {
         assert_eq!(result.execution_duration_ms, Some(3.0));
     }
 
+    fn adapter_json(counts: &str, extra: &str) -> String {
+        format!(
+            r#"{{"counts": {counts}, "memory": null,
+                "backend_metadata": {{"method": "statevector", "shots": 100, "nested": {{"a": [1, 2]}}}},
+                "execution_duration_ms": 2.5{extra},
+                "provenance": {}}}"#,
+            serde_json::to_string(&provenance()).unwrap()
+        )
+    }
+
+    #[test]
+    fn an_adapter_result_becomes_an_execution_result() {
+        // The §10 retrieval step: what a Python adapter returned comes back as
+        // the crate's own structured result, provenance intact.
+        let result =
+            ExecutionResult::from_adapter(&adapter_json(r#"{"00": 60, "11": 40}"#, ""), Some(1.5))
+                .unwrap();
+        assert_eq!(result.observed_shots(), 100);
+        assert_eq!(result.provenance, provenance());
+        assert_eq!(result.compilation_duration_ms, Some(1.5));
+        assert_eq!(result.execution_duration_ms, Some(2.5));
+        assert_eq!(
+            result.submission_duration_ms, None,
+            "a local simulator has no queue, and none is invented"
+        );
+        // Non-string metadata is kept as JSON text, not dropped.
+        assert_eq!(result.backend_metadata["method"], "statevector");
+        assert_eq!(result.backend_metadata["shots"], "100");
+        assert_eq!(result.backend_metadata["nested"], r#"{"a":[1,2]}"#);
+    }
+
+    #[test]
+    fn queue_time_is_carried_separately_from_execution_time() {
+        let result = ExecutionResult::from_adapter(
+            &adapter_json(r#"{"0": 1}"#, r#", "queue_duration_ms": 9000.0"#),
+            None,
+        )
+        .unwrap();
+        assert_eq!(result.submission_duration_ms, Some(9000.0));
+        assert_eq!(result.execution_duration_ms, Some(2.5));
+        assert_eq!(result.compilation_duration_ms, None);
+    }
+
+    #[test]
+    fn malformed_adapter_output_is_refused() {
+        assert!(matches!(
+            ExecutionResult::from_adapter("{}", None),
+            Err(ResultError::Malformed(_))
+        ));
+        assert!(matches!(
+            ExecutionResult::from_adapter(&adapter_json(r#"{"00": 1, "1": 2}"#, ""), None),
+            Err(ResultError::BadBitstring { .. })
+        ));
+        assert!(matches!(
+            ExecutionResult::from_adapter(&adapter_json(r#"{"0x": 1}"#, ""), None),
+            Err(ResultError::BadBitstring { .. })
+        ));
+    }
+
     #[test]
     fn a_result_round_trips_through_json() {
         // The wire format has to survive a round trip: an execution result is
         // an archival record, and something will eventually read one back.
-        //
-        // Note that the Python adapter's `AerResult` is deliberately *not*
-        // this type — it carries only what an execution knows, with no
-        // compilation timings to invent — so nothing converts between the two
-        // today. If something ever does, the conversion is the thing to test,
-        // not this.
         let original = result(&[("00", 12), ("11", 9)]);
         let json = serde_json::to_string(&original).unwrap();
         let parsed: ExecutionResult = serde_json::from_str(&json).unwrap();

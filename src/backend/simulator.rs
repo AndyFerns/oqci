@@ -97,9 +97,13 @@ impl SimulatorBackend {
     /// # Errors
     ///
     /// [`BackendError::InvalidTarget`] if the profile's cost model is
-    /// unknown. `cost::resolve` returns `None` rather than substituting a
-    /// default, because a result recording a cost model that did not produce
-    /// it is false provenance (Stage E §9).
+    /// unknown, or if its decomposition rules cannot reach its own basis.
+    /// `cost::resolve` returns `None` rather than substituting a default,
+    /// because a result recording a cost model that did not produce it is
+    /// false provenance (Stage E §9). The rule check is the one
+    /// [`IbmBackend::from_profile`](super::IbmBackend::from_profile) makes, so a
+    /// malformed target is reported against the target whichever backend kind
+    /// is built from it, rather than on the first circuit.
     pub fn try_from_profile(
         id: &str,
         description: &str,
@@ -110,6 +114,10 @@ impl SimulatorBackend {
                 backend: id.to_string(),
                 detail: format!("unknown cost model `{}`", profile.cost_model_id()),
             })?;
+        crate::lowering::RuleSet::new(&profile).map_err(|source| BackendError::InvalidTarget {
+            backend: id.to_string(),
+            detail: format!("decomposition rules do not reach the basis: {source}"),
+        })?;
         Ok(SimulatorBackend {
             id: id.to_string(),
             description: description.to_string(),
@@ -190,6 +198,7 @@ pub fn provenance_for(
         swaps_inserted: lowered.swaps_inserted,
         shots: settings.shots,
         seed: settings.seed,
+        extensions: Vec::new(),
     }
 }
 

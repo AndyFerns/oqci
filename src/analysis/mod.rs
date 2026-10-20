@@ -21,7 +21,9 @@
 //! `None` rather than being reported as zero.
 
 pub mod diff;
+pub mod lint;
 pub mod report;
 
 pub use diff::{CircuitDiff, DiffEntry, diff_circuits};
+pub use lint::{Diagnostic, LintReport, LintRule, Linter, Severity};
 pub use report::{ResourceReport, analyze};

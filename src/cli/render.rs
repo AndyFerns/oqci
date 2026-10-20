@@ -11,8 +11,9 @@
 
 use std::fmt::Write as _;
 
+use crate::analysis::lint::LintReport;
 use crate::cli::CliError;
-use crate::cli::snapshot::{PipelineReport, StageSnapshot};
+use crate::cli::snapshot::{PipelineReport, StageSnapshot, TimingsView};
 use crate::target::Violation;
 
 /// Serializes a report as pretty-printed JSON.
@@ -40,6 +41,9 @@ pub fn human(report: &PipelineReport) -> String {
             "   unbound parameter(s): {}",
             report.unbound_parameters.join(", ")
         );
+    }
+    for extension in &report.extensions {
+        let _ = writeln!(out, "   extension: {extension}");
     }
 
     if let Some(passes) = &report.passes {
@@ -83,7 +87,116 @@ pub fn human(report: &PipelineReport) -> String {
         }
     }
 
+    if let Some(lint) = &report.lint {
+        render_lint(&mut out, lint);
+    }
+    if let Some(verification) = &report.verification {
+        render_verification(&mut out, verification);
+    }
+    if let Some(timings) = &report.timings {
+        render_timings(&mut out, timings);
+    }
+
     out
+}
+
+fn render_verification(out: &mut String, report: &crate::verify::VerificationReport) {
+    use crate::verify::Verdict;
+    let _ = writeln!(
+        out,
+        "\n-- verification -- {} equivalent, {} not equivalent, {} inconclusive",
+        report.equivalent, report.not_equivalent, report.inconclusive
+    );
+    for check in &report.checks {
+        let verdict = match &check.verdict {
+            Verdict::Equivalent { strength } => {
+                format!(
+                    "equivalent ({})",
+                    serde_json::to_value(strength).map_or_else(
+                        |_| String::new(),
+                        |v| v.as_str().unwrap_or_default().to_string()
+                    )
+                )
+            }
+            Verdict::NotEquivalent {
+                strength_tested,
+                residual,
+            } => format!(
+                "NOT EQUIVALENT ({} residual {residual:e})",
+                serde_json::to_value(strength_tested).map_or_else(
+                    |_| String::new(),
+                    |v| v.as_str().unwrap_or_default().to_string()
+                )
+            ),
+            Verdict::Inconclusive { reason } => format!(
+                "inconclusive: {}",
+                serde_json::to_string(reason).unwrap_or_default()
+            ),
+        };
+        let _ = writeln!(out, "  {:<28} {verdict}", check.transformation);
+    }
+    if !report.not_checked.is_empty() {
+        let _ = writeln!(out, "  not checked: {}", report.not_checked.join(", "));
+    }
+}
+
+/// Renders a lint-only report: the header, then the findings.
+#[must_use]
+pub fn lint(report: &PipelineReport) -> String {
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "== {} ({} via {})",
+        report.source_path, report.circuit_name, report.frontend
+    );
+    if let Some(lint) = &report.lint {
+        render_lint(&mut out, lint);
+    }
+    render_target(&mut out, report);
+    out
+}
+
+fn render_lint(out: &mut String, lint: &LintReport) {
+    let _ = writeln!(
+        out,
+        "\n-- lint -- {} finding(s), {} rule(s)",
+        lint.diagnostics.len(),
+        lint.rules.len()
+    );
+    if lint.diagnostics.is_empty() {
+        out.push_str("  (clean)\n");
+    }
+    for diagnostic in &lint.diagnostics {
+        let _ = writeln!(
+            out,
+            "  {:<7} [{}] {}",
+            diagnostic.severity.id(),
+            diagnostic.rule,
+            diagnostic.message
+        );
+    }
+}
+
+fn render_timings(out: &mut String, timings: &TimingsView) {
+    out.push_str("\n-- timings (µs; measurements, not results) --\n");
+    let rows: [(&str, Option<u64>); 11] = [
+        ("frontend", timings.frontend_us),
+        ("ir construction", timings.ir_construction_us),
+        ("binding", Some(timings.binding_us)),
+        ("optimization", Some(timings.optimization_us)),
+        ("lowering", timings.lowering_us),
+        ("cost", timings.cost_us),
+        ("qir emission", Some(timings.qir_emission_us)),
+        ("preparation", timings.preparation_us),
+        ("lint", timings.lint_us),
+        ("verification", timings.verification_us),
+        ("total", Some(timings.total_us)),
+    ];
+    for (label, value) in rows {
+        if let Some(value) = value {
+            let _ = writeln!(out, "  {label:<16} {value:>10}");
+        }
+    }
 }
 
 /// Renders the target section, shared by every renderer that can show one.

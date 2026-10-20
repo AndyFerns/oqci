@@ -20,9 +20,10 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
+use crate::analysis::lint::LintReport;
 use crate::analysis::{CircuitDiff, ResourceReport};
 use crate::backend::Executable;
-use crate::compile::{QirArtifact, QirStage};
+use crate::compile::{QirArtifact, QirStage, Timings};
 use crate::ir::{
     Circuit, GateKind, Instruction, Param, PointerStyle, QcoCircuit, QirProfile, Wire,
 };
@@ -31,7 +32,7 @@ use crate::pass::PassRecord;
 use crate::target::{BasisProfile, Cost, CostModel, Violation, check};
 
 /// A full run of the compiler over one input.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct PipelineReport {
     /// Path the source was read from.
     pub source_path: String,
@@ -59,6 +60,95 @@ pub struct PipelineReport {
     /// The prepared executable, when `prepare` ran.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub executable: Option<ExecutableView>,
+    /// Every extension that took part (§18), as `crate@version kind:id`.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub extensions: Vec<String>,
+    /// Lint findings, when requested.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lint: Option<LintReport>,
+    /// Per-stage compile times, when requested. A measurement, not a
+    /// semantic output: see [`strip_measurements`].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timings: Option<TimingsView>,
+    /// Semantic verification verdicts, when `--verify` was given.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification: Option<crate::verify::VerificationReport>,
+}
+
+/// Per-stage compile times in microseconds (`final-deliverables-spec.md`
+/// §24). A stage that did not run is absent (`null`), never zero.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct TimingsView {
+    /// Reading source text.
+    pub frontend_us: Option<u64>,
+    /// Building validated QC-IR, when measured separately.
+    pub ir_construction_us: Option<u64>,
+    /// Parameter binding.
+    pub binding_us: u64,
+    /// The pass pipeline.
+    pub optimization_us: u64,
+    /// Target lowering.
+    pub lowering_us: Option<u64>,
+    /// Cost-model evaluation.
+    pub cost_us: Option<u64>,
+    /// Canonical QIR emission.
+    pub qir_emission_us: u64,
+    /// Execution preparation.
+    pub preparation_us: Option<u64>,
+    /// Linting.
+    pub lint_us: Option<u64>,
+    /// Semantic verification.
+    pub verification_us: Option<u64>,
+    /// The whole compilation.
+    pub total_us: u64,
+}
+
+impl TimingsView {
+    /// A view of the orchestrator's timings.
+    #[must_use]
+    pub fn new(timings: &Timings) -> Self {
+        let us = |d: std::time::Duration| u64::try_from(d.as_micros()).unwrap_or(u64::MAX);
+        TimingsView {
+            frontend_us: timings.frontend.map(us),
+            ir_construction_us: timings.ir_construction.map(us),
+            binding_us: us(timings.binding),
+            optimization_us: us(timings.optimization),
+            lowering_us: timings.lowering.map(us),
+            cost_us: timings.cost.map(us),
+            qir_emission_us: us(timings.qir_emission),
+            preparation_us: timings.preparation.map(us),
+            lint_us: timings.lint.map(us),
+            verification_us: timings.verification.map(us),
+            total_us: us(timings.total),
+        }
+    }
+}
+
+/// Removes every *measurement* from a serialized report or artifact, leaving
+/// only its semantic outputs and build identity.
+///
+/// The single definition of the partition in Stage G §3.2 and
+/// `docs/determinism.md`: durations are measurements and are never expected
+/// to repeat, so they are removed before two runs are compared byte for
+/// byte. Removed: any object key named `timings`, and any key ending in
+/// `duration_us` or `duration_ms`, at any depth. Nothing else is touched.
+pub fn strip_measurements(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            map.retain(|key, _| {
+                key != "timings" && !key.ends_with("duration_us") && !key.ends_with("duration_ms")
+            });
+            for child in map.values_mut() {
+                strip_measurements(child);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for child in items {
+                strip_measurements(child);
+            }
+        }
+        _ => {}
+    }
 }
 
 /// How a circuit fares against a specific backend target.
@@ -611,6 +701,7 @@ mod tests {
             target: None,
             lowering: None,
             executable: None,
+            ..PipelineReport::default()
         };
         let json = serde_json::to_string(&report).unwrap();
         assert!(json.contains("\"frontend\":\"openqasm3\""));
