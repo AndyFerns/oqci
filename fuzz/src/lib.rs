@@ -28,9 +28,9 @@ pub fn cudaq(data: &[u8]) {
     }
 }
 
-/// A target description from outside the process (Â§29: safe parsing of
-/// untrusted input) is either loaded â€” and then compiles a small circuit
-/// without panicking â€” or refused with a typed error.
+/// A target description from outside the process (§29: safe parsing of
+/// untrusted input) is either loaded — and then compiles a small circuit
+/// without panicking — or refused with a typed error.
 pub fn target_json(data: &[u8]) {
     let Ok(text) = std::str::from_utf8(data) else {
         return;
@@ -56,7 +56,7 @@ pub fn target_json(data: &[u8]) {
 }
 
 /// The Qiskit translation core accepts any handoff struct the PyO3 layer
-/// could build â€” arbitrary names, operands and parameters â€” without panicking.
+/// could build — arbitrary names, operands and parameters — without panicking.
 pub fn qiskit_handoff(data: &[u8]) {
     let mut bytes = data.iter().copied();
     let mut next = || bytes.next();

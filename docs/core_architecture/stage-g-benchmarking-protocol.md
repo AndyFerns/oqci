@@ -44,7 +44,7 @@ experiment is run by its operator with their own account and budget.
 - simulator/noise-model policy;
 - baseline compiler configurations;
 - statistical treatment;
-- primary and secondary metrics (definitions in §3–§4; values pending);
+- primary and secondary metrics (definitions in §3–§4; values in §5);
 - fair-comparison rules;
 - raw-result retention;
 - resource-budget constraints;
@@ -55,7 +55,7 @@ experiment is run by its operator with their own account and budget.
 ## 3. Primary metric definitions
 
 These definitions say **what** is measured and **how** it is computed. Every
-threshold, count, size, seed and tolerance is **PENDING** and listed in §5.
+threshold, count, size, seed and tolerance is locked in §5.
 
 ### 3.1 Validation strength
 
@@ -79,7 +79,7 @@ of what kind.
   deliberately injected defects and whether the checker caught each one. The
   docs already contain individual records of this kind (e.g. the rotation-merge
   sign inversion in `pass_manager.md`; the dropped `H` in
-  `tests/lowering_equivalence.rs`). The mutant set is PENDING.
+  `tests/lowering_equivalence.rs`). The mutant set is locked in §5.
 - **Inconclusive rate**: the fraction of checked transformations for which
   the in-compiler validator reported "inconclusive" rather than a verdict,
   reported with the reasons.
@@ -97,7 +97,7 @@ of what kind.
 - **Scope.** Claimed only for the same build, and only across platforms that
   are in the CI matrix. No cross-version claim.
 - Reported as pass/fail per input, per platform. The number of repetitions and
-  the corpus are PENDING.
+  the corpus are locked in §5.
 
 ### 3.3 Interoperability
 
@@ -106,7 +106,7 @@ of what kind.
   what that acceptance proves.
 - **Execution agreement** (where the consumer executes): whether its output
   distribution agrees with a reference simulator run of the same artifact.
-  The statistical test and tolerance are PENDING.
+  The statistical test and tolerance are locked in §5.
 - Only consumers that actually ran are counted. A consumer that was not run is
   reported as *not run*, never as a pass.
 
