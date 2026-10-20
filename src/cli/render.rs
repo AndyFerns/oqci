@@ -56,7 +56,7 @@ pub fn human(report: &PipelineReport) -> String {
             };
             let _ = writeln!(
                 out,
-                "  [{status}] {:<18} {} -> {} ops, depth {} -> {}",
+                "  [{status}] {:<20} {} -> {} ops, depth {} -> {}",
                 pass.id,
                 pass.before.op_count,
                 pass.after.op_count,

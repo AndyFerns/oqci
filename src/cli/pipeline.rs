@@ -622,7 +622,7 @@ mod tests {
         assert_eq!(labels, vec!["qc-ir", "optimized", "qco-ir", "qir"]);
 
         let passes = report.passes.expect("pass records are present");
-        assert_eq!(passes.len(), 5);
+        assert_eq!(passes.len(), 6);
         assert!(
             passes
                 .iter()
@@ -714,7 +714,7 @@ mod tests {
             Path::new("t.qasm"),
             source,
             &HashMap::new(),
-            &PassSelection::all_except(["gate-cancellation"]),
+            &PassSelection::all_except(["gate-cancellation", "single-qubit-fusion"]),
             &[Stage::QcIr],
             false,
             None,

@@ -892,7 +892,7 @@ fn list_passes(registry: &Registry) {
     }
     println!(
         "\nuse --passes ID,... to run only some, or --disable ID,... to ablate one.\n\
-         `canonicalize` appears twice: it also cleans up after rotation merging."
+         `canonicalize` appears twice: it also cleans up after rotation merging and fusion."
     );
 }
 

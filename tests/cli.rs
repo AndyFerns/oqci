@@ -121,7 +121,7 @@ fn optimize_can_ablate_a_pass() {
         "optimize",
         path.to_str().unwrap(),
         "--disable",
-        "gate-cancellation",
+        "gate-cancellation,single-qubit-fusion",
         "--emit",
         "qc-ir",
     ]);
@@ -129,7 +129,7 @@ fn optimize_can_ablate_a_pass() {
     assert!(optimized.contains("-- optimized -- 3 qubit(s), 3 clbit(s), 7 op(s)"));
     assert!(
         ablated.contains("-- optimized -- 3 qubit(s), 3 clbit(s), 9 op(s)"),
-        "with cancellation disabled the pair survives"
+        "with cancellation and fusion disabled the pair survives"
     );
     assert!(ablated.contains("[skip] gate-cancellation"));
 }
@@ -146,7 +146,7 @@ fn optimize_json_carries_pass_records() {
     ]);
 
     let passes = value["passes"].as_array().expect("pass records");
-    assert_eq!(passes.len(), 5);
+    assert_eq!(passes.len(), 6);
     let cancellation = passes
         .iter()
         .find(|p| p["id"] == "gate-cancellation")
@@ -222,7 +222,8 @@ fn passes_lists_the_default_pipeline_in_order() {
     assert!(text.contains("1. canonicalize"));
     assert!(text.contains("2. gate-cancellation"));
     assert!(text.contains("3. rotation-merge"));
-    assert!(text.contains("5. schedule"));
+    assert!(text.contains("4. single-qubit-fusion"));
+    assert!(text.contains("6. schedule"));
 }
 
 // --- targets ----------------------------------------------------------------

@@ -37,6 +37,7 @@
 pub(crate) mod adjacency;
 pub mod cancellation;
 pub mod canonicalize;
+pub mod fusion;
 pub mod rotation_merge;
 pub mod schedule;
 
@@ -49,6 +50,7 @@ use crate::target::{BasisProfile, CostModel};
 
 pub use cancellation::GateCancellation;
 pub use canonicalize::Canonicalize;
+pub use fusion::SingleQubitFusion;
 pub use rotation_merge::RotationMerge;
 pub use schedule::Schedule;
 
@@ -353,7 +355,8 @@ impl PassManager {
     /// The default optimization pipeline:
     ///
     /// ```text
-    /// canonicalize → gate-cancellation → rotation-merge → canonicalize → schedule
+    /// canonicalize → gate-cancellation → rotation-merge → single-qubit-fusion
+    ///   → canonicalize → schedule
     /// ```
     ///
     /// The ordering is deliberate, not incidental:
@@ -366,6 +369,10 @@ impl PassManager {
     ///   how to remove exactly. This is a fixed, finite order rather than a
     ///   fixed-point loop — §7 asks for meaningful ordering, not iteration to
     ///   convergence, and a finite pipeline cannot fail to terminate.
+    /// - `single-qubit-fusion` runs after the peephole passes, so it fuses
+    ///   what they could not remove rather than hiding a cancellable pair
+    ///   inside a `U` the cancellation pass cannot see into. With a target it
+    ///   fuses only when the target's rules make the result cheaper.
     /// - `schedule` is last and read-only: it measures the circuit that
     ///   actually comes out.
     #[must_use]
@@ -375,6 +382,7 @@ impl PassManager {
             .register(Box::new(Canonicalize))
             .register(Box::new(GateCancellation))
             .register(Box::new(RotationMerge))
+            .register(Box::new(SingleQubitFusion))
             .register(Box::new(Canonicalize))
             .register(Box::new(Schedule));
         manager
@@ -661,6 +669,7 @@ mod tests {
                 "canonicalize",
                 "gate-cancellation",
                 "rotation-merge",
+                "single-qubit-fusion",
                 "canonicalize",
                 "schedule",
             ]
@@ -672,7 +681,7 @@ mod tests {
         let result = PassManager::default_pipeline()
             .run(
                 &cancellable(),
-                &PassSelection::all_except(["gate-cancellation"]),
+                &PassSelection::all_except(["gate-cancellation", "single-qubit-fusion"]),
                 &PassContext::none(),
             )
             .unwrap();
@@ -687,7 +696,7 @@ mod tests {
         assert_eq!(cancellation.before, cancellation.after);
         assert_eq!(cancellation.duration, Duration::ZERO);
 
-        // With cancellation disabled, the H;H pair survives.
+        // With cancellation and fusion disabled, the H;H pair survives.
         assert_eq!(result.circuit.len(), 2);
     }
 
@@ -701,7 +710,7 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(result.records.len(), 5, "every pass is still reported");
+        assert_eq!(result.records.len(), 6, "every pass is still reported");
         let enabled: Vec<&str> = result
             .records
             .iter()
