@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 3cb4eee4f452ebdb33cf6ac40b9893bd4807d5816d331b6eba4c7d8146fae97e # shrinks to circuit = Circuit { name: "random", num_qubits: 2, num_clbits: 2, instructions: [Gate { kind: Cx, qubits: [QubitId(0), QubitId(1)] }] }
