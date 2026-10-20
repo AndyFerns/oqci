@@ -90,6 +90,23 @@ def test_every_compiler_output_passes_the_correctness_check(item, compiler, entr
     assert set(metrics.metrics(compiled.circuit, target.basis)["gate_counts"]) <= set(target.basis)
 
 
+@pytest.mark.parametrize("kind", ["all-to-all", "linear", "heron"])
+def test_the_tket_permutation_fallback_is_correct_and_recorded(kind):
+    # The Stage G item on which FullPeepholeOptimise(allow_swaps=False) still
+    # leaves an implicit qubit permutation (pytket 2.18.5).
+    stage_g = config.load("configs/stage_g.toml")
+    item = circuits.find(circuits.corpus(stage_g), "random_4_i6")
+    target = targets.for_item(kind, item.width, stage_g)
+    compiled = registry()["tket"](item, target, {"id": "tket"})
+    assert compiled.internal["notes"] and "fallback" in compiled.internal["notes"][0]
+    assert check(item.circuit, compiled).status == "pass"
+
+
+def test_the_tket_fallback_is_not_used_where_the_recipe_suffices(item):
+    compiled = registry()["tket"](item, targets.for_item("linear", item.width, CONFIG), {"id": "tket"})
+    assert compiled.internal["notes"] == []
+
+
 def _oqci(item, kind="linear"):
     target = targets.for_item(kind, item.width, CONFIG)
     return registry()["oqci"](item, target, {"id": "oqci-default", "layout": "dense"})

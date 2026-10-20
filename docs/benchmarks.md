@@ -70,7 +70,7 @@ calibration data.
 |---|---|
 | `oqci-default` | OQCI through its Python SDK, dense layout, default pipeline |
 | `qiskit-o3`, `qiskit-o0` | `transpile` with the coupling map and basis, `seed_transpiler` = the item seed |
-| `tket` | `FullPeepholeOptimise(allow_swaps=False)` → `DefaultMappingPass` → `AutoRebase` → `RemoveRedundancies` |
+| `tket` | `FullPeepholeOptimise(allow_swaps=False)` → `DefaultMappingPass` → `AutoRebase` → `RemoveRedundancies`. If the first pass still leaves an implicit qubit permutation, it is rerun without the final measurements and the permutation made explicit as SWAPs; the record's `compiler_notes` says so |
 | `oqci-no-passes`, `oqci-no-<pass>`, `oqci-trivial-layout` | the ablation |
 
 ## Correctness of every output

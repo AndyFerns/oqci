@@ -43,6 +43,7 @@
     },
     "oqci_timings": {"type": ["object", "null"]},
     "oqci_passes": {"type": ["array", "null"]},
+    "compiler_notes": {"type": "array", "description": "Deviations from the compiler's fixed recipe on this item (the t|ket> permutation fallback); empty when none"},
     "metrics": {
       "type": "object",
       "required": ["total_gates", "one_qubit_gates", "two_qubit_gates", "depth", "native_gates",
