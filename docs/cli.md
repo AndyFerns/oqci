@@ -332,8 +332,8 @@ Lists the default pipeline in execution order — the ids `--passes` and
 
 ### targets
 
-Lists the built-in target profiles — the ids `--target` accepts. Both are
-synthetic; neither describes real hardware. See
+Lists the built-in target profiles — the ids `--target` accepts. All of
+them are synthetic; none describes real hardware. See
 [`target_model.md`](target_model.md).
 
 ### `--target ID`

@@ -12,6 +12,20 @@ and may change without a major bump (per SemVer §4).
 
 ## [Unreleased]
 
+### Fixed
+
+- The QIR profile serialized as `"base"` in JSON output (CLI `--json`, the
+  Python dict, the visualization server) while the module attribute and the
+  docs say `"base_profile"`. It now serializes as `"base_profile"`, pinned by a
+  CLI test.
+
+### Documentation
+
+- External QIR validation is recorded as observed: PyQIR 0.12.5, `llvm-as` 18
+  (opaque and typed pointers) and `llvm-as` 14 (typed) passed in CI run
+  39384077389 on `d70c44a`. Documents that still described the 0.5.0 QIR
+  boundary or the CUDA-Q work as planned or unreleased are corrected.
+
 ## [0.5.0] - 2026-09-30
 
 QIR becomes an honest, externally validated interoperability artifact
@@ -128,8 +142,8 @@ and execution adapter listed below, which were on `master` but unreleased.
 
 ## [0.4.1] - 2026-09-28
 
-A single lowering fix. Everything under `[Unreleased]` above is recorded
-there rather than here.
+A single lowering fix. The CUDA-Q work that was unreleased at this point is
+recorded under `[0.5.0]`.
 
 ### Fixed
 

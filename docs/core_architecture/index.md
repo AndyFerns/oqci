@@ -1,7 +1,7 @@
 # OQCI Source-of-Truth Documentation Index
 
 Status: Active planning baseline
-Last verified against repository: 2026-09-30
+Last verified against repository: 2026-10-20
 Repository: `https://github.com/AndyFerns/oqci`  
 Branch reviewed: `master`  
 Current repository version: `0.5.0`
@@ -91,7 +91,12 @@ At the verified `master` state:
 - QC-IR exists;
 - QCO-IR exists;
 - deterministic QC-IR → QCO-IR conversion exists;
-- QCO-IR → textual LLVM-compatible QIR emission exists;
+- QCO-IR → textual QIR 1.0 emission exists as the compiler's interoperability
+  boundary (`final-deliverables-spec.md` §14, released in `0.5.0`): one
+  canonical module per compilation, honest `base_profile`/`custom` labeling
+  against the `qir-base` profile, and external validation by PyQIR 0.12.5,
+  `llvm-as` 18 and `llvm-as` 14, observed passing in CI
+  (`docs/qir_lowering.md` §4);
 - validation/error infrastructure exists;
 - symbolic/numeric gate parameters (`Param`) and explicit parameter binding
   exist, satisfying the Stage F IR requirement;
@@ -101,8 +106,7 @@ At the verified `master` state:
   boundary (`docs/qiskit_adapter.md`), and — through
   `compile::compile_circuit` — a Qiskit circuit reaches the whole pipeline,
   not only QIR;
-- a CUDA-Q frontend exists on `master` (listed under `[Unreleased]` in the
-  changelog) over a documented subset verified against
+- a CUDA-Q frontend exists (released in `0.5.0`) over a documented subset verified against
   NVIDIA's documentation (`docs/cudaq_frontend.md`), mapping into the same
   QC-IR as §5.5 requires and selected by `compile::Frontend::CudaQ` (or a
   `.py` extension). With the `oqci.backends.cudaq` execution adapter it
@@ -146,8 +150,7 @@ At the verified `master` state:
 - per-operation cost and error/noise metadata on profiles (Stage D §2) remain
   absent, deliberately: every built-in profile is synthetic, and a profile
   asserting error rates nobody measured would be a fabricated record;
-- a CUDA-Q execution adapter (§15.2) exists on `master` (listed under
-  `[Unreleased]`), but it has never run against a
+- a CUDA-Q execution adapter (§15.2) exists (released in `0.5.0`), but it has never run against a
   real CUDA-Q install and its results are unverified until it is checked
   against Aer; there is no Cirq frontend (§5.4) and no Cirq execution adapter;
 - `benchmarks/` is not yet a populated benchmark suite;
@@ -170,15 +173,12 @@ with the backend: lowering, the backend contract, orchestration and a
 simulator execution path, `0.4.0` as the live visualization companion
 described above — a new consumer of the compiler, not a change to it — and
 `0.4.1` as a single lowering fix (a wide gate the target declares, such as
-`ccx` on `ideal-simulator`, is no longer refused). The CUDA-Q frontend and
-execution adapter are on `master` but listed under `[Unreleased]`.
+`ccx` on `ideal-simulator`, is no longer refused), and `0.5.0` as the QIR
+interoperability boundary together with the CUDA-Q frontend and execution
+adapter.
 
-What remains before the non-G definition of done is met is the QIR
-interoperability boundary specified in `final-deliverables-spec.md` §14 —
-QIR 1.0 structure and module flags, honest `base_profile`/`custom` labeling
-against a `qir-base` profile, one canonical QIR output per compilation, and
-external validation in CI (planned for `0.5.0`) — plus the benchmark
-infrastructure of §20. Live IBM submission and result retrieval are outside
+What remains before the non-G definition of done is met is the benchmark
+infrastructure of §20 and the plugin/extension demonstration of §18. Live IBM submission and result retrieval are outside
 the definition of done (§34, amended 2026-09-30) and remain future work.
 
 ## How to Use These Documents

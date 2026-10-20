@@ -177,7 +177,7 @@ The implementation must converge toward the following conceptual structure.
          (PyQIR, llvm-as, …)
 ```
 
-*Amended 2026-09-30 per [`framing-and-research-question.md`](framing-and-research-question.md).* Execution runs through the right-hand branch only: backends consume the backend-specific executable, never QIR. QIR is an interoperability artifact — one canonical module per compilation, emitted from the most-lowered circuit available — whose evidence of interoperability is that external QIR tools accept it (§14). As of `0.4.1`, QIR is still emitted outside the orchestrator by each tool separately ([`../qir_lowering.md`](../qir_lowering.md) §1.4); §14 specifies the target state.
+*Amended 2026-09-30 per [`framing-and-research-question.md`](framing-and-research-question.md).* Execution runs through the right-hand branch only: backends consume the backend-specific executable, never QIR. QIR is an interoperability artifact — one canonical module per compilation, emitted from the most-lowered circuit available — whose evidence of interoperability is that external QIR tools accept it (§14). Since `0.5.0` the orchestrator emits that canonical module and every tool shows it ([`../qir_lowering.md`](../qir_lowering.md) §1.4).
 
 MLIR may appear within the IR/pass/lowering layers as an enabling infrastructure component, but it is not the sole definition of the OQCI architecture.
 
@@ -685,7 +685,7 @@ The project must retain a well-defined lowering/output path into QIR/LLVM-compat
 
 ## 14.1 Current Emitter
 
-The existing textual QIR emitter is part of the current foundation. Its known limitations — including a `base_profile` label written unconditionally and never validated — are documented in [`../qir_lowering.md`](../qir_lowering.md) and must not be hidden.
+The textual QIR emitter is part of the foundation. Up to `0.4.1` it wrote a `base_profile` label unconditionally and was never validated; since `0.5.0` it implements §14.2 and is validated as §14.3 describes. Its remaining limitations are documented in [`../qir_lowering.md`](../qir_lowering.md) and must not be hidden.
 
 ## 14.2 Target Specification
 

@@ -64,7 +64,7 @@ future port mechanical — C1–C8 — is owned by
    `quantum.measure`/`quantum.reset`, the MLIR encoding of QCO-IR's
    `DepKind::Control` barrier.
 
-*Status as of 0.4.1:* items 1 and 2 have Rust counterparts that exist without
+*Status as of 0.5.0 (unchanged since 0.4.1):* items 1 and 2 have Rust counterparts that exist without
 MLIR. The optimization passes run under a Rust `PassManager` (`src/pass/`,
 [`pass_manager.md`](pass_manager.md)), target lowering is Rust
 (`src/lowering/`), and the textual emitter in `qir.rs` is the only QIR path.

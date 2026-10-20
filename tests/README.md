@@ -19,13 +19,19 @@ implementation-internal cases and live next to the code they test).
 | [`qiskit_adapter.rs`](qiskit_adapter.rs) | The Qiskit adapter's pure-Rust translation core (`QiskitCircuitIr` → `Circuit`), with no Python interpreter involved — see [`../python/README.md`](../python/README.md) for the PyO3-boundary tests that do need one. |
 | [`pass_equivalence.rs`](pass_equivalence.rs) | **The test that makes the optimization passes trustworthy.** Runs `proptest`-generated circuits through each pass and asserts the resulting state vector is unchanged up to global phase, using an independent state-vector simulator (see `support/`) rather than the tables the passes themselves consult. See [`../docs/pass_manager.md`](../docs/pass_manager.md#correctness-verification). |
 | [`pass_equivalence.proptest-regressions`](pass_equivalence.proptest-regressions) | Saved failing-case seeds from `pass_equivalence.rs`, checked in per `proptest` convention so everyone who runs the suite benefits from cases it has found before. Read the file's header comment for the provenance of the current entries. |
+| [`cudaq_frontend.rs`](cudaq_frontend.rs) | The CUDA-Q frontend end to end, asserted by equivalence: a kernel must emit byte-identical QIR to the same circuit written in OpenQASM 3. |
+| [`target_model.rs`](target_model.rs) | The target model's seams: profiles, legality checking and cost, exercised the way a caller would. |
+| [`decomposition.rs`](decomposition.rs) | Every decomposition rule checked as a **matrix** against the independent simulator in `support/`, plus the rule-set closure checks each profile relies on. |
+| [`lowering.rs`](lowering.rs) | Target lowering's behaviour: each refusal fires for its own reason, reported metadata means what it says, orientation policies are the identities they claim to be. |
+| [`lowering_equivalence.rs`](lowering_equivalence.rs) | **The central lowering property.** Generated circuits on generated devices either refuse for an independently confirmed reason, or lower to a circuit that is equivalent modulo the final layout, legal, and byte-identical across runs. |
+| [`qir_conformance.rs`](qir_conformance.rs) | QIR 1.0 Base Profile structure of every emitted module (every example × every backend × both pointer styles). OQCI's own reading of the spec, so *not independent evidence*; it also writes the corpus CI feeds to PyQIR and `llvm-as`. |
 | [`cli.rs`](cli.rs) | The compiled `oqci` binary, invoked as a subprocess against the fixtures in [`../examples/`](../examples/) — the parts unit tests can't reach: argument parsing, file I/O, exit codes, and `--json` output actually parsing as JSON. |
 
 ## `support/`
 
 [`support/`](support/) holds test-only helpers, currently a single dense
-state-vector simulator (`support/statevector.rs`) used exclusively by
-`pass_equivalence.rs`. It is **not** a backend and is not built as part of
+state-vector simulator (`support/statevector.rs`) used by the equivalence
+and decomposition tests. It is **not** a backend and is not built as part of
 the library — see its module doc comment for why an independent
 implementation is the point, and why this isn't the "custom simulator" the
 project's non-goals rule out.
