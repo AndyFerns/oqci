@@ -10,9 +10,19 @@ It is skipped where CUDA-Q is not installed (it has no Windows wheels); the
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
-cudaq = pytest.importorskip("cudaq")
+# Skipped where CUDA-Q is absent — unless OQCI_REQUIRE_CUDAQ=1 (the `cudaq` CI
+# job), where a missing or broken install is a failure, with its error, not a
+# silent skip that would look like verification.
+try:
+    import cudaq
+except Exception as error:  # noqa: BLE001 — a broken install may raise anything
+    if os.environ.get("OQCI_REQUIRE_CUDAQ") == "1":
+        raise RuntimeError(f"CUDA-Q is required here but failed to import: {error!r}") from error
+    pytest.skip(f"CUDA-Q is not available: {error!r}", allow_module_level=True)
 pytest.importorskip("qiskit_aer")
 stats = pytest.importorskip("scipy.stats")
 
