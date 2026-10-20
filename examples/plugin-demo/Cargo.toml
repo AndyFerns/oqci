@@ -1,0 +1,22 @@
+[package]
+name = "oqci-plugin-demo"
+description = "A demonstration OQCI extension: one pass, one frontend, one backend, added without modifying the compiler core"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+license = "Apache-2.0"
+repository = "https://github.com/AndyFerns/oqci"
+
+[lib]
+name = "oqci_plugin_demo"
+path = "src/lib.rs"
+
+[[bin]]
+name = "oqci-demo"
+path = "src/main.rs"
+
+[dependencies]
+# The public API only: this crate cannot reach anything `pub(crate)` in the
+# compiler, which is the point of the demonstration.
+oqci = { path = "../.." }

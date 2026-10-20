@@ -9,7 +9,7 @@ license = "Apache-2.0"
 repository = "https://github.com/AndyFerns/oqci"
 
 [workspace]
-members = [".", "python", "server"]
+members = [".", "python", "server", "examples/plugin-demo"]
 
 [lib]
 name = "oqci"
