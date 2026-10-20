@@ -462,7 +462,7 @@ What is genuinely still absent here:
 
 | Spec | Status |
 |---|---|
-| Live hardware submission (Stage C §8) | not implemented, and not for want of trying: the SDK is absent, there are no credentials, and §33.4 forbids writing a vendor API from memory. **No claim of IBM hardware executability is made.** |
+| Live hardware submission (Stage C §8) | **implemented since `0.6.0`**, outside the compiler: the Python adapter `oqci.backends.ibm` builds the profile from the device's live target, checks the ISA and submits verbatim. It was written against `qiskit-ibm-runtime` 0.50.0's installed source (§33.4) and is tested offline on a Heron snapshot; real-hardware runs are operator-run. See [`hardware.md`](hardware.md). |
 
 Also absent:
 
@@ -470,11 +470,12 @@ Also absent:
   `&PassContext` carrying an optional profile and cost model, and the
   orchestrator populates it whenever a backend is selected — so Stage E exit
   criterion 3 is met, and `pass::tests::a_pass_can_consult_the_selected_target`
-  demonstrates it. But none of the four shipped generic passes reads it; all
-  four bind it as `_context`. That is Stage E §8 working as intended rather
+  demonstrates it. One shipped pass reads it: `single-qubit-fusion` uses the profile's rule set
+  so that it never fuses a run into more native operations than it replaces.
+  The other four bind it as `_context`, and no pass reads the cost model. That is Stage E §8 working as intended rather
   than a gap ("target-aware behavior must not make every pass
   backend-specific"), and the real consumers are the lowering steps — but it
-  does mean no shipped *optimization* consults cost yet.
+  does mean no shipped *optimization* consults the cost model yet.
 - **A pluggable cost-model registry.** `cost::resolve` maps the two built-in
   ids (`uniform`, `nisq-weighted`) to configured `WeightedCostModel`s, and
   returns `None` for anything else rather than substituting a default — a

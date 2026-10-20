@@ -64,10 +64,11 @@ Two deviations, both deliberate:
   after them. Nothing is lowered at that point; the backend is resolved early so
   its profile and cost model can be put into the `PassContext` the pipeline
   receives. Stage E exit criterion 3 asks that optimization be *able* to consult
-  backend-defined costs, and this is the channel. None of the four shipped
-  generic passes reads it — Stage E §8 is explicit that target awareness must
-  not make every pass backend-specific — so the channel being open and unused is
-  the intended state. Resolving the backend early also means an unknown backend
+  backend-defined costs, and this is the channel. One shipped pass reads it:
+  `single-qubit-fusion` uses the profile's rule set so that it never fuses a
+  run into more native operations. The other four do not, and no pass reads the
+  cost model — Stage E §8 is explicit that target awareness must not make every
+  pass backend-specific. Resolving the backend early also means an unknown backend
   id fails before any work is done rather than after.
 
 ## `CompilerConfig`

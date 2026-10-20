@@ -204,7 +204,7 @@ runtimes, such as `python -m oqci run`, needs nothing.
 | Every refusal | One parametrized test per refusal. |
 | The bit-order conversion | Aer's counts for an asymmetric, cross-wired executable are converted to CUDA-Q's documented order and back, and must come back unchanged. |
 | `run`'s plumbing (seed, target, shots, kernel loading) | A stand-in `cudaq` module in `python/tests/test_backend_cudaq.py`. |
-| **Real CUDA-Q returns what its docs say** | The `cudaq` CI job (Linux) installs CUDA-Q **0.16.0.post1**, pinned in the `cudaq` extra, and runs `python/tests/test_backend_cudaq_live.py`. That test runs OQCI executables on real CUDA-Q and requires the counts to agree with the exact source distribution and with Aer: chi-square, alpha 0.001, 8192 shots, three circuits on two backends. CUDA-Q has no Windows wheels, so this is checked only in CI. It counts as verified once that job has passed; until then, treat CUDA-Q numbers as unverified. |
+| **Real CUDA-Q returns what its docs say** | The `cudaq` CI job (Linux) installs CUDA-Q **0.16.0.post1**, pinned in the `cudaq` extra, and runs `python/tests/test_backend_cudaq_live.py`. That test runs OQCI executables on real CUDA-Q and requires the counts to agree with the exact source distribution and with Aer: chi-square, alpha 0.001, 8192 shots, three circuits on two backends. CUDA-Q has no Windows wheels, so this is checked only in CI. **Observed passing** at `73195fb` on 2026-10-20, CI run [39463866107](https://github.com/AndyFerns/oqci/actions/runs/39463866107). |
 
 ## The IBM execution adapter
 

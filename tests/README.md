@@ -30,7 +30,7 @@ implementation-internal cases and live next to the code they test).
 | [`verifier.rs`](verifier.rs) | The in-compiler semantic checker: property agreement with the test oracle, a deliberately wrong extension pass that must stop compilation, every example verified on every backend. |
 | [`lint.rs`](lint.rs) | One firing and one non-firing case per lint rule, deterministic ordering, an extension rule. |
 | [`determinism.rs`](determinism.rs) | The determinism contract across separate `oqci` processes, with measurements stripped ([`../docs/determinism.md`](../docs/determinism.md)). |
-| [`limits.rs`](limits.rs) | Untrusted register widths refused before allocation, at every boundary (found by fuzzing). |
+| [`limits.rs`](limits.rs) | The numerical and structural limits, all found by fuzzing: untrusted register widths refused before allocation at every boundary, expression depth and size, exact angle arithmetic in merges and lowering, and no matrices from huge angles ([`../docs/verification.md`](../docs/verification.md#numerical-and-structural-limits)). |
 | [`cli.rs`](cli.rs) | The compiled `oqci` binary, invoked as a subprocess against the fixtures in [`../examples/`](../examples/) — the parts unit tests can't reach: argument parsing, file I/O, exit codes, and `--json` output actually parsing as JSON. |
 
 ## `support/`
@@ -58,5 +58,5 @@ project's non-goals rule out.
 ## Elsewhere
 
 - [`../examples/plugin-demo/tests/no_core_modification.rs`](../examples/plugin-demo/tests/no_core_modification.rs) — the extension demonstration, end to end.
-- [`../fuzz/`](../fuzz/) — cargo-fuzz targets; `fuzz/tests/corpus.rs` runs their seed corpus on any toolchain.
+- [`../fuzz/`](../fuzz/) — cargo-fuzz targets; `fuzz/tests/corpus.rs` runs their seed corpus on any toolchain, and `fuzz/tests/mutate.rs` is a mutation fuzzer for any toolchain ([`../docs/fuzzing.md`](../docs/fuzzing.md)).
 - [`../python/tests/`](../python/tests/) and [`../benchmarks/tests/`](../benchmarks/tests/) — the SDK, adapters and benchmark harness.

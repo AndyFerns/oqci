@@ -54,6 +54,7 @@
 
 - [Benchmarks and Research Package](benchmarks.md)
 - [Determinism Contract](determinism.md)
+- [Fuzzing](fuzzing.md)
 
 # Positioning
 
