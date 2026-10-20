@@ -230,13 +230,30 @@ class IbmResult(RunResult):
     queue_duration_ms: Optional[float] = None
 
 
+def configured_sampler(backend: Any) -> tuple[Any, dict[str, bool]]:
+    """A Sampler for ``backend`` that runs circuits exactly as given — no
+    Pauli frames inserted around gates or measurements, no idle-time pulse
+    sequences — and the options it set, for the record."""
+    from qiskit_ibm_runtime.executor_sampler import Sampler
+
+    sampler = Sampler(mode=backend)
+    sampler.options.twirling.enable_gates = False
+    sampler.options.twirling.enable_measure = False
+    sampler.options.dynamical_decoupling.enable = False
+    return sampler, {
+        "twirling.enable_gates": False,
+        "twirling.enable_measure": False,
+        "dynamical_decoupling.enable": False,
+    }
+
+
 def submit(
     executable: Mapping[str, Any],
     backend: Any,
     *,
     shots: Optional[int] = None,
 ) -> tuple[Any, IbmSubmission]:
-    """Submit one executable to ``backend`` with ``SamplerV2``.
+    """Submit one executable to ``backend`` with the configured Sampler (:func:`configured_sampler`).
 
     ``backend`` is an ``IBMBackend`` from ``QiskitRuntimeService`` — or, for
     an offline run, a fake backend, which IBM Runtime executes locally on Aer.
@@ -245,8 +262,6 @@ def submit(
     :raises IsaViolation: if the executable is not valid for this backend as
         written. Nothing is submitted in that case.
     """
-    from qiskit_ibm_runtime.executor_sampler import Sampler
-
     settings = executable.get("settings") or {}
     shots = int(settings.get("shots", 1024)) if shots is None else int(shots)
     if not any(op["op"] == "measure" for op in executable["ops"]):
@@ -256,17 +271,7 @@ def submit(
     circuit = to_isa_circuit(executable, backend)
     check_isa(circuit, backend)
 
-    sampler = Sampler(mode=backend)
-    # Execute exactly the circuit OQCI produced: no Pauli frames inserted
-    # around gates or measurements, no idle-time pulse sequences.
-    options = {
-        "twirling.enable_gates": False,
-        "twirling.enable_measure": False,
-        "dynamical_decoupling.enable": False,
-    }
-    sampler.options.twirling.enable_gates = False
-    sampler.options.twirling.enable_measure = False
-    sampler.options.dynamical_decoupling.enable = False
+    sampler, options = configured_sampler(backend)
     job = sampler.run([circuit], shots=shots)
     provenance = dict(executable.get("provenance") or {})
     provenance["shots"] = shots

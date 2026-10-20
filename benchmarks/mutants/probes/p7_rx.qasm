@@ -1,0 +1,5 @@
+// An Rx, decomposed by rx-to-rz-sx, with its phase observed through an H.
+OPENQASM 3.0; include "stdgates.inc";
+qubit[1] q; bit[1] c;
+h q[0]; rx(0.7) q[0]; h q[0];
+c[0] = measure q[0];

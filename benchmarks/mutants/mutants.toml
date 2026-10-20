@@ -1,0 +1,192 @@
+# The Stage G mutant set (§3.1 mutation evidence; locked 2026-10-20).
+#
+# Each mutant is one deliberate defect, applied as an exact text replacement
+# (the `find` text must occur exactly once) to a throwaway git worktree of
+# HEAD. Every checker then runs against the mutated compiler, and the result
+# records which checkers caught it. A mutant no checker catches is reported
+# as surviving — never hidden.
+
+[[mutant]]
+id = "rotation-merge-sign-flip"
+description = "rotation merging subtracts the second angle instead of adding it"
+file = "src/pass/rotation_merge.rs"
+find = "Some(Param::concrete(a.radians() + b.radians()))"
+replace = "Some(Param::concrete(a.radians() - b.radians()))"
+
+[[mutant]]
+id = "cancel-non-inverse-pair"
+description = "gate cancellation treats S;S as an inverse pair (it is Z)"
+file = "src/pass/cancellation.rs"
+find = "        | (Ccx, Ccx) => true,"
+replace = "        | (Ccx, Ccx)\n        | (S, S) => true,"
+
+[[mutant]]
+id = "cancel-across-measurement"
+description = "gate cancellation looks through a measurement to pair the gates around it"
+file = "src/pass/adjacency.rs"
+find = """
+                    Some(NodeId::Op(next)) if candidate.is_none_or(|c| c == *next) => {
+                        candidate = Some(*next);
+                        true
+                    }"""
+replace = """
+                    Some(NodeId::Op(next)) if candidate.is_none_or(|c| c == *next) => {
+                        let mut next = *next;
+                        if matches!(circuit.instructions()[next], Instruction::Measure { .. }) {
+                            if let Some(NodeId::Op(after)) =
+                                next_on_wire.get(&(NodeId::Op(next), Wire::Qubit(*q)))
+                            {
+                                next = *after;
+                            }
+                        }
+                        candidate = Some(next);
+                        true
+                    }"""
+
+[[mutant]]
+id = "canonicalize-commutes-h-x"
+description = "canonicalization swaps an adjacent H;X pair on one qubit, which do not commute"
+file = "src/pass/canonicalize.rs"
+find = """
+        let kept: Vec<Instruction> = circuit
+            .instructions()
+            .iter()
+            .filter(|inst| !is_identity(inst))
+            .cloned()
+            .collect();
+"""
+replace = """
+        let mut kept: Vec<Instruction> = circuit
+            .instructions()
+            .iter()
+            .filter(|inst| !is_identity(inst))
+            .cloned()
+            .collect();
+        for i in 0..kept.len().saturating_sub(1) {
+            if let (
+                Instruction::Gate { kind: GateKind::H, qubits: a },
+                Instruction::Gate { kind: GateKind::X, qubits: b },
+            ) = (&kept[i], &kept[i + 1])
+            {
+                if a == b {
+                    kept.swap(i, i + 1);
+                    break;
+                }
+            }
+        }
+"""
+
+[[mutant]]
+id = "fusion-wrong-euler-angle"
+description = "single-qubit fusion negates phi when synthesizing the U"
+file = "src/pass/fusion.rs"
+find = "(wrap(m[1][0].arg() - phase), wrap((-m[0][1]).arg() - phase))"
+replace = "(wrap(phase - m[1][0].arg()), wrap((-m[0][1]).arg() - phase))"
+
+[[mutant]]
+id = "h-to-rz-sx-drops-a-step"
+description = "the h-to-rz-sx rule loses its final Rz(pi/2)"
+file = "src/lowering/rules.rs"
+find = "steps: &[RZ_HALF_PI, step(\"sx\", &[0]), RZ_HALF_PI],"
+replace = "steps: &[RZ_HALF_PI, step(\"sx\", &[0])],"
+
+[[mutant]]
+id = "rx-to-rz-sx-wrong-angle"
+description = "the rx-to-rz-sx rule's last rotation is -pi/2 instead of 5pi/2"
+file = "src/lowering/rules.rs"
+find = """
+            step("sx", &[0]),
+            RZ_FIVE_HALVES_PI,
+        ],
+        exactness: Exactness::UpToGlobalPhase,
+        note: "Euler ZXZXZ form; the theta+pi offset means a symbolic angle cannot survive this rule","""
+replace = """
+            step("sx", &[0]),
+            RZ_NEG_HALF_PI,
+        ],
+        exactness: Exactness::UpToGlobalPhase,
+        note: "Euler ZXZXZ form; the theta+pi offset means a symbolic angle cannot survive this rule","""
+
+[[mutant]]
+id = "swap-to-cx-wrong-orientation"
+description = "swap-to-cx emits three CNOTs in the same direction (that is one CNOT, not a SWAP)"
+file = "src/lowering/rules.rs"
+find = """
+            step("cx", &[0, 1]),
+            step("cx", &[1, 0]),
+            step("cx", &[0, 1]),
+        ],
+        exactness: Exactness::Exact,
+        note: "three alternating CNOTs exchange two qubits","""
+replace = """
+            step("cx", &[0, 1]),
+            step("cx", &[0, 1]),
+            step("cx", &[0, 1]),
+        ],
+        exactness: Exactness::Exact,
+        note: "three alternating CNOTs exchange two qubits","""
+
+[[mutant]]
+id = "routing-forged-final-layout"
+description = "lowering reports the initial layout as the final one, ignoring the SWAPs it inserted"
+file = "src/lowering/mod.rs"
+find = """
+        initial_layout: routed.initial_layout,
+        final_layout: routed.final_layout,"""
+replace = """
+        initial_layout: routed.initial_layout.clone(),
+        final_layout: routed.initial_layout,"""
+
+[[mutant]]
+id = "qir-cx-operands-swapped"
+description = "QIR emission writes a CX's target before its control"
+file = "src/ir/qir.rs"
+find = """
+            for q in qubits {
+                arg_tys.push(spell.qubit_ty.to_string());"""
+replace = """
+            let ordered: Vec<_> = if matches!(kind, GateKind::Cx) {
+                qubits.iter().rev().copied().collect()
+            } else {
+                qubits.clone()
+            };
+            for q in &ordered {
+                arg_tys.push(spell.qubit_ty.to_string());"""
+
+# --- Checkers ---------------------------------------------------------------
+# Each runs against every mutant; a nonzero exit means "caught". Kinds follow
+# Stage G §3.1: structural, semantic-test (an independent model, in tests
+# only), semantic-in-compiler (crate::verify, during compilation), and
+# example-based unit tests.
+
+[[checker]]
+id = "pass-equivalence"
+kind = "semantic-test"
+command = ["cargo", "test", "-q", "--test", "pass_equivalence"]
+
+[[checker]]
+id = "lowering-equivalence"
+kind = "semantic-test"
+command = ["cargo", "test", "-q", "--test", "lowering_equivalence"]
+
+[[checker]]
+id = "decomposition"
+kind = "semantic-test"
+command = ["cargo", "test", "-q", "--test", "decomposition"]
+
+[[checker]]
+id = "in-compiler-verifier"
+kind = "semantic-in-compiler"
+# Runs `oqci lower <probe> --backend simulator-nisq --verify` on every probe
+# in benchmarks/mutants/probes/; caught if any reports a semantic mismatch.
+probes = "benchmarks/mutants/probes"
+
+[[checker]]
+id = "qir-structure"
+kind = "structural"
+command = ["cargo", "test", "-q", "--test", "qir_conformance", "--test", "qir_emit"]
+
+[[checker]]
+id = "unit-tests"
+kind = "example-based"
+command = ["cargo", "test", "-q", "--lib"]
