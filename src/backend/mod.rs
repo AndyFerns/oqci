@@ -36,12 +36,13 @@
 //!   project's non-goals explicitly rule out "a custom quantum simulator
 //!   replacing established simulator frameworks", so execution belongs to
 //!   Qiskit Aer through the Python adapter, not to a simulator written here.
-//! - **[`IbmBackend`]** prepares artifacts for IBM hardware. Submission needs
-//!   `qiskit-ibm-runtime` and an account, neither of which exists in this
-//!   environment — and §33.4 forbids implementing a vendor API from memory
-//!   when the SDK cannot be checked. **No claim of IBM executability is made**
-//!   (§33.12); what is claimed is that the artifact has been lowered and
-//!   validated against the supplied target description.
+//! - **[`IbmBackend`]** prepares artifacts for IBM hardware. Submission and
+//!   retrieval run in the Python adapter `oqci.backends.ibm`, through
+//!   `qiskit-ibm-runtime` and the caller's own account, after checking the
+//!   artifact is already in the device's instruction set (it is never
+//!   transpiled). What this crate claims (§33.12) is that the artifact has
+//!   been lowered and validated against the supplied target description —
+//!   which, for a real device, the adapter retrieves from the device itself.
 //!
 //! An error that names the boundary is more useful than a stub: a caller can
 //! match on it, and nobody can mistake it for a result.

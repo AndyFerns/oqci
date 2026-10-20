@@ -153,7 +153,8 @@ CANCELLABLE = "qubit[1] q; bit[1] c; h q[0]; h q[0]; c = measure q;"
 
 def test_disabling_a_pass_changes_the_result():
     full = oqci.compile(CANCELLABLE)
-    ablated = oqci.compile(CANCELLABLE, disable=["gate-cancellation"])
+    # Fusion would also remove H;H, so the ablation disables both.
+    ablated = oqci.compile(CANCELLABLE, disable=["gate-cancellation", "single-qubit-fusion"])
     assert full["optimized_metrics"]["op_count"] == 1
     assert ablated["optimized_metrics"]["op_count"] == 3
     skipped = [p for p in ablated["passes"] if p["id"] == "gate-cancellation"]

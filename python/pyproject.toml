@@ -16,6 +16,9 @@ dynamic = ["version"]
 [project.optional-dependencies]
 qiskit = ["qiskit>=1.0"]
 aer = ["qiskit>=1.0", "qiskit-aer>=0.14"]
+# Pinned to the minor release `oqci.backends.ibm` was verified against
+# (docs/adapters.md, §33.4). Raising it means re-checking that module.
+ibm = ["qiskit>=2.0,<3.0", "qiskit-ibm-runtime>=0.50.0,<0.51"]
 # Unpinned: no CUDA-Q release has yet been run against `oqci.backends.cudaq`
 # (see docs/adapters.md). Pin one once it has.
 cudaq = ["cudaq"]

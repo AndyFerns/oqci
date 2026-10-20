@@ -253,9 +253,44 @@ struct CompileOptions<'py> {
     disable: Option<Vec<String>>,
     qir_profile: &'py str,
     qir_pointers: &'py str,
+    /// A serialized target profile to compile for, instead of `backend`.
+    target: Option<String>,
+    /// The backend kind to load `target` as; defaults to its `backend_id`.
+    target_kind: Option<String>,
+    verify: bool,
+    verify_max_qubits: u32,
+    lint: bool,
 }
 
 impl CompileOptions<'_> {
+    /// The registry this compilation uses: the built-ins, plus `target` when
+    /// one was given. Returns the backend id to compile for.
+    fn registry(&self) -> PyResult<(oqci::extension::Registry, Option<String>)> {
+        use oqci::extension::{ExtensionOrigin, Registry};
+
+        let mut registry = Registry::default();
+        let backend = match (&self.target, self.backend) {
+            (Some(_), Some(_)) => {
+                return Err(OqciError::new_err(
+                    "pass `backend` or `target`, not both: `target` is the device description \
+                     to compile for",
+                ));
+            }
+            (Some(json), None) => Some(
+                registry
+                    .register_target_json(
+                        ExtensionOrigin::target_file("python"),
+                        json,
+                        self.target_kind.as_deref(),
+                        None,
+                    )
+                    .map_err(|e| to_py_err(&e))?,
+            ),
+            (None, backend) => backend.map(str::to_string),
+        };
+        Ok((registry, backend))
+    }
+
     fn config(&self) -> PyResult<oqci::compile::CompilerConfig> {
         use oqci::compile::CompilerConfig;
         use oqci::lowering::{LayoutChoice, LoweringConfig};
@@ -270,10 +305,11 @@ impl CompileOptions<'_> {
             }
         };
 
+        let (registry, backend) = self.registry()?;
         Ok(CompilerConfig {
             bindings: read_bindings(self.bindings)?,
-            passes: pass_selection(self.passes.as_deref(), self.disable.as_deref())?,
-            backend: self.backend.map(str::to_string),
+            passes: pass_selection(&registry, self.passes.as_deref(), self.disable.as_deref())?,
+            backend,
             lowering: LoweringConfig {
                 layout,
                 ..LoweringConfig::default()
@@ -284,6 +320,13 @@ impl CompileOptions<'_> {
                 memory: false,
             },
             qir: qir_request(self.qir_profile, self.qir_pointers)?,
+            extensions: registry,
+            lint: self.lint,
+            verify: oqci::verify::VerifyConfig {
+                enabled: self.verify,
+                max_qubits: self.verify_max_qubits,
+                ..oqci::verify::VerifyConfig::default()
+            },
             ..CompilerConfig::default()
         })
     }
@@ -293,15 +336,16 @@ impl CompileOptions<'_> {
 /// and the two together — the same rules as the CLI's `--passes`/`--disable`,
 /// so an ablation cannot silently run a different pipeline than asked for.
 fn pass_selection(
+    registry: &oqci::extension::Registry,
     only: Option<&[String]>,
     except: Option<&[String]>,
 ) -> PyResult<oqci::pass::PassSelection> {
-    use oqci::pass::{PassManager, PassSelection};
+    use oqci::pass::PassSelection;
 
-    let known = PassManager::default_pipeline().pass_ids();
+    let known = registry.pass_ids();
     let check = |ids: &[String]| -> PyResult<()> {
         for id in ids {
-            if !known.contains(&id.as_str()) {
+            if !known.contains(id) {
                 return Err(OqciError::new_err(format!(
                     "unknown pass `{id}`; available: {}",
                     known.join(", ")
@@ -335,7 +379,7 @@ fn pass_selection(
 /// what happened. `backend` names one of `backends()`; omitting it means
 /// target-independent compilation, which stops after optimization.
 #[pyfunction]
-#[pyo3(signature = (source, frontend = "openqasm3", backend = None, bindings = None, name = "main", shots = 1024, seed = None, layout = "trivial", passes = None, disable = None, qir_profile = "any", qir_pointers = "opaque"))]
+#[pyo3(signature = (source, frontend = "openqasm3", backend = None, bindings = None, name = "main", shots = 1024, seed = None, layout = "trivial", passes = None, disable = None, qir_profile = "any", qir_pointers = "opaque", target = None, target_kind = None, verify = false, verify_max_qubits = 8, lint = false))]
 #[allow(clippy::too_many_arguments)]
 fn compile_source<'py>(
     py: Python<'py>,
@@ -351,6 +395,11 @@ fn compile_source<'py>(
     disable: Option<Vec<String>>,
     qir_profile: &'py str,
     qir_pointers: &'py str,
+    target: Option<String>,
+    target_kind: Option<String>,
+    verify: bool,
+    verify_max_qubits: u32,
+    lint: bool,
 ) -> PyResult<PyObject> {
     use oqci::compile::{Frontend, compile_named};
 
@@ -371,6 +420,11 @@ fn compile_source<'py>(
         disable,
         qir_profile,
         qir_pointers,
+        target,
+        target_kind,
+        verify,
+        verify_max_qubits,
+        lint,
     };
     let config = oqci::compile::CompilerConfig {
         frontend: selected,
@@ -411,6 +465,11 @@ fn compile_qasm3<'py>(
         disable,
         "any",
         "opaque",
+        None,
+        None,
+        false,
+        8,
+        false,
     )
 }
 
@@ -423,7 +482,7 @@ fn compile_qasm3<'py>(
 /// a provenance record exactly like an OpenQASM program. `name` defaults to
 /// the circuit's own `name`.
 #[pyfunction]
-#[pyo3(signature = (circuit, backend = None, bindings = None, name = None, shots = 1024, seed = None, layout = "trivial", passes = None, disable = None, qir_profile = "any", qir_pointers = "opaque"))]
+#[pyo3(signature = (circuit, backend = None, bindings = None, name = None, shots = 1024, seed = None, layout = "trivial", passes = None, disable = None, qir_profile = "any", qir_pointers = "opaque", target = None, target_kind = None, verify = false, verify_max_qubits = 8, lint = false))]
 #[allow(clippy::too_many_arguments)]
 fn compile_qiskit<'py>(
     py: Python<'py>,
@@ -438,6 +497,11 @@ fn compile_qiskit<'py>(
     disable: Option<Vec<String>>,
     qir_profile: &'py str,
     qir_pointers: &'py str,
+    target: Option<String>,
+    target_kind: Option<String>,
+    verify: bool,
+    verify_max_qubits: u32,
+    lint: bool,
 ) -> PyResult<PyObject> {
     let mut ir = read_circuit(circuit)?;
     if let Some(name) = name {
@@ -454,6 +518,11 @@ fn compile_qiskit<'py>(
         disable,
         qir_profile,
         qir_pointers,
+        target,
+        target_kind,
+        verify,
+        verify_max_qubits,
+        lint,
     };
     let artifacts = oqci::compile::compile_circuit(translated, &options.config()?)
         .map_err(|e| to_py_err(&e))?;
@@ -475,7 +544,7 @@ fn artifacts_to_dict(
     frontend: &str,
     artifacts: &oqci::compile::CompilationArtifacts,
 ) -> PyResult<PyObject> {
-    use oqci::cli::snapshot::{PassRecordView, instructions_of, lowering_view};
+    use oqci::cli::snapshot::{PassRecordView, TimingsView, instructions_of, lowering_view};
 
     let mut body = serde_json::Map::new();
     body.insert("frontend".to_string(), serde_json::Value::from(frontend));
@@ -550,7 +619,151 @@ fn artifacts_to_dict(
             None => serde_json::Value::Null,
         },
     );
+    body.insert(
+        "extensions".to_string(),
+        serde_json::to_value(&artifacts.extensions).map_err(json_err)?,
+    );
+    body.insert(
+        "lint".to_string(),
+        serde_json::to_value(&artifacts.lint).map_err(json_err)?,
+    );
+    body.insert(
+        "verification".to_string(),
+        serde_json::to_value(&artifacts.verification).map_err(json_err)?,
+    );
+    // A measurement, not a semantic output: never compare it across runs.
+    body.insert(
+        "timings".to_string(),
+        serde_json::to_value(TimingsView::new(&artifacts.timings)).map_err(json_err)?,
+    );
     json_to_py(py, &serde_json::Value::Object(body))
+}
+
+/// Reads a serialized target profile and returns it as a dict, after the
+/// same validation compiling for it would apply (rule closure, cost model).
+#[pyfunction]
+#[pyo3(signature = (json, kind = None))]
+fn load_target(py: Python<'_>, json: &str, kind: Option<&str>) -> PyResult<PyObject> {
+    let backend = oqci::backend::from_target_json(json, kind, None).map_err(|e| to_py_err(&e))?;
+    let value = serde_json::json!({
+        "id": backend.id(),
+        "description": backend.description(),
+        "qualified_id": backend.profile().qualified_id(),
+        "profile": backend.profile(),
+    });
+    json_to_py(py, &value)
+}
+
+/// The named, complete decomposition-rule sets for the two supported
+/// superconducting bases: `{"cx": [...], "cz": [...]}`.
+#[pyfunction]
+fn basis_rule_sets(py: Python<'_>) -> PyResult<PyObject> {
+    let value = serde_json::json!({
+        "cx": oqci::target::builtin::CX_BASIS_RULES,
+        "cz": oqci::target::builtin::CZ_BASIS_RULES,
+    });
+    json_to_py(py, &value)
+}
+
+/// Lints source text or a Qiskit circuit (§13.5), optionally against a
+/// backend's or a target file's profile, optionally after optimization.
+#[pyfunction]
+#[pyo3(signature = (program, frontend = "openqasm3", backend = None, target = None, target_kind = None, bindings = None, optimized = false))]
+#[allow(clippy::too_many_arguments)]
+fn lint_program(
+    py: Python<'_>,
+    program: &Bound<'_, PyAny>,
+    frontend: &str,
+    backend: Option<&str>,
+    target: Option<String>,
+    target_kind: Option<String>,
+    bindings: Option<&Bound<'_, PyDict>>,
+    optimized: bool,
+) -> PyResult<PyObject> {
+    use oqci::compile::{CompilerConfig, Frontend, Stop};
+    use oqci::pass::PassSelection;
+
+    let options = CompileOptions {
+        backend,
+        bindings,
+        shots: 1,
+        seed: None,
+        layout: "trivial",
+        passes: None,
+        disable: None,
+        qir_profile: "any",
+        qir_pointers: "opaque",
+        target,
+        target_kind,
+        verify: false,
+        verify_max_qubits: 8,
+        lint: false,
+    };
+    let (registry, backend_id) = options.registry()?;
+    let profile = match &backend_id {
+        Some(id) => Some(
+            registry
+                .backend(id)
+                .ok_or_else(|| {
+                    OqciError::new_err(format!(
+                        "unknown backend `{id}`; available: {}",
+                        registry.backend_ids().join(", ")
+                    ))
+                })?
+                .profile()
+                .clone(),
+        ),
+        None => None,
+    };
+    let config = CompilerConfig {
+        bindings: read_bindings(bindings)?,
+        passes: if optimized {
+            PassSelection::All
+        } else {
+            PassSelection::only::<[&str; 0], &str>([])
+        },
+        stop: Stop::Optimized,
+        extensions: registry.clone(),
+        ..CompilerConfig::default()
+    };
+    let artifacts = if let Ok(text) = program.extract::<String>() {
+        let selected = Frontend::from_id(frontend)
+            .ok_or_else(|| OqciError::new_err(format!("unknown frontend `{frontend}`")))?;
+        oqci::compile::compile_named(
+            &text,
+            "main",
+            &CompilerConfig {
+                frontend: selected,
+                ..config
+            },
+        )
+    } else {
+        let ir = read_circuit(program)?;
+        let translated = oqci::frontend::qiskit::translate(&ir).map_err(|e| to_py_err(&e))?;
+        oqci::compile::compile_circuit(translated, &config)
+    }
+    .map_err(|e| to_py_err(&e))?;
+    let circuit = if optimized {
+        &artifacts.optimized
+    } else {
+        &artifacts.source_circuit
+    };
+    let report = registry.linter().lint(circuit, profile.as_ref());
+    json_to_py(py, &serde_json::to_value(report).map_err(json_err)?)
+}
+
+/// Converts an execution adapter's result (as JSON) into OQCI's structured
+/// `ExecutionResult` (§10), returned as a dict.
+#[pyfunction]
+#[pyo3(signature = (run_json, compilation_duration_ms = None))]
+fn execution_result(
+    py: Python<'_>,
+    run_json: &str,
+    compilation_duration_ms: Option<f64>,
+) -> PyResult<PyObject> {
+    let result = oqci::backend::ExecutionResult::from_adapter(run_json, compilation_duration_ms)
+        .map_err(|e| to_py_err(&e))?;
+    json_to_py(py, &serde_json::to_value(result).map_err(json_err)?)
 }
 
 /// The backends this build can compile for, as `(id, description)` pairs.
@@ -664,5 +877,9 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(compile_qiskit, module)?)?;
     module.add_function(wrap_pyfunction!(backends, module)?)?;
     module.add_function(wrap_pyfunction!(decomposition_rules, module)?)?;
+    module.add_function(wrap_pyfunction!(load_target, module)?)?;
+    module.add_function(wrap_pyfunction!(basis_rule_sets, module)?)?;
+    module.add_function(wrap_pyfunction!(lint_program, module)?)?;
+    module.add_function(wrap_pyfunction!(execution_result, module)?)?;
     Ok(())
 }

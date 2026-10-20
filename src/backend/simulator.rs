@@ -15,10 +15,11 @@
 //! Execution belongs to Aer, through the Python adapter in `python/`, and
 //! [`Backend::execute`] says so with a typed error.
 //!
-//! The test-only state-vector simulator under `tests/support/` is not a
-//! counterexample: it exists to verify that rewrites preserve semantics, never
-//! leaves `cargo test`, and is a dev-dependency precisely so it cannot become
-//! a product feature by accident.
+//! Neither the test-only state-vector simulator under `tests/support/` nor
+//! the in-compiler checker in `crate::verify` is a counterexample: both exist
+//! to verify that a transformation preserved semantics, compare two of the
+//! compiler's own circuits, and produce verdicts — never samples or counts,
+//! and never through [`Backend::execute`].
 
 use crate::ir::Circuit;
 use crate::lowering::Lowered;
