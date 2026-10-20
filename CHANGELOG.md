@@ -55,7 +55,34 @@ Each of these was found by fuzzing:
 Limits are documented in `docs/verification.md` under "Numerical and
 structural limits", and covered by `tests/limits.rs`.
 
+Also fixed:
+
+- **The t|ket⟩ baseline could stop a benchmark run.** On one corpus circuit
+  (`random_4_i6`), `FullPeepholeOptimise(allow_swaps=False)` still leaves an
+  implicit qubit permutation, which the harness refuses. By the project
+  owner's decision, only in that case, the first pass is rerun on the circuit
+  without its final measurements. The permutation is made explicit as SWAPs,
+  and the measurements are restored. The Stage G protocol records the change.
+- **CI.**
+  - The scripts are executable in git: committed from Windows, they had lost
+    the bit.
+  - `oqci-python` and `oqci-server` are `publish = false`, which cargo-deny
+    requires for their version-less path dependency on `oqci`.
+  - `cargo fuzz` builds for `x86_64-unknown-linux-gnu`. The prebuilt
+    cargo-fuzz defaulted to musl.
+  - The `cudaq` job enlarges glibc's static TLS reserve. Aer and CUDA-Q each
+    bundle a `libgomp`, and the default reserve fits only the first one
+    loaded.
+- **A double-encoded comment in `fuzz/src/lib.rs`.**
+
 ### Added
+
+- **`compiler_notes`** in every benchmark record: a deviation from a
+  compiler's fixed recipe on that item. It is empty when there is none.
+- **`docs/fuzzing.md`**: the five targets, the three ways to run them, the CI
+  job and what fuzzing found.
+- A note in `docs/adapters.md` on running Aer and CUDA-Q in one Linux
+  process.
 
 - **`fuzz/tests/mutate.rs`**, a mutation fuzzer that runs on stable Rust on
   every platform. It mutates the corpus seeds for all five fuzz targets and

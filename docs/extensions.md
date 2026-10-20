@@ -107,7 +107,7 @@ through the public API only:
 - the frontend `qtoy`, a line-based language;
 - the backend `demo-ring`, a synthetic CZ-native ring.
 
-`tests/no_core_modification.rs` then checks, for a `qtoy` program compiled end
+`examples/plugin-demo/tests/no_core_modification.rs` then checks, for a `qtoy` program compiled end
 to end:
 
 - the extension pass fires;
