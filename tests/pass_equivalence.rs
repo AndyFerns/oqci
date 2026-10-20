@@ -307,6 +307,20 @@ fn zero_angle_removal_is_semantics_preserving() {
 }
 
 #[test]
+fn identity_removal_between_non_commuting_gates_is_semantics_preserving() {
+    // Canonicalize rebuilds the circuit only when it removes something, so a
+    // defect in that rebuild shows only with an identity present. H and X do
+    // not commute: H;X|0> = |+>, X;H|0> = |->. Random circuits rarely contain
+    // this pattern (the mutant `canonicalize-commutes-h-x` survived them).
+    let c = circuit(|b| {
+        b.h(QubitId(0))
+            .gate(GateKind::I, [QubitId(0)])
+            .x(QubitId(0));
+    });
+    assert_preserves_semantics(&Canonicalize, &c);
+}
+
+#[test]
 fn a_fully_cancelling_circuit_collapses_to_the_identity() {
     // H;X;X;H on |0> is the identity — and the pipeline should discover that.
     let c = circuit(|b| {

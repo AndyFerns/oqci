@@ -127,9 +127,10 @@ checkers = [
 [[transformation]]
 id = "qir-emission"
 stage = "interop"
-note = "no semantic checker: nothing in the toolchain executes OQCI's QIR"
+note = "nothing in the toolchain executes OQCI's QIR; the semantic test decodes it back instead"
 checkers = [
   { kind = "structural", ref = "tests/qir_conformance.rs::every_emitted_module_follows_the_qir_1_0_structure" },
+  { kind = "semantic-test", ref = "tests/qir_semantics.rs::random_circuits_survive_emission", note = "the entry block decoded back into a circuit: same operator, same measurement map" },
   { kind = "external", ref = "scripts/validate_qir.py::check", note = "PyQIR 0.12.5: parse, verify, metadata" },
 ]
 

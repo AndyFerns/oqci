@@ -104,7 +104,19 @@ mod tests {
                 .x(QubitId(0));
         });
         assert!(out.changed);
-        assert_eq!(out.circuit.len(), 2);
+        // The survivors, in their original order: H and X do not commute, so
+        // a count alone would accept a pass that also reordered them (the
+        // Stage G mutant `canonicalize-commutes-h-x` survived that way).
+        let kinds: Vec<&GateKind> = out
+            .circuit
+            .instructions()
+            .iter()
+            .map(|inst| match inst {
+                Instruction::Gate { kind, .. } => kind,
+                other => panic!("unexpected {other:?}"),
+            })
+            .collect();
+        assert_eq!(kinds, [&GateKind::H, &GateKind::X]);
         assert_eq!(out.notes, vec!["removed 1 identity operation(s)"]);
     }
 

@@ -188,6 +188,12 @@ kind = "structural"
 command = ["cargo", "test", "-q", "--test", "qir_conformance", "--test", "qir_emit"]
 
 [[checker]]
+id = "qir-semantics"
+kind = "semantic-test"
+# The emitted QIR decoded back into a circuit and compared with its source.
+command = ["cargo", "test", "-q", "--test", "qir_semantics"]
+
+[[checker]]
 id = "unit-tests"
 kind = "example-based"
 command = ["cargo", "test", "-q", "--lib"]

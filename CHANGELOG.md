@@ -12,6 +12,27 @@ and may change without a major bump (per SemVer §4).
 
 ## [Unreleased]
 
+### Added
+
+- **`tests/qir_semantics.rs`**: QIR emission is checked semantically. Each
+  module's entry block is decoded back into a circuit and must have the
+  source's operator and measurement map. It runs on every example, on a
+  circuit using every gate kind with its operands in both orders, and on
+  random circuits. The coverage matrix now lists a semantic test for QIR
+  emission, and the mutation harness has a `qir-semantics` checker.
+
+### Fixed
+
+- **Two checker gaps that the Stage G mutation evidence exposed.**
+  - `qir-cx-operands-swapped` survived because no test read a gate call's
+    operands back. Closed by `tests/qir_semantics.rs`.
+  - `canonicalize-commutes-h-x` survived for two reasons. First, canonicalize
+    rebuilds a circuit only when it removes an identity, and the verifier
+    probe for this case had none. Second, the unit test that did build
+    `h; id; x` checked only the gate count. The unit test now checks the
+    survivors and their order, `pass_equivalence` has a deterministic case,
+    and the probe includes an `id`.
+
 ## [0.7.1] - 2026-10-20
 
 Fixes for the CI failures on the 0.6.0 pull request, plus the defects that
