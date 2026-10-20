@@ -45,6 +45,7 @@ struct Scope {
 pub fn translate(program: &Program, name: &str) -> Result<Circuit, FrontendError> {
     let mut builder = CircuitBuilder::new(name);
     let mut scope = Scope::default();
+    let (mut qubits_declared, mut clbits_declared) = (0u32, 0u32);
 
     for statement in &program.statements {
         match statement {
@@ -58,6 +59,7 @@ pub fn translate(program: &Program, name: &str) -> Result<Circuit, FrontendError
                     )));
                 }
                 let size = size.unwrap_or(1);
+                qubits_declared = within_limit(qubits_declared, size, "qubit", pos)?;
                 let start = builder.alloc_qubits(size).first().map_or(0, |q| q.index());
                 scope.qubits.insert(name.clone(), Register { start, size });
             }
@@ -70,6 +72,7 @@ pub fn translate(program: &Program, name: &str) -> Result<Circuit, FrontendError
                     )));
                 }
                 let size = size.unwrap_or(1);
+                clbits_declared = within_limit(clbits_declared, size, "bit", pos)?;
                 let start = builder.alloc_clbits(size).first().map_or(0, |c| c.index());
                 scope.clbits.insert(name.clone(), Register { start, size });
             }
@@ -251,6 +254,25 @@ fn eval_f64(expr: &Expr, inputs: &HashSet<String>) -> Result<f64, FrontendError>
                 BinOp::Div => lhs / rhs,
             })
         }
+    }
+}
+
+/// The running register width after declaring `size` more, refused beyond
+/// [`crate::ir::MAX_REGISTER_WIDTH`] before anything is allocated.
+fn within_limit(
+    declared: u32,
+    size: u32,
+    kind: &str,
+    pos: &super::ast::Pos,
+) -> Result<u32, FrontendError> {
+    match declared.checked_add(size) {
+        Some(total) if total <= crate::ir::MAX_REGISTER_WIDTH => Ok(total),
+        _ => Err(FrontendError::unsupported(format!(
+            "{kind} registers wider than {} in total (line {}, column {})",
+            crate::ir::MAX_REGISTER_WIDTH,
+            pos.line,
+            pos.column
+        ))),
     }
 }
 

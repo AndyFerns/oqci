@@ -104,6 +104,12 @@ pub fn translate(kernel: &Kernel, name: &str) -> Result<Circuit, FrontendError> 
         }
     }
 
+    if t.qubits > crate::ir::MAX_REGISTER_WIDTH {
+        return Err(FrontendError::unsupported(format!(
+            "a kernel allocating more than {} qubits in total",
+            crate::ir::MAX_REGISTER_WIDTH
+        )));
+    }
     let mut builder = CircuitBuilder::new(name);
     builder.alloc_qubits(t.qubits);
     builder.alloc_clbits(if t.measures { t.qubits } else { 0 });

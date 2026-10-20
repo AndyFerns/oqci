@@ -1,0 +1,70 @@
+[package]
+name = "oqci-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+license = "Apache-2.0"
+
+# cargo-fuzz targets (final-deliverables-spec.md §23.3). Run with a nightly
+# toolchain on Linux, e.g. `cargo +nightly fuzz run openqasm -- -max_total_time=60`.
+# Kept out of the main workspace: libFuzzer needs nightly and sanitizers.
+
+[package.metadata]
+cargo-fuzz = true
+
+[lib]
+name = "oqci_fuzz"
+path = "src/lib.rs"
+
+[features]
+# libFuzzer needs nightly and, on Windows, MSVC; without it the library and
+# the corpus regression test still build on any toolchain.
+default = ["libfuzzer"]
+libfuzzer = ["dep:libfuzzer-sys"]
+
+[dependencies]
+libfuzzer-sys = { version = "0.4", optional = true }
+oqci = { path = ".." }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "openqasm"
+path = "fuzz_targets/openqasm.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "cudaq"
+path = "fuzz_targets/cudaq.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "target_json"
+path = "fuzz_targets/target_json.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "qiskit_handoff"
+path = "fuzz_targets/qiskit_handoff.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
+
+[[bin]]
+name = "compile_verified"
+path = "fuzz_targets/compile_verified.rs"
+test = false
+doc = false
+bench = false
+required-features = ["libfuzzer"]
