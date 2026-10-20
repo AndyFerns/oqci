@@ -1,13 +1,10 @@
 {
   "summary": {
-    "commit": "80827f93915fb188395e5be68ebb873c0863e495",
+    "commit": "6ff76331f4aa6782726033141ec5912af1e98748",
     "baseline_clean": true,
     "mutants": 10,
-    "caught": 8,
-    "survived": [
-      "canonicalize-commutes-h-x",
-      "qir-cx-operands-swapped"
-    ],
+    "caught": 10,
+    "survived": [],
     "broken": [],
     "checkers": [
       {
@@ -29,6 +26,10 @@
       {
         "id": "qir-structure",
         "kind": "structural"
+      },
+      {
+        "id": "qir-semantics",
+        "kind": "semantic-test"
       },
       {
         "id": "unit-tests",
@@ -62,6 +63,10 @@
         },
         "qir-structure": {
           "kind": "structural",
+          "caught": false
+        },
+        "qir-semantics": {
+          "kind": "semantic-test",
           "caught": false
         },
         "unit-tests": {
@@ -99,6 +104,10 @@
         },
         "qir-structure": {
           "kind": "structural",
+          "caught": false
+        },
+        "qir-semantics": {
+          "kind": "semantic-test",
           "caught": false
         },
         "unit-tests": {
@@ -142,6 +151,10 @@
           "kind": "structural",
           "caught": false
         },
+        "qir-semantics": {
+          "kind": "semantic-test",
+          "caught": false
+        },
         "unit-tests": {
           "kind": "example-based",
           "caught": false
@@ -178,6 +191,10 @@
           "kind": "structural",
           "caught": false
         },
+        "qir-semantics": {
+          "kind": "semantic-test",
+          "caught": false
+        },
         "unit-tests": {
           "kind": "example-based",
           "caught": true
@@ -195,7 +212,7 @@
       "checkers": {
         "pass-equivalence": {
           "kind": "semantic-test",
-          "caught": false
+          "caught": true
         },
         "lowering-equivalence": {
           "kind": "semantic-test",
@@ -207,19 +224,30 @@
         },
         "in-compiler-verifier": {
           "kind": "semantic-in-compiler",
-          "caught": false,
-          "evidence": []
+          "caught": true,
+          "evidence": [
+            "p4_h_x.qasm@simulator",
+            "p4_h_x.qasm@simulator-nisq"
+          ]
         },
         "qir-structure": {
           "kind": "structural",
           "caught": false
         },
+        "qir-semantics": {
+          "kind": "semantic-test",
+          "caught": false
+        },
         "unit-tests": {
           "kind": "example-based",
-          "caught": false
+          "caught": true
         }
       },
-      "caught_by": []
+      "caught_by": [
+        "pass-equivalence",
+        "in-compiler-verifier",
+        "unit-tests"
+      ]
     },
     {
       "id": "fusion-wrong-euler-angle",
@@ -246,6 +274,10 @@
         },
         "qir-structure": {
           "kind": "structural",
+          "caught": false
+        },
+        "qir-semantics": {
+          "kind": "semantic-test",
           "caught": false
         },
         "unit-tests": {
@@ -286,6 +318,10 @@
           "kind": "structural",
           "caught": false
         },
+        "qir-semantics": {
+          "kind": "semantic-test",
+          "caught": false
+        },
         "unit-tests": {
           "kind": "example-based",
           "caught": true
@@ -323,6 +359,10 @@
         },
         "qir-structure": {
           "kind": "structural",
+          "caught": false
+        },
+        "qir-semantics": {
+          "kind": "semantic-test",
           "caught": false
         },
         "unit-tests": {
@@ -365,6 +405,10 @@
           "kind": "structural",
           "caught": false
         },
+        "qir-semantics": {
+          "kind": "semantic-test",
+          "caught": false
+        },
         "unit-tests": {
           "kind": "example-based",
           "caught": false
@@ -403,6 +447,10 @@
           "kind": "structural",
           "caught": false
         },
+        "qir-semantics": {
+          "kind": "semantic-test",
+          "caught": false
+        },
         "unit-tests": {
           "kind": "example-based",
           "caught": false
@@ -439,12 +487,18 @@
           "kind": "structural",
           "caught": false
         },
+        "qir-semantics": {
+          "kind": "semantic-test",
+          "caught": true
+        },
         "unit-tests": {
           "kind": "example-based",
           "caught": false
         }
       },
-      "caught_by": []
+      "caught_by": [
+        "qir-semantics"
+      ]
     }
   ]
 }

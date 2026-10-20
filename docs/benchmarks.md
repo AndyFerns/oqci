@@ -163,9 +163,14 @@ mutant that no checker catches is reported as **surviving**, not hidden.
 The committed reference run is `benchmarks/results/20261020-stage-g/`, built
 from `d42b413` at `0.7.1`. A first attempt, built at `0.6.0`, stopped at
 `random_4_i6` on the t\|ket⟩ permutation that the fallback now handles. It was
-dropped rather than mixed with a second build. The mutation step stopped on a
-stale mutant and was rerun alone at `80827f9`, whose compiler source is
-identical to `d42b413`'s. `mutants.json` records that commit.
+dropped rather than mixed with a second build.
+
+The mutation and coverage steps were rerun alone at `6ff7633`. The first
+rerun followed a stale mutant. The second followed new checkers: two mutants
+had survived every checker, and the gaps were closed (`CHANGELOG.md`,
+`[Unreleased]`). All 10 are now caught. Between `d42b413` and `6ff7633` the
+compiler changed only in test code, so the records and the mutation evidence
+describe the same compiler. `mutants.json` records its commit.
 
 It holds:
 

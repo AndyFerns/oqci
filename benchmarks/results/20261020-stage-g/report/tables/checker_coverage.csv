@@ -11,5 +11,5 @@ lowering:routing,lowering,1,2,1,0,semantic-in-compiler
 lowering:basis-decomposition,lowering,1,3,1,0,semantic-in-compiler
 lowering:orientation-repair,lowering,1,2,1,0,semantic-in-compiler
 lowering:single-qubit-cleanup,lowering,1,1,1,0,semantic-in-compiler
-qir-emission,interop,1,0,0,1,structural
+qir-emission,interop,1,1,0,1,semantic-test
 execution:aer,execution,0,0,0,1,external

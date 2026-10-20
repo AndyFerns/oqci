@@ -225,18 +225,20 @@
     {
       "transformation": "qir-emission",
       "stage": "interop",
-      "note": "no semantic checker: nothing in the toolchain executes OQCI's QIR",
+      "note": "nothing in the toolchain executes OQCI's QIR; the semantic test decodes it back instead",
       "checkers": {
         "structural": [
           "tests/qir_conformance.rs::every_emitted_module_follows_the_qir_1_0_structure"
         ],
-        "semantic-test": [],
+        "semantic-test": [
+          "tests/qir_semantics.rs::random_circuits_survive_emission"
+        ],
         "semantic-in-compiler": [],
         "external": [
           "scripts/validate_qir.py::check"
         ]
       },
-      "strongest": "structural"
+      "strongest": "semantic-test"
     },
     {
       "transformation": "execution:aer",
