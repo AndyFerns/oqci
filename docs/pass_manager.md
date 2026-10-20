@@ -151,7 +151,11 @@ Why the exclusions:
 
 `Rz(a); Rz(b) → Rz(a+b)`, likewise `Rx`, `Ry`, and the phase gate `P`.
 
-Merged **only when both parameters are concrete**. Merging `Rz(θ); Rz(φ)`
+Merged **only when both parameters are concrete**, and only when the
+floating-point sum is the exact sum to within `ir::ANGLE_ROUNDING_LIMIT`
+(1e-12 rad), measured exactly with TwoSum. That fails only for huge angles,
+where a single rounding can exceed a radian. Fuzzing found
+`rz(7.0e18); rz(0.4)` merging into a rotation that had lost the `0.4`. Merging `Rz(θ); Rz(φ)`
 would need a parameter meaning "θ + φ", and `Param` represents a symbol, not
 an expression (`ir_spec.md` §1.1) — folding them would silently lose a term.
 Stage F §6 requires the same from the other direction: passes must preserve
@@ -190,7 +194,9 @@ The fusion policy §8.3 requires the implementation to document:
 
   "Identity" and "diagonal" are decided within 1e-12 on matrix entries. That
   is the only approximation, and both the property test and the in-compiler
-  checker re-check every fusion.
+  checker re-check every fusion. A gate whose angle exceeds
+  `ir::MAX_EVALUATED_ANGLE` (2²⁰ rad) ends a run: its matrix would come from
+  a platform maths library that is unreliable at that size.
 - **When a run is replaced.**
   - Only runs of two or more gates.
   - With a target, only when the replacement expands to *strictly fewer*

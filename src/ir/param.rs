@@ -106,6 +106,51 @@ impl Param {
     }
 }
 
+/// The most a compiler-computed angle may differ, through floating-point
+/// rounding, from the exact value of the arithmetic that produced it.
+///
+/// Rewrites that compute an angle — merging `Rz(a); Rz(b)` into
+/// `Rz(a + b)`, or a decomposition rule's `scale·θ + offset` — are exact in
+/// real arithmetic but rounded in `f64`. For ordinary angles the rounding is
+/// around 1e-16 rad. For huge ones it is not: at |θ| ≈ 7e18 one floating-point
+/// step is about 1024 rad, so `7e18 + 0.4` rounds back to `7e18` and the
+/// merged rotation is simply different. The fuzz targets found exactly that
+/// miscompilation, and the in-compiler verifier reported it. So every such
+/// computation is checked: an optimization skips a rewrite whose rounding
+/// exceeds this bound, and lowering refuses one. In practice that happens
+/// only beyond about 10³ rad.
+pub const ANGLE_ROUNDING_LIMIT: f64 = 1e-12;
+
+/// The largest |angle|, in radians, whose sine and cosine OQCI evaluates
+/// numerically.
+///
+/// Platform maths libraries differ for huge arguments: on the Windows GNU
+/// toolchain `cos(5.5e19)` is wrong in the third decimal place, while glibc and
+/// the MSVC runtime get it right. A pass that built a matrix from such a value
+/// would emit a wrong gate on one platform and a right one on another. So
+/// nothing in the compiler evaluates trigonometry beyond this bound (2²⁰ rad,
+/// where every mainstream libm is accurate to around 1e-14): fusion leaves
+/// such gates alone, and the in-compiler verifier reports them inconclusive.
+/// Gates with larger angles still compile; their angles are carried through
+/// verbatim, never re-derived from a matrix. Found by fuzzing.
+pub const MAX_EVALUATED_ANGLE: f64 = 1_048_576.0;
+
+/// `scale · x + offset`, or `None` if `f64` cannot compute it to within
+/// [`ANGLE_ROUNDING_LIMIT`] of the exact real value (or it is not finite).
+///
+/// The rounding error is computed exactly, not estimated: the product's error
+/// by a fused multiply-add, the sum's by Knuth's TwoSum.
+#[must_use]
+pub fn exact_affine(scale: f64, x: f64, offset: f64) -> Option<f64> {
+    let product = scale * x;
+    let product_error = scale.mul_add(x, -product);
+    let sum = product + offset;
+    let virtual_offset = sum - product;
+    let sum_error = (product - (sum - virtual_offset)) + (offset - virtual_offset);
+    let error = product_error.abs() + sum_error.abs();
+    (sum.is_finite() && error.is_finite() && error <= ANGLE_ROUNDING_LIMIT).then_some(sum)
+}
+
 impl From<Angle> for Param {
     fn from(angle: Angle) -> Self {
         Param::Concrete(angle)
@@ -161,6 +206,20 @@ mod tests {
         assert!(!Param::concrete(f64::NAN).is_valid());
         assert!(Param::symbol("x").is_valid());
         assert!(!Param::symbol("").is_valid());
+    }
+
+    #[test]
+    fn exact_affine_accepts_ordinary_angles_and_refuses_lossy_ones() {
+        assert_eq!(exact_affine(1.0, 0.3, 0.4), Some(0.3 + 0.4));
+        assert_eq!(
+            exact_affine(-0.5, 2.0, std::f64::consts::PI),
+            Some(-1.0 + std::f64::consts::PI)
+        );
+        // The fuzz finding: 7e18 + 0.4 rounds the 0.4 away entirely.
+        assert_eq!(exact_affine(1.0, 7.009_997_822_827_971e18, 0.4), None);
+        assert_eq!(exact_affine(1.0, f64::MAX, f64::MAX), None);
+        // A large angle whose arithmetic happens to be exact is fine.
+        assert_eq!(exact_affine(1.0, 1024.0, 1.0), Some(1025.0));
     }
 
     #[test]

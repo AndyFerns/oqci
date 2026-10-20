@@ -14,6 +14,9 @@
 //!   reset (both are barriers: §33.14 forbids optimizing across them without
 //!   proof), a gate with a symbolic parameter (its matrix is unknown until
 //!   binding), and an opaque gate (its semantics are not OQCI's to define).
+//!   A run containing an angle larger than [`crate::ir::MAX_EVALUATED_ANGLE`]
+//!   is left alone: its matrix cannot be evaluated reliably on every
+//!   platform.
 //! - **Parameter composition.** The run's matrices are multiplied in order,
 //!   and the product is re-expressed exactly — up to one global phase, which
 //!   is unobservable (see the invariant on
@@ -268,7 +271,13 @@ fn matrix(kind: &GateKind) -> Option<Matrix> {
     let zero = c(0.0, 0.0);
     let one = c(1.0, 0.0);
     let diag = |lower: C| [[one, zero], [zero, lower]];
-    let angle = |p: &Param| p.as_concrete().map(crate::ir::Angle::radians);
+    // Beyond MAX_EVALUATED_ANGLE trigonometry is not reliable on every
+    // platform, so such a gate has no matrix here and its run is not fused.
+    let angle = |p: &Param| {
+        p.as_concrete()
+            .map(crate::ir::Angle::radians)
+            .filter(|a| a.abs() <= crate::ir::MAX_EVALUATED_ANGLE)
+    };
     Some(match kind {
         GateKind::I => identity(),
         GateKind::X => [[zero, one], [one, zero]],
@@ -425,6 +434,18 @@ mod tests {
             })
             .changed
         );
+    }
+
+    #[test]
+    fn a_run_with_a_huge_angle_is_not_fused() {
+        // Found by fuzzing: on some platforms cos(5.5e19) is wrong in the third
+        // decimal place, so a U built from it would be a different gate.
+        let out = run(|b| {
+            b.h(QubitId(0))
+                .rz(1.103_378_508_729_725_2e20, QubitId(0))
+                .gate(GateKind::SX, [QubitId(0)]);
+        });
+        assert!(!out.changed);
     }
 
     #[test]

@@ -46,7 +46,9 @@ The reasons for `inconclusive` are:
 - `symbolic_parameter`;
 - `opaque_gate`;
 - `non_terminal_measurement`;
-- `reset` of a used qubit.
+- `reset` of a used qubit;
+- `angle_too_large`: an angle beyond `ir::MAX_EVALUATED_ANGLE` (2²⁰ rad),
+  whose sine and cosine are not reliable on every platform's maths library.
 
 A `not_equivalent` verdict stops compilation with
 `CompileError::SemanticMismatch`, so no executable is produced.
@@ -109,3 +111,18 @@ The same rules are available through `oqci.lint(...)` and
 Output is sorted deterministically. Extension rules register through
 `Registry::register_lint_rule`. This is a small, modular rule set. It is not
 a static-analysis research system, and nothing here claims one.
+
+## Numerical and structural limits
+
+Fuzzing found three classes of input that could crash the compiler or change
+what a program computes. Each is now refused or handled explicitly, with a
+typed error or an honest verdict, rather than left to chance:
+
+| Limit | Value | What happens beyond it |
+|---|---|---|
+| `ir::MAX_REGISTER_WIDTH` | 65,536 qubits or bits | The frontends, the Qiskit handoff and target profiles refuse the input before allocating anything. |
+| `frontend::MAX_EXPRESSION_DEPTH` / `MAX_EXPRESSION_NODES` | 32 levels / 256 terms | Both parsers refuse the expression, instead of overflowing the stack. |
+| `ir::ANGLE_ROUNDING_LIMIT` | 1e-12 rad | An angle computed by a rewrite (a rotation merge, a decomposition rule's `scale·θ + offset`) must equal the exact real result to within this bound. The rounding error is computed exactly, with an FMA and TwoSum. Beyond the bound, the optimization is skipped and lowering refuses with `RuleError::InexactAngle`. |
+| `ir::MAX_EVALUATED_ANGLE` | 2²⁰ rad | No matrix is built from the angle, because platform `cos`/`sin` disagree for huge arguments. Fusion leaves such gates alone, and the checker reports them `inconclusive`. They still compile, and their angles are carried through verbatim. |
+
+Real angle expressions and real rotations never come near any of these.

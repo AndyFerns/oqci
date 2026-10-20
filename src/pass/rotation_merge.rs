@@ -156,16 +156,32 @@ fn combine(a: &GateKind, b: &GateKind) -> Option<GateKind> {
 }
 
 /// Sums two parameters, but only when both are concrete — see the module docs
-/// on why symbolic parameters are never merged.
+/// on why symbolic parameters are never merged — and only when the
+/// floating-point sum is the real sum to within
+/// [`crate::ir::ANGLE_ROUNDING_LIMIT`]. A sum that rounds further is not
+/// merged: for huge angles the rounding can be whole radians, and the merged
+/// rotation would compute something else.
 fn add(a: &Param, b: &Param) -> Option<Param> {
     let (a, b) = (a.as_concrete()?, b.as_concrete()?);
-    Some(Param::concrete(a.radians() + b.radians()))
+    crate::ir::exact_affine(1.0, a.radians(), b.radians()).map(Param::concrete)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ir::{CircuitBuilder, ClbitId, QubitId};
+
+    #[test]
+    fn a_sum_that_rounds_is_not_merged() {
+        // Found by fuzzing: merging these computed Rz(7.009997822827970e18),
+        // dropping the 0.4, and the in-compiler verifier caught the change.
+        let out = run(|b| {
+            b.rz(7.009_997_822_827_971e18, QubitId(0))
+                .rz(0.4, QubitId(0));
+        });
+        assert!(!out.changed);
+        assert_eq!(out.circuit.len(), 2);
+    }
 
     fn run(build: impl FnOnce(&mut CircuitBuilder)) -> PassOutput {
         let mut b = CircuitBuilder::new("c");

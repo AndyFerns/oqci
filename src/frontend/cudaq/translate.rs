@@ -150,6 +150,21 @@ impl Translator {
                 value as u32
             }
         };
+        // Checked here, at the allocation, not after the kernel: a broadcast
+        // such as `h(q)` over a register lists every qubit, so a hostile
+        // `qvector(3000000000)` would allocate gigabytes before any later
+        // check ran (found by fuzzing). Checked addition, so the running
+        // total cannot wrap either.
+        let total = self
+            .qubits
+            .checked_add(width)
+            .filter(|total| *total <= crate::ir::MAX_REGISTER_WIDTH)
+            .ok_or_else(|| {
+                FrontendError::unsupported(format!(
+                    "a kernel allocating more than {} qubits in total (line {line})",
+                    crate::ir::MAX_REGISTER_WIDTH
+                ))
+            })?;
         self.registers.insert(
             name.to_string(),
             Register {
@@ -157,7 +172,7 @@ impl Translator {
                 size: width,
             },
         );
-        self.qubits += width;
+        self.qubits = total;
         Ok(())
     }
 

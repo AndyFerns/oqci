@@ -188,7 +188,13 @@ const REFUSED_KEYWORDS: [(&str, &str); 22] = [
 pub fn parse(source: &str) -> Result<Kernel, FrontendError> {
     let (region, first_line) = extract(source)?;
     let tokens = tokenize(&region, first_line)?;
-    Parser { tokens, pos: 0 }.kernel()
+    Parser {
+        tokens,
+        pos: 0,
+        depth: 0,
+        nodes: 0,
+    }
+    .kernel()
 }
 
 /// Returns the kernel's `def` line and body as one string, together with the
@@ -317,6 +323,10 @@ fn bracket_delta(line: &str) -> i64 {
 struct Parser {
     tokens: Vec<Token>,
     pos: usize,
+    /// Current expression nesting, bounded by `MAX_EXPRESSION_DEPTH`.
+    depth: usize,
+    /// Nodes in the expression being parsed, bounded by `MAX_EXPRESSION_NODES`.
+    nodes: usize,
 }
 
 impl Parser {
@@ -683,7 +693,43 @@ impl Parser {
         Ok(args)
     }
 
+    /// Enters one level of expression nesting, refusing beyond the limit.
+    fn enter(&mut self) -> Result<(), FrontendError> {
+        self.depth += 1;
+        if self.depth > crate::frontend::MAX_EXPRESSION_DEPTH {
+            return Err(FrontendError::unsupported(format!(
+                "an expression nested deeper than {} levels (line {})",
+                crate::frontend::MAX_EXPRESSION_DEPTH,
+                self.peek().line
+            )));
+        }
+        Ok(())
+    }
+
+    /// Counts one expression node, refusing beyond the limit.
+    fn node(&mut self) -> Result<(), FrontendError> {
+        self.nodes += 1;
+        if self.nodes > crate::frontend::MAX_EXPRESSION_NODES {
+            return Err(FrontendError::unsupported(format!(
+                "an expression with more than {} terms (line {})",
+                crate::frontend::MAX_EXPRESSION_NODES,
+                self.peek().line
+            )));
+        }
+        Ok(())
+    }
+
     fn expr(&mut self) -> Result<Expr, FrontendError> {
+        if self.depth == 0 {
+            self.nodes = 0;
+        }
+        self.enter()?;
+        let result = self.expr_inner();
+        self.depth -= 1;
+        result
+    }
+
+    fn expr_inner(&mut self) -> Result<Expr, FrontendError> {
         let mut left = self.term()?;
         loop {
             let op = match self.peek().kind {
@@ -692,6 +738,7 @@ impl Parser {
                 _ => return Ok(left),
             };
             self.next();
+            self.node()?;
             let right = self.term()?;
             left = Expr::Binary {
                 op,
@@ -710,6 +757,7 @@ impl Parser {
                 _ => return Ok(left),
             };
             self.next();
+            self.node()?;
             let right = self.unary()?;
             left = Expr::Binary {
                 op,
@@ -721,15 +769,24 @@ impl Parser {
 
     fn unary(&mut self) -> Result<Expr, FrontendError> {
         match self.peek().kind {
-            TokenKind::Minus => {
+            TokenKind::Minus | TokenKind::Plus => {
+                let negate = self.peek().kind == TokenKind::Minus;
                 self.next();
-                Ok(Expr::Neg(Box::new(self.unary()?)))
+                self.node()?;
+                self.enter()?;
+                let inner = self.unary();
+                self.depth -= 1;
+                let inner = inner?;
+                Ok(if negate {
+                    Expr::Neg(Box::new(inner))
+                } else {
+                    inner
+                })
             }
-            TokenKind::Plus => {
-                self.next();
-                self.unary()
+            _ => {
+                self.node()?;
+                self.atom()
             }
-            _ => self.atom(),
         }
     }
 

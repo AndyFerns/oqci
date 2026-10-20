@@ -19,12 +19,15 @@ use crate::ir::{GateKind, Param};
 type Matrix = [[C; 2]; 2];
 
 /// Why a gate cannot be simulated.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Unsimulable {
     /// A parameter is still a symbol.
     Symbolic(String),
     /// An unregistered gate whose semantics OQCI does not define.
     Opaque(String),
+    /// An angle beyond [`crate::ir::MAX_EVALUATED_ANGLE`], whose sine and
+    /// cosine are not reliable on every platform.
+    AngleTooLarge(f64),
 }
 
 /// A dense state vector over `n` qubits.
@@ -94,10 +97,14 @@ fn phase(theta: f64) -> C {
 }
 
 fn angle(param: &Param) -> Result<f64, Unsimulable> {
-    param
+    let value = param
         .as_concrete()
         .map(crate::ir::Angle::radians)
-        .ok_or_else(|| Unsimulable::Symbolic(param.as_symbol().unwrap_or_default().to_string()))
+        .ok_or_else(|| Unsimulable::Symbolic(param.as_symbol().unwrap_or_default().to_string()))?;
+    if value.abs() > crate::ir::MAX_EVALUATED_ANGLE {
+        return Err(Unsimulable::AngleTooLarge(value));
+    }
+    Ok(value)
 }
 
 fn x() -> Matrix {

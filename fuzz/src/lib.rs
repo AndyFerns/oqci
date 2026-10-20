@@ -49,7 +49,10 @@ pub fn target_json(data: &[u8]) {
         extensions: registry,
         ..Default::default()
     };
-    let _ = oqci::compile::compile("qubit[2] q; bit[2] c; h q[0]; cx q[0], q[1]; c = measure q;", &config);
+    let _ = oqci::compile::compile(
+        "qubit[2] q; bit[2] c; h q[0]; cx q[0], q[1]; c = measure q;",
+        &config,
+    );
 }
 
 /// The Qiskit translation core accepts any handoff struct the PyO3 layer
@@ -69,7 +72,9 @@ pub fn qiskit_handoff(data: &[u8]) {
     while let Some(op) = next() {
         let name = NAMES[usize::from(op) % NAMES.len()].to_string();
         let count = usize::from(next().unwrap_or(0) % 4);
-        let qubits = (0..count).map(|_| u32::from(next().unwrap_or(0) % 10)).collect();
+        let qubits = (0..count)
+            .map(|_| u32::from(next().unwrap_or(0) % 10))
+            .collect();
         let clbits = (0..usize::from(next().unwrap_or(0) % 2))
             .map(|_| u32::from(next().unwrap_or(0) % 10))
             .collect();
@@ -81,7 +86,12 @@ pub fn qiskit_handoff(data: &[u8]) {
                 _ => QiskitParam::Expression("2*t".into()),
             })
             .collect();
-        circuit.instructions.push(QiskitInstruction { name, params, qubits, clbits });
+        circuit.instructions.push(QiskitInstruction {
+            name,
+            params,
+            qubits,
+            clbits,
+        });
     }
     let _ = oqci::frontend::qiskit::translate(&circuit);
 }
@@ -97,10 +107,18 @@ pub fn compile_verified(data: &[u8]) {
     for backend in ["simulator-nisq", "ibm-illustrative", "qir-base"] {
         let config = CompilerConfig {
             backend: Some(backend.into()),
-            verify: VerifyConfig { enabled: true, max_qubits: 5, ..VerifyConfig::default() },
+            verify: VerifyConfig {
+                enabled: true,
+                max_qubits: 5,
+                ..VerifyConfig::default()
+            },
             ..CompilerConfig::default()
         };
-        if let Err(CompileError::SemanticMismatch { transformation, detail }) = compile(text, &config) {
+        if let Err(CompileError::SemanticMismatch {
+            transformation,
+            detail,
+        }) = compile(text, &config)
+        {
             panic!("miscompilation on {backend}: {transformation}: {detail}");
         }
     }

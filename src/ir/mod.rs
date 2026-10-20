@@ -37,7 +37,7 @@ pub mod types;
 pub use bind::bind_parameters;
 pub use convert::qc_to_qco;
 pub use error::IrError;
-pub use param::Param;
+pub use param::{ANGLE_ROUNDING_LIMIT, MAX_EVALUATED_ANGLE, Param, exact_affine};
 pub use qc::{Circuit, CircuitBuilder, Instruction};
 pub use qco::{DepKind, NodeKind, QcoCircuit, QcoNode, Wire};
 pub use qir::{PointerStyle, QirOptions, QirProfile, emit_qir, emit_qir_with};

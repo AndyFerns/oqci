@@ -142,6 +142,13 @@ and parentheses, folded to a number at compile time. A bare `float` argument
 is a symbol; **any arithmetic on one** (`theta / 2`, `-theta`) is refused.
 The OpenQASM frontend applies the same rule to compound `input` expressions.
 
+An expression may nest at most `frontend::MAX_EXPRESSION_DEPTH` (32) levels
+deep and contain at most `MAX_EXPRESSION_NODES` (256) terms. Anything larger
+is refused as unsupported, so a hostile input cannot overflow the parser's
+stack. Registers may total at most `ir::MAX_REGISTER_WIDTH` (65,536) qubits,
+checked at each declaration before anything is allocated. See
+[`verification.md`](verification.md#numerical-and-structural-limits).
+
 ### Also accepted
 
 - Comments, blank lines, a docstring, and `pass`.

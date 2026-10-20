@@ -135,6 +135,12 @@ pub enum InconclusiveReason {
         /// Its name.
         name: String,
     },
+    /// An angle beyond `ir::MAX_EVALUATED_ANGLE`: its sine and cosine are not
+    /// reliable on every platform, so no verdict would be trustworthy.
+    AngleTooLarge {
+        /// The angle, as text (exact, and keeps the verdict `Eq`).
+        angle: String,
+    },
     /// A measurement is followed by further work on its qubit.
     NonTerminalMeasurement {
         /// Program index of the measurement.
@@ -546,6 +552,9 @@ fn unsimulable(error: Unsimulable) -> Verdict {
         reason: match error {
             Unsimulable::Symbolic(symbol) => InconclusiveReason::SymbolicParameter { symbol },
             Unsimulable::Opaque(name) => InconclusiveReason::OpaqueGate { name },
+            Unsimulable::AngleTooLarge(angle) => InconclusiveReason::AngleTooLarge {
+                angle: angle.to_string(),
+            },
         },
     }
 }
