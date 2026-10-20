@@ -1,0 +1,142 @@
+# The checker coverage matrix (Stage G §3.1), as data.
+#
+# For every transformation the compiler performs, the checkers that cover it
+# and their kind:
+#
+#   structural            I1-I8 re-validation, target legality
+#   semantic-test         an independent semantic model, in tests only
+#   semantic-in-compiler  crate::verify, running during compilation (--verify)
+#   external              a third-party tool at a pinned version
+#
+# Every `ref` is `path::function`, and `python -m oqci_bench coverage`
+# fails if the function does not exist in that file — the matrix cannot cite
+# a check that is not there. It is reported as-is, never collapsed into a
+# score.
+
+[[transformation]]
+id = "binding"
+stage = "parameters"
+checkers = [
+  { kind = "structural", ref = "src/ir/bind.rs::bind_parameters", note = "re-validates through CircuitBuilder" },
+  { kind = "semantic-test", ref = "src/ir/bind.rs::binding_matches_a_directly_built_concrete_circuit" },
+  { kind = "semantic-in-compiler", ref = "src/verify/mod.rs::check_binding", note = "exact substitution" },
+]
+
+[[transformation]]
+id = "pass:canonicalize"
+stage = "optimization"
+checkers = [
+  { kind = "structural", ref = "src/pass/mod.rs::rebuild" },
+  { kind = "semantic-test", ref = "tests/pass_equivalence.rs::canonicalize_preserves_semantics" },
+  { kind = "semantic-in-compiler", ref = "src/verify/mod.rs::check_pass" },
+]
+
+[[transformation]]
+id = "pass:gate-cancellation"
+stage = "optimization"
+checkers = [
+  { kind = "structural", ref = "src/pass/mod.rs::rebuild" },
+  { kind = "semantic-test", ref = "tests/pass_equivalence.rs::gate_cancellation_preserves_semantics" },
+  { kind = "semantic-in-compiler", ref = "src/verify/mod.rs::check_pass" },
+]
+
+[[transformation]]
+id = "pass:rotation-merge"
+stage = "optimization"
+checkers = [
+  { kind = "structural", ref = "src/pass/mod.rs::rebuild" },
+  { kind = "semantic-test", ref = "tests/pass_equivalence.rs::rotation_merge_preserves_semantics" },
+  { kind = "semantic-in-compiler", ref = "src/verify/mod.rs::check_pass" },
+]
+
+[[transformation]]
+id = "pass:single-qubit-fusion"
+stage = "optimization"
+checkers = [
+  { kind = "structural", ref = "src/pass/mod.rs::rebuild" },
+  { kind = "semantic-test", ref = "tests/pass_equivalence.rs::single_qubit_fusion_preserves_semantics" },
+  { kind = "semantic-in-compiler", ref = "src/verify/mod.rs::check_pass" },
+]
+
+[[transformation]]
+id = "pass:schedule"
+stage = "optimization"
+note = "analysis only: never changes the circuit"
+checkers = [
+  { kind = "semantic-in-compiler", ref = "src/verify/mod.rs::check_pass", note = "verdict: identical" },
+]
+
+[[transformation]]
+id = "lowering:arity-reduction"
+stage = "lowering"
+checkers = [
+  { kind = "structural", ref = "src/lowering/mod.rs::verify" },
+  { kind = "semantic-test", ref = "tests/lowering_equivalence.rs::lowering_is_equivalent_legal_and_deterministic" },
+  { kind = "semantic-in-compiler", ref = "src/verify/mod.rs::check_lowering", note = "composite: all lowering steps together" },
+]
+
+[[transformation]]
+id = "lowering:layout"
+stage = "lowering"
+checkers = [
+  { kind = "structural", ref = "src/lowering/mod.rs::verify" },
+  { kind = "semantic-test", ref = "tests/lowering_equivalence.rs::lowering_is_equivalent_legal_and_deterministic" },
+  { kind = "semantic-in-compiler", ref = "src/verify/mod.rs::check_lowering", note = "composite" },
+]
+
+[[transformation]]
+id = "lowering:routing"
+stage = "lowering"
+checkers = [
+  { kind = "structural", ref = "src/lowering/mod.rs::verify" },
+  { kind = "semantic-test", ref = "tests/lowering_equivalence.rs::lowering_is_equivalent_legal_and_deterministic" },
+  { kind = "semantic-test", ref = "tests/lowering_equivalence.rs::the_reported_final_layout_matches_the_emitted_swaps", note = "independent swap replay" },
+  { kind = "semantic-in-compiler", ref = "src/verify/mod.rs::check_lowering", note = "composite" },
+]
+
+[[transformation]]
+id = "lowering:basis-decomposition"
+stage = "lowering"
+checkers = [
+  { kind = "structural", ref = "src/lowering/mod.rs::verify" },
+  { kind = "semantic-test", ref = "tests/decomposition.rs::every_builtin_rule_reproduces_its_source_operator" },
+  { kind = "semantic-test", ref = "python/tests/test_rules.py::test_every_rule_reproduces_its_source", note = "Qiskit quantum_info, a second implementation" },
+  { kind = "semantic-test", ref = "tests/lowering_equivalence.rs::lowering_is_equivalent_legal_and_deterministic" },
+  { kind = "semantic-in-compiler", ref = "src/verify/mod.rs::check_lowering", note = "composite" },
+]
+
+[[transformation]]
+id = "lowering:orientation-repair"
+stage = "lowering"
+checkers = [
+  { kind = "structural", ref = "src/lowering/mod.rs::verify" },
+  { kind = "semantic-test", ref = "python/tests/test_rules.py::test_the_orientation_repair_identity_holds" },
+  { kind = "semantic-test", ref = "tests/lowering_equivalence.rs::lowering_is_equivalent_legal_and_deterministic" },
+  { kind = "semantic-in-compiler", ref = "src/verify/mod.rs::check_lowering", note = "composite" },
+]
+
+[[transformation]]
+id = "lowering:single-qubit-cleanup"
+stage = "lowering"
+checkers = [
+  { kind = "structural", ref = "src/lowering/mod.rs::verify" },
+  { kind = "semantic-test", ref = "tests/lowering_equivalence.rs::lowering_is_equivalent_legal_and_deterministic" },
+  { kind = "semantic-in-compiler", ref = "src/verify/mod.rs::check_lowering", note = "composite" },
+]
+
+[[transformation]]
+id = "qir-emission"
+stage = "interop"
+note = "no semantic checker: nothing in the toolchain executes OQCI's QIR"
+checkers = [
+  { kind = "structural", ref = "tests/qir_conformance.rs::every_emitted_module_follows_the_qir_1_0_structure" },
+  { kind = "external", ref = "scripts/validate_qir.py::check", note = "PyQIR 0.12.5: parse, verify, metadata" },
+]
+
+[[transformation]]
+id = "execution:aer"
+stage = "execution"
+note = "the compiler's output checked against an implementation other than its own"
+checkers = [
+  { kind = "external", ref = "python/tests/test_aer.py::test_a_distant_bell_pair_survives_routing", note = "Qiskit Aer" },
+]

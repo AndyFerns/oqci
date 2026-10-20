@@ -47,6 +47,14 @@ use crate::target::topology::{PhysicalQubit, Topology};
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum TargetError {
+    /// The topology declares more qubits than any untrusted input may.
+    #[error("topology declares {qubit_count} qubits, more than the limit of {limit}")]
+    TooManyQubits {
+        /// The topology's qubit count.
+        qubit_count: u32,
+        /// [`crate::ir::MAX_REGISTER_WIDTH`].
+        limit: u32,
+    },
     /// The profile is missing an identifier, version, or backend id.
     #[error("profile is missing a non-empty `{field}`")]
     MissingField {
@@ -422,6 +430,13 @@ impl BasisProfileBuilder {
             if value.trim().is_empty() {
                 return Err(TargetError::MissingField { field });
             }
+        }
+
+        if self.topology.qubit_count() > crate::ir::MAX_REGISTER_WIDTH {
+            return Err(TargetError::TooManyQubits {
+                qubit_count: self.topology.qubit_count(),
+                limit: crate::ir::MAX_REGISTER_WIDTH,
+            });
         }
 
         if let Some((control, target)) = self.topology.out_of_range_edges().first() {

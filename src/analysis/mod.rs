@@ -13,12 +13,17 @@
 //!   circuits, computed by comparing them rather than by trusting a pass's
 //!   own account of itself.
 //!
-//! Target-native gate counts and routing overhead are also named in §13 but
-//! require per-operation calibration data no profile carries; they are absent rather
-//! than reported as zero.
+//! Target-native gate counts and routing overhead (§13) depend on a target,
+//! so they are reported by the target's cost model rather than here:
+//! `target::cost::Cost` (`native_gate_count`, `non_native_gate_count`,
+//! `swap_count`) and `lowering::Lowered::swaps_inserted`. Duration and error
+//! estimates need calibration data no built-in profile carries and stay
+//! `None` rather than being reported as zero.
 
 pub mod diff;
+pub mod lint;
 pub mod report;
 
 pub use diff::{CircuitDiff, DiffEntry, diff_circuits};
+pub use lint::{Diagnostic, LintReport, LintRule, Linter, Severity};
 pub use report::{ResourceReport, analyze};

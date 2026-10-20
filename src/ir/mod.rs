@@ -37,8 +37,20 @@ pub mod types;
 pub use bind::bind_parameters;
 pub use convert::qc_to_qco;
 pub use error::IrError;
-pub use param::Param;
+pub use param::{ANGLE_ROUNDING_LIMIT, MAX_EVALUATED_ANGLE, Param, exact_affine};
 pub use qc::{Circuit, CircuitBuilder, Instruction};
 pub use qco::{DepKind, NodeKind, QcoCircuit, QcoNode, Wire};
 pub use qir::{PointerStyle, QirOptions, QirProfile, emit_qir, emit_qir_with};
 pub use types::{Angle, ClbitId, GateKind, QubitId};
+
+/// The widest qubit or classical register any untrusted input may declare.
+///
+/// A structural safety limit (`final-deliverables-spec.md` §29: safe parsing
+/// of untrusted input), not a statement about hardware: it is far above any
+/// device that exists (IBM's largest current processors have a few hundred
+/// qubits), and far below what would exhaust memory. Every boundary that reads
+/// a width from outside the process — the OpenQASM 3 and CUDA-Q frontends,
+/// the Qiskit handoff, and a target profile's topology — refuses anything
+/// wider *before* allocating, so a hostile `qubit[4294967295]` is a typed
+/// error rather than an allocation failure. Found by the fuzz corpus.
+pub const MAX_REGISTER_WIDTH: u32 = 1 << 16;

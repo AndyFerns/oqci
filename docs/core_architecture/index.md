@@ -1,10 +1,10 @@
 # OQCI Source-of-Truth Documentation Index
 
 Status: Active planning baseline
-Last verified against repository: 2026-09-30
+Last verified against repository: 2026-10-20
 Repository: `https://github.com/AndyFerns/oqci`  
-Branch reviewed: `master`  
-Current repository version: `0.5.0`
+Branch reviewed: `feat/completion` (0.6.0)  
+Current repository version: `0.6.0`
 
 ## Purpose
 
@@ -12,7 +12,7 @@ This directory is the authoritative implementation-planning index for the Open Q
 
 The documents are intentionally split into architecture/design decisions and one consolidated final-deliverables specification. They are written to be usable by a human developer or an LLM coding agent without silently inventing architecture.
 
-**Stage G is intentionally not finalized.** Its purpose is the experimental benchmark matrix/protocol and hardware-test methodology. It requires additional research and discussion before becoming a locked specification.
+**Stage G is locked** (2026-10-20, by the project owner's approval of the 0.6.0 completion plan). Its purpose is the experimental benchmark matrix/protocol and hardware-test methodology; its values are recorded in its own document and mirrored in `benchmarks/configs/stage_g.toml`.
 
 ## Locked Architecture Decisions
 
@@ -25,7 +25,7 @@ The documents are intentionally split into architecture/design decisions and one
 | D | [`stage-d-backend-specific-basis-profiles.md`](stage-d-backend-specific-basis-profiles.md) | Target-independent abstract gates are lowered through backend-specific basis profiles. | LOCKED |
 | E | [`stage-e-backend-defined-cost-model.md`](stage-e-backend-defined-cost-model.md) | Optimization cost is supplied by the selected backend/target cost model. Preserve raw metrics; do not collapse the research evaluation to one scalar. | LOCKED |
 | F | [`stage-f-static-parameterized-circuit-scope.md`](stage-f-static-parameterized-circuit-scope.md) | Main project supports static circuits plus symbolic/numeric parameterized rotations. Runtime-dependent dynamic control flow is deferred. | LOCKED |
-| G | [`stage-g-benchmarking-protocol.md`](stage-g-benchmarking-protocol.md) | Experimental protocol. Primary axes: validation strength, determinism, interoperability (definitions only); hardware experiments secondary. All numeric parameters pending. | PENDING — NOT LOCKED |
+| G | [`stage-g-benchmarking-protocol.md`](stage-g-benchmarking-protocol.md) | Experimental protocol. Primary axes: validation strength, determinism, interoperability; hardware experiments secondary. Every numeric parameter is decided in its §5. | LOCKED (2026-10-20) |
 
 The binding IR constraints C1–C8 are recorded in the IR Contract ADR,
 [`../architecture_decision_ir_contract.md`](../architecture_decision_ir_contract.md),
@@ -82,104 +82,98 @@ An implementation agent must not silently override a locked decision because ano
 
 ## Current Repository Baseline
 
-At the verified `master` state:
+At version `0.6.0` (branch `feat/completion`), the non-G Definition of Done
+(`final-deliverables-spec.md` §34) is met, and Stage G is locked and
+implemented. In detail:
 
-- the repository is at version `0.5.0`;
-- the implemented core is the Phase 0 IR foundation, the frontend layer, the
-  pass manager, the target model, target lowering, the backend contract and
-  compiler orchestration;
-- QC-IR exists;
-- QCO-IR exists;
-- deterministic QC-IR → QCO-IR conversion exists;
-- QCO-IR → textual LLVM-compatible QIR emission exists;
-- validation/error infrastructure exists;
-- symbolic/numeric gate parameters (`Param`) and explicit parameter binding
-  exist, satisfying the Stage F IR requirement;
-- an OpenQASM 3 frontend exists over a documented subset
-  (`docs/openqasm_frontend.md`);
-- a Qiskit adapter exists, split into a pure-Rust translation core and a PyO3
-  boundary (`docs/qiskit_adapter.md`), and — through
-  `compile::compile_circuit` — a Qiskit circuit reaches the whole pipeline,
-  not only QIR;
-- a CUDA-Q frontend exists on `master` (listed under `[Unreleased]` in the
-  changelog) over a documented subset verified against
-  NVIDIA's documentation (`docs/cudaq_frontend.md`), mapping into the same
-  QC-IR as §5.5 requires and selected by `compile::Frontend::CudaQ` (or a
-  `.py` extension). With the `oqci.backends.cudaq` execution adapter it
-  replaces the root-level `cudaq-adapter/` prototype, which has been removed.
-  Every adapter now follows one layout (`docs/adapters.md`);
-- a pass manager and four target-independent passes exist, and `Pass::run`
-  now receives a `PassContext` carrying the selected target, which closes
-  Stage E exit criterion 3 (`docs/pass_manager.md`);
-- pass correctness is verified by property-based state-vector equivalence
-  testing (`tests/pass_equivalence.rs`);
-- an analysis module provides gate counts, depth and circuit diffing
-  (`src/analysis/`);
-- a target model exists — basis profiles, directed topology with path
-  queries, legality checking and a backend-supplied cost model
-  (`docs/target_model.md`);
-- `SX`/`SXdg` are in the registered gate set under an explicit architecture
-  decision (`docs/architecture_decision_sx_basis_gate.md`);
-- **target lowering exists** — qubit mapping (§8.6), routing with SWAP
-  insertion (§8.7) and basis decomposition (§8.8), with an executable
-  decomposition-rule model covering Stage D §5 and a verification step that
-  re-checks lowering's own output (`docs/lowering.md`). This satisfies
-  Stage D exit criteria 3, 5 and 7;
-- **a backend contract exists** — target lowering, validation, execution
-  preparation and execution as four distinct stages, with a structured
-  executable representation and full Stage C §9 provenance
-  (`docs/backend_contract.md`);
-- **a compiler orchestrator exists** (§6), and is the single path the CLI,
-  the Python SDK and library callers all take (`docs/compiler.md`);
-- an `oqci` CLI exposes every stage, including `lower`, `prepare`, `backends`
-  and a live `watch` mode (`docs/cli.md`);
-- a Python SDK covers §17's surface, and `oqci.backends.aer` executes a
-  prepared circuit on Qiskit Aer (§15.1), which is the first verification of
-  OQCI's output against an implementation other than its own;
-- **no backend executes inside the compiler process.** Each returns a typed
-  `ExecutionNotAvailableInProcess`. For the simulator that is because the
-  project's non-goals rule out writing one; for IBM it is because
-  `qiskit-ibm-runtime` and credentials are both absent, and §33.4 forbids
-  implementing a vendor API from memory. **Live IBM submission and result
-  retrieval are not implemented, and no claim of IBM hardware executability
-  is made** (§33.12);
-- per-operation cost and error/noise metadata on profiles (Stage D §2) remain
-  absent, deliberately: every built-in profile is synthetic, and a profile
-  asserting error rates nobody measured would be a fabricated record;
-- a CUDA-Q execution adapter (§15.2) exists on `master` (listed under
-  `[Unreleased]`), but it has never run against a
-  real CUDA-Q install and its results are unverified until it is checked
-  against Aer; there is no Cirq frontend (§5.4) and no Cirq execution adapter;
-- `benchmarks/` is not yet a populated benchmark suite;
-- `mlir_compat.rs` exists as the future MLIR boundary but the full MLIR integration is not implemented;
-- **a live visualization companion exists** (`server/`, `frontend/`) — a
-  browser view of the pipeline, live-updating on save, with a pass-by-pass
-  and swap/rule-by-rule replay that cross-validates itself against a real
-  `compile_named`/`lower()` call on every request rather than trusting its
-  own reconstruction (`docs/visualization.md`). It is read-only by
-  construction: the only change made to this crate to build it is a single
-  visibility flip (`src/cli/mod.rs`), and nothing in `src/pass/`,
-  `src/lowering/`, or any other compiler-logic file was touched. It is a
-  local dev-companion only — no hosted, multi-user, or authenticated mode
-  exists.
+- **IR core.** QC-IR, QCO-IR, deterministic conversion, validation (I1–I8)
+  and symbolic/numeric parameters with explicit binding. Untrusted register
+  widths are refused before allocation (`ir::MAX_REGISTER_WIDTH`).
+- **QIR.** QIR 1.0 emission is the interoperability boundary (§14): one
+  canonical module per compilation, honest `base_profile`/`custom` labeling,
+  and acceptance by PyQIR 0.12.5, `llvm-as` 18 and `llvm-as` 14, observed in
+  CI (`docs/qir_lowering.md` §4).
+- **Frontends.** OpenQASM 3 and CUDA-Q (documented subsets) and Qiskit, all
+  into the same QC-IR. **Cirq is out of scope** by the owner's decision for
+  `0.6.0`: §5.4 reserves it "to the committed scope", and the committed scope
+  is none.
+- **Optimization.** The pass manager runs canonicalization, gate
+  cancellation, rotation merging, **single-qubit gate fusion** (§8.3,
+  target-aware) and scheduling. All are property-tested against an
+  independent state-vector model (`docs/pass_manager.md`).
+- **Semantic verification in the compiler** (Stage G §3.1), `--verify`. It
+  checks binding, every pass (extension passes included) and lowering, and
+  stops compilation on a mismatch (`docs/verification.md`).
+- **Lint** (§13.5): five rules behind a `LintRule` boundary.
+- **Targets and lowering.**
+  - Basis profiles, directed topology, legality and a target-supplied cost
+    model.
+  - Profiles can be loaded at runtime: `backend::from_target_json`,
+    `--target-file`, `target=`.
+  - Layout, routing and 22 decomposition rules covering CX- and CZ-native
+    bases, with lowering re-checking its own output.
+- **Backend contract and orchestration.** Lowering, validation, preparation
+  and execution are distinct stages with full provenance. One orchestrator
+  serves the CLI, the SDK and library callers, and reports per-stage
+  `Timings` (§24). Adapter results convert back into `ExecutionResult`
+  (§10).
+- **Extensions** (§18, DoD item 9). A source-level `Registry` of frontends,
+  passes, backends and lint rules. The demonstration crate
+  `examples/plugin-demo` is tested end to end (`docs/extensions.md`).
+- **Execution adapters.**
+  - **Aer.**
+  - **CUDA-Q**, checked against a real, pinned CUDA-Q in a Linux CI job.
+  - **IBM Quantum hardware** (CZ-native Heron), `oqci.backends.ibm`. It
+    builds the profile from the device's live target, checks the ISA (never
+    transpiling), and submits verbatim with no twirling or dynamical
+    decoupling. Queue and execution time are kept separately. It is tested
+    end to end offline through IBM's local testing mode on a Heron
+    snapshot, and verified against `qiskit-ibm-runtime` 0.50.0.
+  - Live runs are the operator's, with their own account
+    (`docs/hardware.md`). Live submission remains outside the Definition of
+    Done (§34); it is implemented anyway.
+  - `python -m oqci run` compiles and executes in one command.
+- **Benchmarks** (§20–§22, §24, §30): `benchmarks/`, under the locked
+  Stage G. It includes:
+  - a 64-circuit corpus on three targets;
+  - OQCI against Qiskit O3/O0 and t|ket⟩;
+  - an exhaustive correctness check of every compiled output;
+  - determinism across fresh processes, interop and mutation evidence;
+  - a validated checker coverage matrix;
+  - a report generated only from serialized data, and a committed
+    reference run (`docs/benchmarks.md`).
+- **Determinism contract**, specified in `docs/determinism.md` and checked
+  across processes on ubuntu and windows.
+- **Engineering.**
+  - Unit, integration and property tests.
+  - Five cargo-fuzz targets, one of which hunts miscompilations under
+    `--verify`.
+  - `cargo-deny` and `cargo-audit`.
+  - Wheel builds, a `Dockerfile`, and an mdBook documentation build — all in
+    CI.
+- **Live visualization companion** (`server/`, `frontend/`): a local,
+  read-only dev tool (`docs/visualization.md`).
 
-The repository's changelog defines `0.0.1` as the Phase 0 IR core, `0.2.0`
-as the frontend layer, the Stage F parameter work, the pass manager with its
-target-independent passes and the CLI, `0.3.0` as the target model together
-with the backend: lowering, the backend contract, orchestration and a
-simulator execution path, `0.4.0` as the live visualization companion
-described above — a new consumer of the compiler, not a change to it — and
-`0.4.1` as a single lowering fix (a wide gate the target declares, such as
-`ccx` on `ideal-simulator`, is no longer refused). The CUDA-Q frontend and
-execution adapter are on `master` but listed under `[Unreleased]`.
+Deliberately absent:
 
-What remains before the non-G definition of done is met is the QIR
-interoperability boundary specified in `final-deliverables-spec.md` §14 —
-QIR 1.0 structure and module flags, honest `base_profile`/`custom` labeling
-against a `qir-base` profile, one canonical QIR output per compilation, and
-external validation in CI (planned for `0.5.0`) — plus the benchmark
-infrastructure of §20. Live IBM submission and result retrieval are outside
-the definition of done (§34, amended 2026-09-30) and remain future work.
+- **MLIR integration.** Optional by Stage B, and out of scope for `0.6.0`;
+  `mlir_compat.rs` is the empty seam.
+- **Calibration and error data on profiles** (Stage D §2). Layout and routing
+  minimize hop count, not error.
+- **ECR-native IBM devices.** ECR is not in the gate set.
+- **A dynamic (binary) plugin mechanism** (§18.4).
+
+The changelog maps the versions:
+
+| Version | Contents |
+|---|---|
+| `0.0.1` | The Phase 0 IR core. |
+| `0.2.0` | Frontends, Stage F parameters, the pass manager and the CLI. |
+| `0.3.0` | The target model, lowering, the backend contract and the orchestrator. |
+| `0.4.0` | The visualization companion. |
+| `0.4.1` | A lowering fix. |
+| `0.5.0` | The QIR interoperability boundary, and the CUDA-Q frontend and adapter. |
+| `0.6.0` | Completion: extensions, verification, lint, fusion, runtime targets and the IBM adapter, timing and result retrieval, the benchmark suite under the locked Stage G, and fuzzing and CI hardening. |
 
 ## How to Use These Documents
 
@@ -207,6 +201,7 @@ does, not by a phase number.
 | — | `0.4.1` | A lowering fix (declared wide gates). |
 | "Phase 2" (MLIR integration) | — | Not done; MLIR is optional (Stage B). |
 | — | `0.5.0` | QIR interoperability boundary: `final-deliverables-spec.md` §14. |
+| — | `0.6.0` | Completion of the non-G deliverables and of Stage G (see the baseline above). |
 
 ## Critical Rule
 

@@ -27,22 +27,29 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::time::{Duration, Instant};
 
+use crate::analysis::lint::LintReport;
 use crate::analysis::{ResourceReport, analyze};
 use crate::backend::{
     BackendError, Executable, ExecutionSettings, Provenance, simulator::provenance_for,
 };
 use serde::Serialize;
 
-use crate::frontend::{FrontendError, parse_cudaq_named, parse_openqasm3_named};
+use crate::extension::Registry;
+use crate::frontend::{
+    FrontendError, FrontendTiming, parse_cudaq_named, parse_cudaq_timed, parse_openqasm3_named,
+    parse_openqasm3_timed,
+};
 use crate::ir::qir::emit_qir_base;
 use crate::ir::{
     Circuit, IrError, PointerStyle, QirOptions, QirProfile, bind_parameters, emit_qir_with,
     qc_to_qco,
 };
 use crate::lowering::{Lowered, LoweringConfig};
-use crate::pass::{PassContext, PassError, PassManager, PassRecord, PassSelection};
+use crate::pass::{PassContext, PassError, PassRecord, PassSelection};
 use crate::target::{Cost, Violation, builtin, check};
+use crate::verify::{OnMismatch, VerificationReport, VerifyConfig};
 
 /// Which frontend to read source text with.
 ///
@@ -102,6 +109,22 @@ impl Frontend {
             Frontend::CudaQ => parse_cudaq_named(source, name),
         }
     }
+
+    /// As [`Frontend::parse`], timing parsing and IR construction separately.
+    ///
+    /// # Errors
+    ///
+    /// As [`Frontend::parse`].
+    pub fn parse_timed(
+        self,
+        source: &str,
+        name: &str,
+    ) -> Result<(Circuit, FrontendTiming), FrontendError> {
+        match self {
+            Frontend::OpenQasm3 => parse_openqasm3_timed(source, name),
+            Frontend::CudaQ => parse_cudaq_timed(source, name),
+        }
+    }
 }
 
 /// How far through the pipeline to go.
@@ -140,6 +163,15 @@ pub struct CompilerConfig {
     pub stop: Stop,
     /// How to emit the canonical QIR artifact.
     pub qir: QirRequest,
+    /// Extension frontends, passes, backends and lint rules (§18). The
+    /// default is none: exactly the built-in compiler.
+    pub extensions: Registry,
+    /// Whether to lint the source circuit (§13.5), against the selected
+    /// backend's target when there is one.
+    pub lint: bool,
+    /// Whether, and how, to verify each transformation semantically
+    /// (`crate::verify`). Off by default.
+    pub verify: VerifyConfig,
 }
 
 /// What a compilation must do about its QIR output.
@@ -274,6 +306,64 @@ pub enum CompileError {
         /// What exists.
         available: String,
     },
+    /// The configuration named a frontend that does not exist.
+    #[error("unknown frontend `{requested}`; available: {available}")]
+    UnknownFrontend {
+        /// What was asked for.
+        requested: String,
+        /// What exists.
+        available: String,
+    },
+    /// Verification found a transformation that changed what the circuit
+    /// computes. No executable was produced.
+    #[error(
+        "semantic verification failed: `{transformation}` does not preserve the circuit's \
+         semantics ({detail}); this is a compiler defect, please report it"
+    )]
+    SemanticMismatch {
+        /// The transformation that failed.
+        transformation: String,
+        /// What the checker found.
+        detail: String,
+    },
+}
+
+/// How long each stage of a compilation took (`final-deliverables-spec.md`
+/// §24).
+///
+/// These are *measurements*, not semantic outputs: they are never expected
+/// to be equal across runs, and the determinism contract
+/// (`docs/determinism.md`) excludes them. No queue time exists here — the
+/// compiler never submits anything — so nothing in this struct can conflate
+/// compilation with waiting (Stage C §8).
+///
+/// A stage that did not run is `None`, never zero.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Timings {
+    /// Reading source text. `None` when the circuit arrived already built
+    /// ([`compile_circuit`]).
+    pub frontend: Option<Duration>,
+    /// Building validated QC-IR from the frontend's representation, when the
+    /// frontend measures it separately.
+    pub ir_construction: Option<Duration>,
+    /// Parameter binding (near zero when there was nothing to bind).
+    pub binding: Duration,
+    /// The pass pipeline, including its per-pass metric bookkeeping.
+    pub optimization: Duration,
+    /// Target lowering.
+    pub lowering: Option<Duration>,
+    /// Cost-model evaluation.
+    pub cost: Option<Duration>,
+    /// Emitting the canonical QIR artifact.
+    pub qir_emission: Duration,
+    /// Execution preparation.
+    pub preparation: Option<Duration>,
+    /// Linting, when requested.
+    pub lint: Option<Duration>,
+    /// Semantic verification, when requested.
+    pub verification: Option<Duration>,
+    /// The whole compilation, from the first stage that ran to the last.
+    pub total: Duration,
 }
 
 /// What a compilation produced.
@@ -308,6 +398,16 @@ pub struct CompilationArtifacts {
     ///
     /// [`final_circuit`]: CompilationArtifacts::final_circuit
     pub qir: Option<QirArtifact>,
+    /// The frontend that read the source, when compilation started from text.
+    pub frontend_id: Option<String>,
+    /// Every extension that took part (§18), as recorded in provenance.
+    pub extensions: Vec<String>,
+    /// Lint findings on the source circuit, when requested.
+    pub lint: Option<LintReport>,
+    /// Semantic verification verdicts, when requested.
+    pub verification: Option<VerificationReport>,
+    /// How long each stage took. A measurement, not a semantic output.
+    pub timings: Timings,
 }
 
 impl CompilationArtifacts {
@@ -349,8 +449,40 @@ pub fn compile_named(
     name: &str,
     config: &CompilerConfig,
 ) -> Result<CompilationArtifacts, CompileError> {
-    let parsed = config.frontend.parse(source, name)?;
-    compile_circuit(parsed, config)
+    let started = Instant::now();
+    let (parsed, timing) = config.frontend.parse_timed(source, name)?;
+    compile_parsed(
+        parsed,
+        Some(config.frontend.id()),
+        Some(timing),
+        started,
+        config,
+    )
+}
+
+/// As [`compile_named`], reading the source with the frontend registered
+/// under `frontend_id` — a built-in or an extension (§18.1).
+///
+/// # Errors
+///
+/// [`CompileError::UnknownFrontend`], or as [`compile`].
+pub fn compile_with_frontend(
+    source: &str,
+    name: &str,
+    frontend_id: &str,
+    config: &CompilerConfig,
+) -> Result<CompilationArtifacts, CompileError> {
+    let started = Instant::now();
+    let frontend =
+        config
+            .extensions
+            .frontend(frontend_id)
+            .ok_or_else(|| CompileError::UnknownFrontend {
+                requested: frontend_id.to_string(),
+                available: config.extensions.frontend_ids().join(", "),
+            })?;
+    let (parsed, timing) = frontend.parse_timed(source, name)?;
+    compile_parsed(parsed, Some(frontend.id()), Some(timing), started, config)
 }
 
 /// Runs the pipeline on a circuit a frontend has already built.
@@ -369,30 +501,78 @@ pub fn compile_circuit(
     parsed: Circuit,
     config: &CompilerConfig,
 ) -> Result<CompilationArtifacts, CompileError> {
+    compile_parsed(parsed, None, None, Instant::now(), config)
+}
+
+/// Everything after the frontend: the shared second half of every entry
+/// point.
+fn compile_parsed(
+    parsed: Circuit,
+    frontend_id: Option<&str>,
+    frontend_timing: Option<FrontendTiming>,
+    started: Instant,
+    config: &CompilerConfig,
+) -> Result<CompilationArtifacts, CompileError> {
+    let mut timings = Timings {
+        frontend: frontend_timing.map(|t| t.parse),
+        ir_construction: frontend_timing.and_then(|t| t.ir_construction),
+        ..Timings::default()
+    };
+
     // --- Parameter binding, before optimization ---
     // Binding first means the passes see concrete angles and can actually
     // fire: `Rz(theta); Rz(-theta)` cancels only once both are numbers.
+    let stage = Instant::now();
+    let mut verification = config.verify.enabled.then(VerificationReport::new);
     let source_circuit = if config.bindings.is_empty() {
         parsed
     } else {
-        bind_parameters(&parsed, &config.bindings)?
+        let bound = bind_parameters(&parsed, &config.bindings)?;
+        timings.binding = stage.elapsed();
+        if let Some(report) = verification.as_mut() {
+            let started = Instant::now();
+            report.push(
+                "binding",
+                crate::verify::check_binding(&parsed, &bound, &config.bindings),
+            );
+            add_time(&mut timings.verification, started.elapsed());
+        }
+        bound
     };
+    if config.bindings.is_empty() {
+        timings.binding = stage.elapsed();
+    }
     let source_metrics = analyze(&source_circuit)?;
 
     // --- Backend selection ---
-    // A registry lookup, not a match on a vendor name (Stage C §6).
+    // A registry lookup, not a match on a vendor name (Stage C §6). The
+    // registry holds the built-ins plus any extension or runtime target.
     let backend = match &config.backend {
         None => None,
-        Some(id) => Some(crate::backend::by_id(id).ok_or_else(|| {
-            CompileError::UnknownBackend {
-                requested: id.clone(),
-                available: crate::backend::all()
-                    .iter()
-                    .map(|b| b.id().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            }
-        })?),
+        Some(id) => {
+            Some(
+                config
+                    .extensions
+                    .backend(id)
+                    .ok_or_else(|| CompileError::UnknownBackend {
+                        requested: id.clone(),
+                        available: config.extensions.backend_ids().join(", "),
+                    })?,
+            )
+        }
+    };
+
+    // --- Lint, on the circuit as the user wrote it (after binding) ---
+    let lint = if config.lint {
+        let stage = Instant::now();
+        let report = config
+            .extensions
+            .linter()
+            .lint(&source_circuit, backend.as_ref().map(|b| b.profile()));
+        timings.lint = Some(stage.elapsed());
+        Some(report)
+    } else {
+        None
     };
 
     // --- Optimization ---
@@ -406,8 +586,53 @@ pub fn compile_circuit(
         }
         None => PassContext::none(),
     };
-    let result = PassManager::default_pipeline().run(&source_circuit, &config.passes, &context)?;
+    // Each pass's before/after pair is kept only when verifying, and checked
+    // after the pipeline, so verification time is not charged to the passes.
+    let mut observed: Vec<(String, Circuit, Circuit)> = Vec::new();
+    let stage = Instant::now();
+    let result = if verification.is_some() {
+        config.extensions.pass_manager().run_observed(
+            &source_circuit,
+            &config.passes,
+            &context,
+            &mut |seen| {
+                observed.push((
+                    format!("pass:{}#{}", seen.id, seen.position),
+                    seen.before.clone(),
+                    seen.after.clone(),
+                ));
+            },
+        )?
+    } else {
+        config
+            .extensions
+            .pass_manager()
+            .run(&source_circuit, &config.passes, &context)?
+    };
+    timings.optimization = stage.elapsed();
+    if let Some(report) = verification.as_mut() {
+        let started = Instant::now();
+        for (label, before, after) in &observed {
+            report.push(
+                label.clone(),
+                crate::verify::check_pass(before, after, &config.verify),
+            );
+        }
+        add_time(&mut timings.verification, started.elapsed());
+        refuse_mismatch(report, &config.verify)?;
+    }
     let optimized_metrics = analyze(&result.circuit)?;
+
+    let passes_run: Vec<String> = result
+        .records
+        .iter()
+        .filter(|record| record.enabled)
+        .map(|record| record.id.clone())
+        .collect();
+    let extensions =
+        config
+            .extensions
+            .labels_for(frontend_id, &passes_run, backend.as_ref().map(|b| b.id()));
 
     let mut artifacts = CompilationArtifacts {
         source_circuit,
@@ -421,53 +646,109 @@ pub fn compile_circuit(
         backend_id: backend.as_ref().map(|b| b.id().to_string()),
         provenance: None,
         qir: None,
+        frontend_id: frontend_id.map(str::to_string),
+        extensions,
+        lint,
+        verification,
+        timings,
     };
 
     let Some(backend) = backend else {
         // Target-independent compilation is a complete result, not a failure
         // to reach a target. There is nothing to lower *to*.
-        artifacts.qir = canonical_qir(&artifacts.optimized, QirStage::Optimized, &config.qir)?;
-        return Ok(artifacts);
+        return finish_optimized(artifacts, config, started);
     };
     if config.stop == Stop::Optimized {
-        artifacts.qir = canonical_qir(&artifacts.optimized, QirStage::Optimized, &config.qir)?;
-        return Ok(artifacts);
+        return finish_optimized(artifacts, config, started);
     }
 
     // --- Target lowering ---
+    let stage = Instant::now();
     let lowered = backend.lower(&artifacts.optimized, &config.lowering)?;
+    artifacts.timings.lowering = Some(stage.elapsed());
+
+    // Checked before anything is built from the lowered circuit: a lowering
+    // that changed the program must not reach an executable.
+    if let Some(report) = artifacts.verification.as_mut() {
+        let started = Instant::now();
+        report.push(
+            "lowering",
+            crate::verify::check_lowering(&artifacts.optimized, &lowered, &config.verify),
+        );
+        add_time(&mut artifacts.timings.verification, started.elapsed());
+        refuse_mismatch(report, &config.verify)?;
+    }
+
+    let stage = Instant::now();
     artifacts.qir = canonical_qir(&lowered.circuit, QirStage::Lowered, &config.qir)?;
+    artifacts.timings.qir_emission = stage.elapsed();
+
+    let stage = Instant::now();
     artifacts.cost = Some(
         backend
             .cost_model()
             .evaluate(&lowered.circuit, backend.profile())?,
     );
+    artifacts.timings.cost = Some(stage.elapsed());
 
-    let pass_pipeline: Vec<String> = artifacts
-        .pass_records
-        .iter()
-        .filter(|record| record.enabled)
-        .map(|record| record.id.clone())
-        .collect();
-    let provenance = provenance_for(
+    let mut provenance = provenance_for(
         backend.as_ref(),
         &artifacts.source_circuit,
         &lowered,
-        &pass_pipeline,
+        &passes_run,
         &config.settings,
     );
+    provenance.extensions.clone_from(&artifacts.extensions);
     artifacts.provenance = Some(provenance.clone());
 
     if config.stop == Stop::Lowered {
         artifacts.lowered = Some(lowered);
+        artifacts.timings.total = started.elapsed();
         return Ok(artifacts);
     }
 
     // --- Execution preparation ---
     // `prepare` re-validates before building the artifact, so an executable
     // cannot exist for a circuit the target rejects (Stage C exit criterion 5).
+    let stage = Instant::now();
     artifacts.executable = Some(backend.prepare(&lowered, &config.settings, provenance)?);
+    artifacts.timings.preparation = Some(stage.elapsed());
     artifacts.lowered = Some(lowered);
+    artifacts.timings.total = started.elapsed();
+    Ok(artifacts)
+}
+
+/// Adds to an optional duration, starting it at zero.
+fn add_time(slot: &mut Option<Duration>, elapsed: Duration) {
+    *slot = Some(slot.unwrap_or_default() + elapsed);
+}
+
+/// Stops compilation at the first `NotEquivalent` verdict, unless the caller
+/// asked only for a report.
+fn refuse_mismatch(report: &VerificationReport, config: &VerifyConfig) -> Result<(), CompileError> {
+    if config.on_mismatch == OnMismatch::Report {
+        return Ok(());
+    }
+    match report.first_mismatch() {
+        None => Ok(()),
+        Some(check) => Err(CompileError::SemanticMismatch {
+            transformation: check.transformation.clone(),
+            detail: serde_json::to_string(&check.verdict)
+                .unwrap_or_else(|_| "not equivalent".to_string()),
+        }),
+    }
+}
+
+/// Finishes a compilation that stops after optimization.
+fn finish_optimized(
+    mut artifacts: CompilationArtifacts,
+    config: &CompilerConfig,
+    started: Instant,
+) -> Result<CompilationArtifacts, CompileError> {
+    let stage = Instant::now();
+    artifacts.qir = canonical_qir(&artifacts.optimized, QirStage::Optimized, &config.qir)?;
+    artifacts.timings.qir_emission = stage.elapsed();
+    artifacts.timings.total = started.elapsed();
     Ok(artifacts)
 }
 

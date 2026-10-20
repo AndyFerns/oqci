@@ -99,7 +99,7 @@ impl Pass for GateCancellation {
 /// Returns the program indices to delete: every member of every cancellable
 /// pair, chosen greedily in ascending order so overlapping candidates (as in
 /// `X;X;X;X`) are matched consistently rather than double-counted.
-fn find_cancellable(circuit: &Circuit) -> Result<HashSet<usize>, crate::ir::IrError> {
+pub(crate) fn find_cancellable(circuit: &Circuit) -> Result<HashSet<usize>, crate::ir::IrError> {
     let successors = unanimous_successors(circuit)?;
     let mut doomed = HashSet::new();
 

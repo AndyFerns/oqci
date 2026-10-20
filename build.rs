@@ -15,6 +15,15 @@
 use std::process::Command;
 
 fn main() {
+    // A build without a checkout (a container image, a source tarball) may be
+    // told its commit explicitly; it is recorded verbatim.
+    println!("cargo:rerun-if-env-changed=OQCI_GIT_COMMIT_OVERRIDE");
+    if let Ok(commit) = std::env::var("OQCI_GIT_COMMIT_OVERRIDE")
+        && !commit.trim().is_empty()
+    {
+        println!("cargo:rustc-env=OQCI_GIT_COMMIT={}", commit.trim());
+        return;
+    }
     let commit = Command::new("git")
         .args(["rev-parse", "HEAD"])
         .output()

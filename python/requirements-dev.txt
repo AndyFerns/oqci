@@ -8,6 +8,9 @@ qiskit>=2.0,<3.0
 # Aer executes what OQCI prepares. The build script skips the py-* stages
 # when a dependency is missing, so a machine without Aer is unaffected.
 qiskit-aer>=0.14
+# The IBM adapter's offline tests run IBM's local testing mode on a Heron fake
+# backend; no credentials are needed. Pinned like the `ibm` extra.
+qiskit-ibm-runtime>=0.50.0,<0.51
 
 maturin>=1.7,<2.0
 pytest>=8.0

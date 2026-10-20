@@ -16,9 +16,12 @@ dynamic = ["version"]
 [project.optional-dependencies]
 qiskit = ["qiskit>=1.0"]
 aer = ["qiskit>=1.0", "qiskit-aer>=0.14"]
-# Unpinned: no CUDA-Q release has yet been run against `oqci.backends.cudaq`
-# (see docs/adapters.md). Pin one once it has.
-cudaq = ["cudaq"]
+# Pinned to the minor release `oqci.backends.ibm` was verified against
+# (docs/adapters.md, §33.4). Raising it means re-checking that module.
+ibm = ["qiskit>=2.0,<3.0", "qiskit-ibm-runtime>=0.50.0,<0.51"]
+# The release the `cudaq` CI job runs oqci.backends.cudaq against
+# (python/tests/test_backend_cudaq_live.py; docs/adapters.md).
+cudaq = ["cudaq==0.16.0.post1"]
 
 [tool.maturin]
 module-name = "oqci._native"

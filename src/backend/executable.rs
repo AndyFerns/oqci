@@ -201,6 +201,7 @@ mod tests {
             swaps_inserted: 0,
             shots: 10,
             seed: None,
+            extensions: Vec::new(),
         }
     }
 

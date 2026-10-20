@@ -35,7 +35,7 @@
 //! - [`ir`] — QC-IR, QCO-IR, validation, and QIR emission. Everything is
 //!   built on this, and reaches it only through [`ir::CircuitBuilder`], so
 //!   every `Circuit` in existence has already passed validation.
-//! - [`frontend`] — OpenQASM 3 and Qiskit, into QC-IR.
+//! - [`frontend`] — OpenQASM 3, CUDA-Q and Qiskit, into QC-IR.
 //! - [`pass`] — the pass manager and the target-independent optimizations.
 //! - [`analysis`] — the single place any metric is computed.
 //! - [`target`] — what a device accepts, and what it finds expensive. It
@@ -44,16 +44,22 @@
 //! - [`backend`] — the backend contract, the executable representation, and
 //!   the provenance a result is cited by.
 //! - [`compile`] — the orchestrator.
+//! - [`extension`] — the source-level plugin boundary: extension frontends,
+//!   passes, backends and lint rules, without modifying the core.
+//! - [`verify`] — semantic verification of each transformation, in the
+//!   compiler.
 //! - [`cli`] — the `oqci` binary, which contains no compiler logic of its own.
 //!
 //! # What this crate does not do
 //!
 //! **It does not execute circuits.** Every shipped backend's `execute`
 //! returns a typed "not available in this process" error naming where
-//! execution actually happens: Qiskit Aer, through the Python adapter. The
-//! project's non-goals rule out writing a simulator here, and live hardware
-//! submission needs an SDK this crate does not depend on and credentials it
-//! does not have. No claim of hardware executability is made.
+//! execution actually happens: the Python execution adapters — Qiskit Aer,
+//! CUDA-Q, and IBM hardware through `qiskit-ibm-runtime`. The project's
+//! non-goals rule out writing a simulator here, and hardware submission
+//! needs an SDK and credentials that belong to the caller, not to this crate.
+//! The [`verify`] module simulates small circuits only to *compare* two of
+//! the compiler's own outputs; it produces verdicts, never counts.
 //!
 //! See `docs/` for the normative specifications, which are the source of
 //! truth wherever they and a doc comment disagree.
@@ -65,8 +71,10 @@ pub mod analysis;
 pub mod backend;
 pub mod cli;
 pub mod compile;
+pub mod extension;
 pub mod frontend;
 pub mod ir;
 pub mod lowering;
 pub mod pass;
 pub mod target;
+pub mod verify;

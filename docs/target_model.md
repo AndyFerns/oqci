@@ -412,9 +412,22 @@ operation the device does not support, or a blank identifier is rejected with
 the same error a caller would have got from the builder.
 
 This is what §9.2 asks for — "do not hard-code one physical IBM device name
-into the compiler core". `IbmBackend::from_target_json` is the constructor
-that matters; the built-in profile exists only so the path can be exercised
-without a network. Covered by
+into the compiler core". The built-in profiles exist so the path can be
+exercised without a network. A real device's profile reaches the compiler at
+runtime, in several ways:
+
+- through `backend::from_target_json(json, kind, id)`, which builds an `ibm`
+  or `simulator` backend from a serialized profile;
+- through `Registry::register_target_json`;
+- through the CLI's `--target-file`;
+- through `oqci.compile(..., target=...)` in Python.
+
+`oqci.backends.ibm.target_from_backend` builds that JSON from a live IBM
+device's `Target` ([`hardware.md`](hardware.md)).
+
+A profile's topology may declare at most `ir::MAX_REGISTER_WIDTH` (65,536)
+qubits. A larger one is refused with `TargetError::TooManyQubits` before
+anything is allocated: profiles are untrusted input (§29). Covered by
 `target::profile::deserialization_tests::deserialization_cannot_smuggle_past_the_builders_validation`,
 which also checks that a **directed** coupling survives the round trip: losing
 directionality would silently turn a one-way device into a symmetric one and

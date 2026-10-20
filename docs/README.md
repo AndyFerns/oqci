@@ -29,14 +29,16 @@ source ─────────▶ Circuit ─────▶ Circuit ──�
  CUDA-Q, Qiskit)   validated)   optional)  QCO-IR built      decomposition,        and Aer
                                            internally)       verification)         consume)
 
-Side output, outside the orchestrator — from the source, optimized or lowered circuit:
-  Circuit ──qc_to_qco──▶ QCO-IR (DAG) ──emit_qir──▶ QIR text
+Interop output, emitted by the orchestrator — one canonical artifact per compilation,
+from the most-lowered circuit available:
+  Circuit ──qc_to_qco──▶ QCO-IR (DAG) ──emit──▶ QIR text (labeled base_profile or custom)
 ```
 
 The top row is `compile::compile_circuit` ([`compiler.md`](compiler.md)),
-the one path the CLI, the Python SDK and the visualization server share. QIR
-is not on it: `emit_qir` is called separately by whichever tool wants QIR text
-([`qir_lowering.md`](qir_lowering.md) §1.4), and no backend reads it.
+the one path the CLI, the Python SDK and the visualization server share. It
+also emits the canonical QIR artifact — every tool shows that one rather than
+emitting its own ([`qir_lowering.md`](qir_lowering.md) §1.4) — and no backend
+reads it: execution consumes the `Executable`.
 
 Run `oqci compile <file>` to see the source circuit's QC-IR, QCO-IR and QIR,
 `oqci optimize`, `oqci lower` or `oqci prepare` to go further along the top
@@ -60,10 +62,15 @@ row, or `oqci watch <file>` to keep seeing them as you edit — see
 | [`backend_contract.md`](backend_contract.md) | **The backend contract.** Lowering, validation, execution preparation and execution as four distinct stages, the structured executable representation, and full provenance. |
 | [`compiler.md`](compiler.md) | **The compiler orchestrator.** The single path from source text to artifacts every consumer — CLI, Python SDK, visualization server — takes. |
 | [`cli.md`](cli.md) | **The `oqci` command line.** Inspecting every pipeline stage, pass-by-pass reports, before/after diffs, watch mode, and the JSON schema. |
+| [`extensions.md`](extensions.md) | **The extension boundary.** Adding frontends, passes, backends, lint rules and runtime target files without modifying the compiler core; what registration refuses; provenance; the demonstration crate. |
+| [`verification.md`](verification.md) | **In-compiler semantic verification and lint.** What `--verify` checks, its verdicts and inconclusive reasons, why it is not a simulator; the five lint rules. |
+| [`hardware.md`](hardware.md) | **IBM Quantum hardware.** The device-target path, the ISA check (no transpiling), submission and retrieval, credentials, and the Stage G hardware experiment's commands. |
+| [`benchmarks.md`](benchmarks.md) | **The benchmark and research harness.** Corpus, targets, compilers, the correctness check of every output, metrics and statistics, determinism, interop, mutation evidence, the report, the reference run. |
+| [`determinism.md`](determinism.md) | **The determinism contract.** The predicate, the semantic / build-identity / measurement partition, scope, and how it is checked across processes. |
 | [`visualization.md`](visualization.md) | **Live visualization.** The `server`/`frontend` companion's wire contract, and the self-validating replay technique that gives it pass-by-pass and swap/rule-by-rule detail without any change to compiler logic. |
 | [`architecture_decision_sx_basis_gate.md`](architecture_decision_sx_basis_gate.md) | **ADR.** Why `SX`/`SXdg` were added to the closed gate set, and what that does and does not license. |
 | [`mlir_dialect.md`](mlir_dialect.md) | **The `quantum` MLIR dialect spec** (written spec only; nothing is built). Types, ops, attribute-vs-operand rules, the op↔Rust correspondence table and its one open gap (classical wires), the Phase 2 integration path, and the implied TableGen skeleton. |
-| [`qir_lowering.md`](qir_lowering.md) | **QIR emission.** Target QIR format, where `emit_qir` is called and on which circuit, the op → QIR intrinsic mapping table, angle/qubit encoding, and the conformance caveats (extended intrinsics, mid-circuit measurement and reset, an unconditional and unvalidated `base_profile` label). |
+| [`qir_lowering.md`](qir_lowering.md) | **QIR emission.** Target QIR format, where `emit_qir` is called and on which circuit, the op → QIR intrinsic mapping table, angle/qubit encoding, QIR 1.0 structure and module flags, honest `base_profile`/`custom` labeling against the `qir-base` profile, and what external validation (PyQIR, `llvm-as`) has been observed. |
 | [`architecture_decision_no_frontend.md`](architecture_decision_no_frontend.md) | **ADR.** Why no frontend is built before the IR is stable, and how to resist adding one early. |
 | [`related_work.md`](related_work.md) | **Positioning.** The QIR spec, PyQIR and MLIR-based quantum compilers, each claim checked against a dated primary source or marked to verify. |
 | [`architecture_decision_ir_contract.md`](architecture_decision_ir_contract.md) | **ADR (binding constraints).** The IR contract: constraints C1–C8, what each guarantees about I1–I8, and where each is enforced and tested. |

@@ -177,7 +177,7 @@ The implementation must converge toward the following conceptual structure.
          (PyQIR, llvm-as, …)
 ```
 
-*Amended 2026-09-30 per [`framing-and-research-question.md`](framing-and-research-question.md).* Execution runs through the right-hand branch only: backends consume the backend-specific executable, never QIR. QIR is an interoperability artifact — one canonical module per compilation, emitted from the most-lowered circuit available — whose evidence of interoperability is that external QIR tools accept it (§14). As of `0.4.1`, QIR is still emitted outside the orchestrator by each tool separately ([`../qir_lowering.md`](../qir_lowering.md) §1.4); §14 specifies the target state.
+*Amended 2026-09-30 per [`framing-and-research-question.md`](framing-and-research-question.md).* Execution runs through the right-hand branch only: backends consume the backend-specific executable, never QIR. QIR is an interoperability artifact — one canonical module per compilation, emitted from the most-lowered circuit available — whose evidence of interoperability is that external QIR tools accept it (§14). Since `0.5.0` the orchestrator emits that canonical module and every tool shows it ([`../qir_lowering.md`](../qir_lowering.md) §1.4).
 
 MLIR may appear within the IR/pass/lowering layers as an enabling infrastructure component, but it is not the sole definition of the OQCI architecture.
 
@@ -294,6 +294,8 @@ The adapter must live at the integration boundary rather than contaminating QC-I
 The design reserves a Cirq adapter.
 
 It should be implemented only to the level explicitly committed to by the final project scope and should map into the same QC-IR contract.
+
+*Decision, 2026-10-20:* the committed scope for `0.6.0` is **none**. The project owner placed Cirq out of scope. [`../adapters.md`](../adapters.md) keeps the checklist for adding it later.
 
 ## 5.5 CUDA-Q
 
@@ -472,7 +474,9 @@ Do not encode an IBM basis into generic QC-IR.
 
 # 9. IBM Target Deliverable
 
-*Amended 2026-09-30 per [`framing-and-research-question.md`](framing-and-research-question.md).* Execution submission and result retrieval against a live IBM device are **outside the Definition of Done** (§34) and are future work; they need an SDK and credentials the project does not have, and §33.4 forbids implementing a vendor API from memory. Everything else in this section remains required.
+*Amended 2026-09-30 per [`framing-and-research-question.md`](framing-and-research-question.md).* Execution submission and result retrieval against a live IBM device are **outside the Definition of Done** (§34). Everything else in this section remains required.
+
+*Status at `0.6.0`:* submission and result retrieval are implemented anyway, in the execution adapter `oqci.backends.ibm`. It was written against `qiskit-ibm-runtime` 0.50.0's installed source (§33.4), uses only the operator's own account, and is tested offline on a Heron device snapshot. CZ-native (Heron) devices are supported; ECR-native ones are refused. See [`../hardware.md`](../hardware.md).
 
 IBM is the first real hardware target.
 
@@ -685,7 +689,7 @@ The project must retain a well-defined lowering/output path into QIR/LLVM-compat
 
 ## 14.1 Current Emitter
 
-The existing textual QIR emitter is part of the current foundation. Its known limitations — including a `base_profile` label written unconditionally and never validated — are documented in [`../qir_lowering.md`](../qir_lowering.md) and must not be hidden.
+The textual QIR emitter is part of the foundation. Up to `0.4.1` it wrote a `base_profile` label unconditionally and was never validated; since `0.5.0` it implements §14.2 and is validated as §14.3 describes. Its remaining limitations are documented in [`../qir_lowering.md`](../qir_lowering.md) and must not be hidden.
 
 ## 14.2 Target Specification
 
@@ -1162,122 +1166,124 @@ The experiment protocol itself will be finalized separately as Stage G.
 
 # 31. Final Deliverables Checklist
 
-The final non-G deliverable should contain, in a working and tested state:
+The final non-G deliverable should contain, in a working and tested state, the
+items below. Each box was ticked at `0.6.0` (2026-10-20) with the evidence
+that backs it. An item that is out of scope says so, and by whose decision.
 
 ### Compiler core
-- [ ] Stable Rust compiler library.
-- [ ] QC-IR.
-- [ ] QCO-IR.
-- [ ] deterministic conversions.
-- [ ] compiler orchestrator.
-- [ ] configuration model.
+- [x] Stable Rust compiler library — `src/`, `cargo test --workspace`.
+- [x] QC-IR — `src/ir/qc.rs`, `tests/validation.rs`.
+- [x] QCO-IR — `src/ir/qco.rs`, `tests/qco_structure.rs`.
+- [x] deterministic conversions — `src/ir/convert.rs`, `tests/roundtrip.rs`, `docs/determinism.md`.
+- [x] compiler orchestrator — `src/compile.rs`, `docs/compiler.md`.
+- [x] configuration model — `CompilerConfig`, `benchmarks/configs/`.
 
 ### Frontends
-- [ ] OpenQASM 3 supported subset documented and implemented.
-- [ ] Qiskit adapter.
-- [ ] Cirq adapter, to the committed scope.
-- [ ] CUDA-Q adapter, to the committed scope.
-- [ ] frontend plugin boundary.
-- [ ] validation.
+- [x] OpenQASM 3 supported subset documented and implemented — `docs/openqasm_frontend.md`, `tests/openqasm_pipeline.rs`.
+- [x] Qiskit adapter — `src/frontend/qiskit/`, `python/src/lib.rs`, `tests/qiskit_adapter.rs`.
+- [x] Cirq adapter, to the committed scope — **the committed scope is none**, by the project owner's decision for `0.6.0` (§5.4).
+- [x] CUDA-Q adapter, to the committed scope — `src/frontend/cudaq/`, `docs/cudaq_frontend.md`.
+- [x] frontend plugin boundary — `extension::FrontendPlugin`, `docs/extensions.md`.
+- [x] validation — I1–I8 at construction, `ir::MAX_REGISTER_WIDTH`, `tests/limits.rs`, fuzzing (`fuzz/`).
 
 ### Optimization
-- [ ] pass interface.
-- [ ] pass manager.
-- [ ] canonicalization.
-- [ ] gate cancellation.
-- [ ] gate fusion.
-- [ ] rotation merging.
-- [ ] DAG scheduling.
-- [ ] qubit mapping.
-- [ ] routing/SWAP insertion.
-- [ ] basis decomposition.
-- [ ] pass enable/disable configuration.
-- [ ] pass metadata.
+- [x] pass interface — `pass::Pass`.
+- [x] pass manager — `pass::PassManager`, `docs/pass_manager.md`.
+- [x] canonicalization — `pass::canonicalize`.
+- [x] gate cancellation — `pass::cancellation`.
+- [x] gate fusion — `pass::fusion` (single-qubit runs; policy in `docs/pass_manager.md`).
+- [x] rotation merging — `pass::rotation_merge`.
+- [x] DAG scheduling — `pass::schedule`.
+- [x] qubit mapping — `lowering::layout`.
+- [x] routing/SWAP insertion — `lowering::routing`.
+- [x] basis decomposition — `lowering::rules`, `docs/lowering.md`.
+- [x] pass enable/disable configuration — `PassSelection`, `--passes`/`--disable`.
+- [x] pass metadata — `PassRecord`.
 
 ### Target abstraction
-- [ ] backend interface.
-- [ ] target/basis profile.
-- [ ] topology model.
-- [ ] target legality validation.
-- [ ] target-specific lowering.
-- [ ] backend-defined cost model.
+- [x] backend interface — `backend::Backend`, `docs/backend_contract.md`.
+- [x] target/basis profile — `target::BasisProfile`, `docs/target_model.md`.
+- [x] topology model — `target::Topology`.
+- [x] target legality validation — `target::check`.
+- [x] target-specific lowering — `lowering::lower`, re-checked by its own verification step.
+- [x] backend-defined cost model — `target::cost`.
 
 ### IBM
-- [ ] IBM backend module.
-- [ ] IBM target profile.
-- [ ] IBM target lowering.
-- [ ] execution preparation.
-- [ ] provenance metadata.
-- Live submission and result retrieval: outside the Definition of Done (§9, §34); future work.
+- [x] IBM backend module — `src/backend/ibm.rs`, `python/oqci/backends/ibm.py`.
+- [x] IBM target profile — from the device's live target (`target_from_backend`) or a file (`from_target_json`); `cx-to-cz` for Heron.
+- [x] IBM target lowering — tested against Heron snapshots (`python/tests/test_backend_ibm.py`).
+- [x] execution preparation — `Backend::prepare`, ISA-checked against the device (`check_isa`).
+- [x] provenance metadata — `Provenance`, carried into every result.
+- Live submission and result retrieval: outside the Definition of Done (§9, §34), and **implemented** in `0.6.0` (`oqci.backends.ibm`, `docs/hardware.md`), tested offline; live runs are operator-run.
 
 ### Execution
-- [ ] QIR/LLVM artifact generation.
-- [ ] Qiskit Aer backend.
-- [ ] Cirq simulator backend, to committed scope.
-- [ ] CUDA-Q simulator backend, to committed scope.
-- [ ] backend abstraction shared by simulation/hardware.
+- [x] QIR/LLVM artifact generation — `src/ir/qir.rs`, `docs/qir_lowering.md`, external validation in CI.
+- [x] Qiskit Aer backend — `oqci.backends.aer`, `python/tests/test_aer.py`.
+- [x] Cirq simulator backend, to committed scope — none committed (see Frontends).
+- [x] CUDA-Q simulator backend, to committed scope — `oqci.backends.cudaq`, checked against a real CUDA-Q in CI.
+- [x] backend abstraction shared by simulation/hardware — one `Backend` trait; one adapter layout (`docs/adapters.md`).
 
 ### Parameters
-- [ ] symbolic/numeric `Rx`.
-- [ ] symbolic/numeric `Ry`.
-- [ ] symbolic/numeric `Rz`.
-- [ ] explicit parameter binding.
-- [ ] static topology guarantee.
+- [x] symbolic/numeric `Rx` — `ir::Param`.
+- [x] symbolic/numeric `Ry`.
+- [x] symbolic/numeric `Rz`.
+- [x] explicit parameter binding — `ir::bind_parameters`, checked by `verify::check_binding`.
+- [x] static topology guarantee — Stage F; binding preserves structure exactly.
 
 ### Analysis
-- [ ] total gate count.
-- [ ] one-qubit count.
-- [ ] two-qubit count.
-- [ ] depth.
-- [ ] routing overhead.
-- [ ] target-native gate counts.
-- [ ] resource report.
-- [ ] validation/lint boundary.
+- [x] total gate count — `analysis::ResourceReport`.
+- [x] one-qubit count.
+- [x] two-qubit count.
+- [x] depth.
+- [x] routing overhead — `Lowered::swaps_inserted`, `Cost::swap_count`; uniformly derived in the benchmark report.
+- [x] target-native gate counts — `Cost::native_gate_count`.
+- [x] resource report — `oqci analyze`, the SDK's metrics.
+- [x] validation/lint boundary — `analysis::lint`, `oqci lint`, `docs/verification.md`.
 
 ### Python/API
-- [ ] PyO3 bindings.
-- [ ] Python packaging.
-- [ ] compiler API.
-- [ ] analysis API.
-- [ ] backend API.
-- [ ] documentation.
+- [x] PyO3 bindings — `python/src/lib.rs`.
+- [x] Python packaging — `python/pyproject.toml` (extras `aer`, `cudaq`, `ibm`), wheels built in CI.
+- [x] compiler API — `oqci.compile`, `oqci.lint`, `oqci.load_target`.
+- [x] analysis API — metrics, lint, verification in the result.
+- [x] backend API — `oqci.backends`, `to_execution_result`, `python -m oqci run`.
+- [x] documentation — `python/README.md`, `docs/adapters.md`, `docs/hardware.md`.
 
 ### Plugins
-- [ ] pass extension contract.
-- [ ] frontend extension contract.
-- [ ] backend extension contract.
-- [ ] configuration mechanism.
-- [ ] at least one demonstration extension.
+- [x] pass extension contract — `Registry::register_pass`, `PassPlacement`.
+- [x] frontend extension contract — `extension::FrontendPlugin`.
+- [x] backend extension contract — `Registry::register_backend`, `register_target_json`.
+- [x] configuration mechanism — `CompilerConfig::extensions`, `cli::run_with`.
+- [x] at least one demonstration extension — `examples/plugin-demo`, `tests/no_core_modification.rs`.
 
 ### Benchmark infrastructure
-- [ ] benchmark runner.
-- [ ] deterministic benchmark metadata.
-- [ ] metric collector.
-- [ ] baseline runner.
-- [ ] result serializer.
-- [ ] plotting/report generation.
-- [ ] reproducible artifact structure.
+- [x] benchmark runner — `benchmarks/oqci_bench/runner.py`.
+- [x] deterministic benchmark metadata — seeded items, `environment.json`, the record schema.
+- [x] metric collector — `oqci_bench/metrics.py`.
+- [x] baseline runner — Qiskit O3/O0 and t|ket⟩ (`oqci_bench/compilers/`).
+- [x] result serializer — `records.jsonl`, `schema/result.schema.json`.
+- [x] plotting/report generation — `oqci_bench/report.py`.
+- [x] reproducible artifact structure — one run directory per run, `docs/benchmarks.md`.
 
 ### Engineering quality
-- [ ] unit tests.
-- [ ] integration tests.
-- [ ] property tests where useful.
-- [ ] parser fuzzing where applicable.
-- [ ] snapshots where useful.
-- [ ] formatting/linting.
-- [ ] dependency/security checks.
-- [ ] CI.
-- [ ] documentation build.
+- [x] unit tests.
+- [x] integration tests.
+- [x] property tests where useful — `pass_equivalence`, `lowering_equivalence`, `verifier`.
+- [x] parser fuzzing where applicable — `fuzz/` (five targets), in CI.
+- [x] snapshots where useful — CLI and QIR output tests.
+- [x] formatting/linting — `cargo fmt`, `clippy -D warnings`.
+- [x] dependency/security checks — `deny.toml`, cargo-deny and cargo-audit in CI.
+- [x] CI — `.github/workflows/ci.yml`.
+- [x] documentation build — `.github/workflows/docs.yml` (mdBook).
 
 ### Research package
-- [ ] raw benchmark data.
-- [ ] machine-readable result schema.
-- [ ] generated figures.
-- [ ] generated tables.
-- [ ] experiment configurations.
-- [ ] ablation framework.
-- [ ] reproducibility instructions.
-- [ ] paper-supporting artifacts.
+- [x] raw benchmark data — `records.jsonl` of the reference run.
+- [x] machine-readable result schema — `benchmarks/schema/result.schema.json`.
+- [x] generated figures — `report/figures/`.
+- [x] generated tables — `report/tables/` (CSV, Markdown, LaTeX).
+- [x] experiment configurations — `benchmarks/configs/stage_g.toml`.
+- [x] ablation framework — the OQCI ablation configurations.
+- [x] reproducibility instructions — `docs/benchmarks.md`, `Dockerfile`.
+- [x] paper-supporting artifacts — the reference run's `report/`.
 
 ---
 

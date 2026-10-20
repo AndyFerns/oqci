@@ -41,6 +41,8 @@ pub fn parse(source: &str) -> Result<Program, FrontendError> {
     Parser {
         tokens: tokenize(source)?,
         at: 0,
+        depth: 0,
+        nodes: 0,
     }
     .program()
 }
@@ -48,6 +50,10 @@ pub fn parse(source: &str) -> Result<Program, FrontendError> {
 struct Parser {
     tokens: Vec<Token>,
     at: usize,
+    /// Current expression nesting, bounded by `MAX_EXPRESSION_DEPTH`.
+    depth: usize,
+    /// Nodes in the expression being parsed, bounded by `MAX_EXPRESSION_NODES`.
+    nodes: usize,
 }
 
 impl Parser {
@@ -338,7 +344,41 @@ impl Parser {
 
     // --- Expressions: `+`/`-` over `*`//`, then unary `-`, then atoms -------
 
+    /// Enters one level of expression nesting, refusing beyond the limit.
+    fn enter(&mut self) -> Result<(), FrontendError> {
+        self.depth += 1;
+        if self.depth > crate::frontend::MAX_EXPRESSION_DEPTH {
+            return Err(FrontendError::unsupported(format!(
+                "a parameter expression nested deeper than {} levels",
+                crate::frontend::MAX_EXPRESSION_DEPTH
+            )));
+        }
+        Ok(())
+    }
+
+    /// Counts one expression node, refusing beyond the limit.
+    fn node(&mut self) -> Result<(), FrontendError> {
+        self.nodes += 1;
+        if self.nodes > crate::frontend::MAX_EXPRESSION_NODES {
+            return Err(FrontendError::unsupported(format!(
+                "a parameter expression with more than {} terms",
+                crate::frontend::MAX_EXPRESSION_NODES
+            )));
+        }
+        Ok(())
+    }
+
     fn expression(&mut self) -> Result<Expr, FrontendError> {
+        if self.depth == 0 {
+            self.nodes = 0;
+        }
+        self.enter()?;
+        let result = self.expression_inner();
+        self.depth -= 1;
+        result
+    }
+
+    fn expression_inner(&mut self) -> Result<Expr, FrontendError> {
         let mut lhs = self.term()?;
         loop {
             let op = match self.peek() {
@@ -347,6 +387,7 @@ impl Parser {
                 _ => break,
             };
             self.bump();
+            self.node()?;
             let rhs = self.term()?;
             lhs = Expr::Binary {
                 op,
@@ -366,6 +407,7 @@ impl Parser {
                 _ => break,
             };
             self.bump();
+            self.node()?;
             let rhs = self.unary()?;
             lhs = Expr::Binary {
                 op,
@@ -379,8 +421,13 @@ impl Parser {
     fn unary(&mut self) -> Result<Expr, FrontendError> {
         if matches!(self.peek(), TokenKind::Minus) {
             self.bump();
-            return Ok(Expr::Neg(Box::new(self.unary()?)));
+            self.node()?;
+            self.enter()?;
+            let inner = self.unary();
+            self.depth -= 1;
+            return Ok(Expr::Neg(Box::new(inner?)));
         }
+        self.node()?;
         self.atom()
     }
 

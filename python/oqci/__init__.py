@@ -27,7 +27,8 @@ actually runs.
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional, Sequence
+import json
+from typing import Any, Mapping, Optional, Sequence, Union
 
 from . import _native as oqci_native
 from . import backends  # noqa: F401  (re-exported for `oqci.backends.aer`)
@@ -47,13 +48,27 @@ __all__ = [
     "__version__",
     "available_backends",
     "backends",
+    "basis_rule_sets",
     "compile",
     "cudaq_to_qir",
     "decomposition_rules",
+    "lint",
+    "load_target",
     "qasm3_to_qir",
     "qiskit_parameters",
     "qiskit_to_qir",
 ]
+
+#: A target description: a basis-profile dict, or its JSON text.
+Target = Union[Mapping[str, Any], str]
+
+
+def _target_json(target: Optional[Target]) -> Optional[str]:
+    if target is None:
+        return None
+    if isinstance(target, str):
+        return target
+    return json.dumps(dict(target))
 
 
 def compile(  # noqa: A001  — mirrors the Rust entry point's name deliberately
@@ -70,6 +85,11 @@ def compile(  # noqa: A001  — mirrors the Rust entry point's name deliberately
     disable: Optional[Sequence[str]] = None,
     qir_profile: str = "any",
     qir_pointers: str = "opaque",
+    target: Optional[Target] = None,
+    target_kind: Optional[str] = None,
+    verify: bool = False,
+    verify_max_qubits: int = 8,
+    lint: bool = False,
 ) -> dict[str, Any]:
     """Compile a program through the whole pipeline, optionally for a backend.
 
@@ -108,7 +128,24 @@ def compile(  # noqa: A001  — mirrors the Rust entry point's name deliberately
         ``"base"`` raises instead of producing a ``custom`` module.
     :param qir_pointers: ``"opaque"`` (default, ``ptr``) or ``"typed"``
         (``%Qubit*``).
+    :param target: compile for this device description instead of a named
+        ``backend``: a basis-profile dict (or its JSON), such as one built
+        from a real device by :func:`oqci.backends.ibm.target_from_backend`.
+        It is validated — rule closure, cost model — before anything
+        compiles. Mutually exclusive with ``backend``.
+    :param target_kind: the backend kind to load ``target`` as (``"ibm"`` or
+        ``"simulator"``); defaults to the profile's own ``backend_id``.
+    :param verify: check that binding, every optimization pass and lowering
+        preserved the circuit's semantics, refusing to produce an executable
+        if one did not. The verdicts are in ``verification``.
+    :param verify_max_qubits: the widest circuit ``verify`` simulates; wider
+        ones are reported inconclusive, never passed.
+    :param lint: include lint findings on the source circuit, against the
+        selected target when there is one, in ``lint``.
     :raises OqciError: if any stage refuses, with the compiler's own message.
+
+    ``timings`` holds per-stage compile times in microseconds. They are
+    measurements, never part of a deterministic comparison.
 
     The result's ``qir`` entry is the compilation's one canonical QIR module:
     ``{"text", "profile", "stage", "pointers", "base_violations"}``, emitted
@@ -133,6 +170,11 @@ def compile(  # noqa: A001  — mirrors the Rust entry point's name deliberately
             disable,
             qir_profile,
             qir_pointers,
+            _target_json(target),
+            target_kind,
+            verify,
+            verify_max_qubits,
+            lint,
         )
 
     if frontend not in (None, "qiskit"):
@@ -153,7 +195,64 @@ def compile(  # noqa: A001  — mirrors the Rust entry point's name deliberately
         disable,
         qir_profile,
         qir_pointers,
+        _target_json(target),
+        target_kind,
+        verify,
+        verify_max_qubits,
+        lint,
     )
+
+
+def lint(
+    program: Any,
+    *,
+    frontend: Optional[str] = None,
+    backend: Optional[str] = None,
+    target: Optional[Target] = None,
+    target_kind: Optional[str] = None,
+    bindings: Optional[Mapping[Any, float]] = None,
+    optimized: bool = False,
+) -> dict[str, Any]:
+    """Run the lint rules over a program (§13.5).
+
+    ``program`` is source text or a Qiskit ``QuantumCircuit``. Rules that
+    concern a target run only when ``backend`` or ``target`` names one.
+    Returns ``{"rules": [...], "diagnostics": [...]}``; each diagnostic has
+    ``rule``, ``severity`` (``info``/``warning``/``error``),
+    ``instructions``, ``qubits`` and ``message``. Lint never changes a
+    circuit.
+    """
+    if not isinstance(program, str) and frontend not in (None, "qiskit"):
+        raise OqciError("`frontend` applies to source text only")
+    return oqci_native.lint_program(
+        program,
+        frontend or "openqasm3",
+        backend,
+        _target_json(target),
+        target_kind,
+        dict(bindings) if bindings else None,
+        optimized,
+    )
+
+
+def load_target(target: Target, kind: Optional[str] = None) -> dict[str, Any]:
+    """Validate a target description and return it as OQCI reads it.
+
+    Returns ``{"id", "description", "qualified_id", "profile"}``. Raises
+    :class:`OqciError` if the profile is malformed, names an unknown cost
+    model, or has decomposition rules that do not reach its own basis.
+    """
+    return oqci_native.load_target(_target_json(target), kind)
+
+
+def basis_rule_sets() -> dict[str, list[str]]:
+    """The complete decomposition-rule sets for the two superconducting bases.
+
+    ``{"cx": [...], "cz": [...]}``: the rules a profile with basis
+    ``{rz, sx, x, cx}`` or ``{rz, sx, x, cz}`` lists so that every registered
+    gate can be lowered onto it.
+    """
+    return oqci_native.basis_rule_sets()
 
 
 def available_backends() -> list[tuple[str, str]]:

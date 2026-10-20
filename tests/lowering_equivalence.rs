@@ -82,7 +82,7 @@ use oqci::lowering::{
     Layout, LayoutChoice, Lowered, LoweringConfig, LoweringError, UnroutableReason, lower,
 };
 use oqci::target::{
-    BasisProfile, BasisProfileBuilder, CouplingMode, PhysicalQubit, Topology, check,
+    BasisProfile, BasisProfileBuilder, CouplingMode, PhysicalQubit, Topology, builtin, check,
 };
 use support::statevector::simulate_from_basis_state;
 
@@ -145,30 +145,20 @@ fn topology_strategy() -> impl Strategy<Value = (u32, Topology)> {
 
 /// A restricted-basis profile over a generated topology.
 ///
-/// Deliberately `{rz, sx, x, cx}` rather than all-to-all with every gate: a
-/// permissive target exercises neither decomposition nor orientation repair.
-fn profile_for(topology: Topology) -> BasisProfile {
+/// Deliberately `{rz, sx, x, cx}` or `{rz, sx, x, cz}` rather than all-to-all
+/// with every gate: a permissive target exercises neither decomposition nor
+/// orientation repair. The two bases share every one-qubit rule and differ in
+/// the two-qubit gate everything is reduced to, so both `cz-to-cx` and
+/// `cx-to-cz` are proved through routing, orientation repair and layout.
+fn profile_for(topology: Topology, cz_basis: bool) -> BasisProfile {
+    let (two_qubit, rules) = if cz_basis {
+        ("cz", builtin::CZ_BASIS_RULES)
+    } else {
+        ("cx", builtin::CX_BASIS_RULES)
+    };
     BasisProfileBuilder::new("generated", "1", "test", topology)
-        .operations(["rz", "sx", "x", "cx"])
-        .decomposition_rules([
-            "id-to-nothing",
-            "y-to-rz-x",
-            "z-to-rz",
-            "h-to-rz-sx",
-            "s-to-rz",
-            "sdg-to-rz",
-            "t-to-rz",
-            "tdg-to-rz",
-            "sxdg-to-sx",
-            "rx-to-rz-sx",
-            "ry-to-rz-sx",
-            "p-to-rz",
-            "u-to-rz-sx",
-            "cy-to-cx",
-            "cz-to-cx",
-            "swap-to-cx",
-            "ccx-to-cx",
-        ])
+        .operations(["rz", "sx", "x", two_qubit])
+        .decomposition_rules(rules.iter().copied())
         .cost_model("uniform")
         .build()
         .expect("generated profile is well-formed")
@@ -235,8 +225,8 @@ fn circuit_strategy(n: u32, topology: Topology) -> impl Strategy<Value = Circuit
 /// and a circuit conjured mid-test would be re-conjured differently on every
 /// shrink attempt, making a failure impossible to minimize.
 fn case_strategy() -> impl Strategy<Value = (Circuit, BasisProfile)> {
-    topology_strategy().prop_flat_map(|(n, topology)| {
-        let profile = profile_for(topology.clone());
+    (topology_strategy(), any::<bool>()).prop_flat_map(|((n, topology), cz_basis)| {
+        let profile = profile_for(topology.clone(), cz_basis);
         circuit_strategy(n, topology).prop_map(move |circuit| (circuit, profile.clone()))
     })
 }
@@ -537,6 +527,7 @@ proptest! {
 fn generators_reach_the_hard_cases() {
     let mut runner = proptest::test_runner::TestRunner::deterministic();
     let (mut routed, mut repaired, mut non_involutive, mut wide, mut refused) = (0, 0, 0, 0, 0);
+    let mut cz_cases = 0;
     let mut refusal_kinds: BTreeSet<&'static str> = BTreeSet::new();
     let samples = 200;
 
@@ -545,6 +536,9 @@ fn generators_reach_the_hard_cases() {
 
         if circuit.instructions().iter().any(|i| i.qubits().len() > 2) {
             wide += 1;
+        }
+        if profile.supports_operation("cz") {
+            cz_cases += 1;
         }
 
         match lower(&circuit, &profile, &LoweringConfig::default()) {
@@ -593,6 +587,10 @@ fn generators_reach_the_hard_cases() {
          so a layout-inversion bug would be invisible"
     );
     assert!(
+        cz_cases * 4 >= samples && (samples - cz_cases) * 4 >= samples,
+        "{cz_cases}/{samples} cases used the CZ basis; both bases need real coverage"
+    );
+    assert!(
         wide * 20 >= samples,
         "only {wide}/{samples} cases contained a wide gate"
     );
@@ -628,7 +626,7 @@ fn refusals_happen_only_when_they_are_forced() {
                 split.add_undirected(PhysicalQubit(a - 1), PhysicalQubit(a));
             }
         }
-        let profile = profile_for(split.clone());
+        let profile = profile_for(split.clone(), n % 2 == 0);
         let circuit = circuit_strategy(n, split.clone())
             .new_tree(&mut runner)
             .unwrap()

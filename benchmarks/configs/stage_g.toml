@@ -1,0 +1,258 @@
+# Stage G — the locked experimental protocol, as data.
+#
+# Every value here was proposed in the 0.6.0 completion plan and locked by
+# the project owner's approval of that plan on 2026-10-20. It is recorded in
+# docs/core_architecture/stage-g-benchmarking-protocol.md §5, which is
+# normative: if the two ever disagree, the document wins and this file is the
+# bug. No value here may be changed without amending that document.
+
+[protocol]
+name = "stage-g"
+version = "1.0"
+locked = "2026-10-20"
+
+[seeds]
+# Per-item seed = first 8 bytes (big-endian) of
+# SHA-256("master|family|n|reps|instance"). See oqci_bench/seeds.py.
+master = 20261020
+
+# --- Benchmark families -----------------------------------------------------
+
+[families.qft]
+sizes = [4, 6, 8, 10, 12, 14, 16, 20]
+
+[families.grover]
+# Data qubits; all-ones mark; floor(pi/4 * sqrt(2^n)) iterations; a CCX ladder
+# with max(0, n-3) clean ancillas.
+sizes = [3, 4, 5, 6]
+
+[families.vqe]
+# Hardware-efficient ansatz: RY+RZ layers, linear CX entangler; angles drawn
+# uniformly from [0, 2pi) with the item seed, then bound.
+sizes = [4, 8, 12, 16]
+reps = [1, 2, 3]
+
+[families.random]
+# QASMBench-style: 10*n gates, two-qubit with probability 0.3; gate pool
+# {h,x,y,z,s,sdg,t,tdg,sx,rx,ry,rz,cx,cz,swap}.
+sizes = [4, 8, 12, 16]
+instances = 10
+gates_per_qubit = 10
+two_qubit_fraction = 0.3
+
+# --- Targets ----------------------------------------------------------------
+
+[targets]
+# T1 all-to-all and T2 linear are sized to each circuit's width; T3 is the
+# coupling map of a Heron-family fake backend shipped with the pinned
+# qiskit-ibm-runtime.
+kinds = ["all-to-all", "linear", "heron"]
+
+[targets.heron]
+fake_backend = "FakeFez"
+
+# --- Compilers --------------------------------------------------------------
+# `timed = true` configurations get the timing protocol below; ablations
+# compile once (their metrics are deterministic).
+
+[[compilers]]
+id = "oqci-default"
+compiler = "oqci"
+layout = "dense"
+timed = true
+targets = ["all-to-all", "linear", "heron"]
+
+[[compilers]]
+id = "qiskit-o3"
+compiler = "qiskit"
+optimization_level = 3
+timed = true
+targets = ["all-to-all", "linear", "heron"]
+
+[[compilers]]
+id = "qiskit-o0"
+compiler = "qiskit"
+optimization_level = 0
+timed = true
+targets = ["all-to-all", "linear", "heron"]
+
+[[compilers]]
+id = "tket"
+compiler = "tket"
+timed = true
+targets = ["all-to-all", "linear", "heron"]
+
+# Ablation (Stage G §5): all passes, no passes, each pass disabled in turn,
+# and trivial versus dense layout — on T2 and T3.
+
+[[compilers]]
+id = "oqci-no-passes"
+compiler = "oqci"
+layout = "dense"
+passes = []
+timed = false
+targets = ["linear", "heron"]
+
+[[compilers]]
+id = "oqci-no-canonicalize"
+compiler = "oqci"
+layout = "dense"
+disable = ["canonicalize"]
+timed = false
+targets = ["linear", "heron"]
+
+[[compilers]]
+id = "oqci-no-gate-cancellation"
+compiler = "oqci"
+layout = "dense"
+disable = ["gate-cancellation"]
+timed = false
+targets = ["linear", "heron"]
+
+[[compilers]]
+id = "oqci-no-rotation-merge"
+compiler = "oqci"
+layout = "dense"
+disable = ["rotation-merge"]
+timed = false
+targets = ["linear", "heron"]
+
+[[compilers]]
+id = "oqci-no-single-qubit-fusion"
+compiler = "oqci"
+layout = "dense"
+disable = ["single-qubit-fusion"]
+timed = false
+targets = ["linear", "heron"]
+
+[[compilers]]
+id = "oqci-no-schedule"
+compiler = "oqci"
+layout = "dense"
+disable = ["schedule"]
+timed = false
+targets = ["linear", "heron"]
+
+[[compilers]]
+id = "oqci-trivial-layout"
+compiler = "oqci"
+layout = "trivial"
+timed = false
+targets = ["linear", "heron"]
+
+# --- Timing -----------------------------------------------------------------
+
+[timing]
+# perf_counter_ns around each compiler's compile call (plus OQCI's internal
+# per-stage timings). Circuit generation and I/O are excluded.
+warmup = 1
+repetitions = 5
+statistic = "median"
+spread = "iqr"
+
+# --- Correctness ------------------------------------------------------------
+
+[correctness]
+# Every compiled output is checked; a failed check aborts the run.
+operator_max_qubits = 10
+state_max_qubits = 20
+# A numerical bound on floating-point agreement, not an experimental
+# parameter: genuine defects produce residuals of order 0.01-1.
+tolerance = 1e-6
+
+# --- Determinism (Stage G §3.2) ---------------------------------------------
+
+[determinism]
+compiler = "oqci-default"
+targets = ["linear", "heron"]
+repetitions = 10
+# Each repetition is a fresh process.
+fresh_process = true
+
+# --- Interoperability (Stage G §3.3) ----------------------------------------
+
+[interop]
+# QIR of the whole corpus (lowered for T2 and for the qir-base backend), both
+# pointer styles, fed to each consumer that is installed; one that is not is
+# reported as "not run", never as a pass.
+consumers = ["pyqir-0.12.5", "llvm-as-18", "llvm-as-14"]
+
+[interop.agreement]
+# Each executing consumer's counts are tested against the exact source
+# distribution with a chi-square goodness-of-fit test; bins with expected
+# count < 5 are merged; reject at p < alpha. TVD is reported alongside.
+consumers = ["aer", "cudaq"]
+max_qubits = 12
+shots = 8192
+alpha = 0.001
+min_expected = 5
+
+# --- Statistics -------------------------------------------------------------
+
+[statistics]
+# Paired OQCI/baseline ratios: geometric mean with a bootstrap CI, and a
+# two-sided Wilcoxon signed-rank test. Reported only; no claims beyond.
+bootstrap_resamples = 10000
+confidence = 0.95
+primary = "oqci-default"
+baselines = ["qiskit-o3", "qiskit-o0", "tket"]
+
+# --- Mutation evidence (Stage G §3.1) ---------------------------------------
+
+[mutants]
+manifest = "mutants/mutants.toml"
+
+# --- Hardware (secondary) ---------------------------------------------------
+
+[hardware]
+shots = 4096
+compilers = ["oqci-default", "qiskit-o3"]
+# The default selection rule; the operator may always name a backend.
+selection = "least-busy-cz"
+metric = "hellinger-fidelity"
+# Secondary noisy-simulation data for the same subset.
+noise_fake_backend = "FakeFez"
+
+[[hardware.circuits]]
+kind = "bell"
+id = "bell_2"
+
+[[hardware.circuits]]
+kind = "ghz"
+n = 3
+id = "ghz_3"
+
+[[hardware.circuits]]
+kind = "ghz"
+n = 5
+id = "ghz_5"
+
+[[hardware.circuits]]
+kind = "grover"
+n = 3
+id = "grover_3"
+
+[[hardware.circuits]]
+kind = "vqe"
+n = 4
+reps = 1
+id = "vqe_4_r1"
+
+[[hardware.circuits]]
+kind = "random"
+n = 4
+instance = 0
+id = "random_4_i0"
+
+[[hardware.circuits]]
+kind = "qft_roundtrip"
+n = 4
+# |0101>: qubits 0 and 2 set (clbit 0 rightmost).
+ones = [0, 2]
+id = "qft_roundtrip_4"
+
+# --- Budget -----------------------------------------------------------------
+
+[budget]
+local_hours = 2
+qpu_minutes = 10

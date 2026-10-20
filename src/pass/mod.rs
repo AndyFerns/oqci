@@ -37,6 +37,7 @@
 pub(crate) mod adjacency;
 pub mod cancellation;
 pub mod canonicalize;
+pub mod fusion;
 pub mod rotation_merge;
 pub mod schedule;
 
@@ -49,6 +50,7 @@ use crate::target::{BasisProfile, CostModel};
 
 pub use cancellation::GateCancellation;
 pub use canonicalize::Canonicalize;
+pub use fusion::SingleQubitFusion;
 pub use rotation_merge::RotationMerge;
 pub use schedule::Schedule;
 
@@ -69,7 +71,13 @@ pub enum PassError {
 }
 
 impl PassError {
-    fn from_ir(pass: &str, source: IrError) -> Self {
+    /// Attributes an IR failure to a pass.
+    ///
+    /// Public so an extension pass (§18.2), which builds its output through
+    /// the public [`crate::ir::CircuitBuilder`], can report a validation
+    /// failure the same way the built-in passes do.
+    #[must_use]
+    pub fn from_ir(pass: &str, source: IrError) -> Self {
         PassError::Ir {
             pass: pass.to_string(),
             source,
@@ -270,6 +278,19 @@ pub struct PassRecord {
     pub notes: Vec<String>,
 }
 
+/// One pass's transformation, as [`PassManager::run_observed`] reports it.
+#[derive(Debug)]
+pub struct PassObservation<'a> {
+    /// The pass's position in the pipeline, from zero.
+    pub position: usize,
+    /// The pass's id.
+    pub id: &'static str,
+    /// The circuit it received.
+    pub before: &'a Circuit,
+    /// The circuit it returned.
+    pub after: &'a Circuit,
+}
+
 /// The result of running a pipeline.
 #[derive(Debug, Clone)]
 pub struct PassPipelineResult {
@@ -323,10 +344,19 @@ impl PassManager {
         self
     }
 
+    /// Inserts a pass at `index` (clamped to the end). Execution order is
+    /// list order.
+    pub fn insert(&mut self, index: usize, pass: Box<dyn Pass>) -> &mut Self {
+        let index = index.min(self.passes.len());
+        self.passes.insert(index, pass);
+        self
+    }
+
     /// The default optimization pipeline:
     ///
     /// ```text
-    /// canonicalize → gate-cancellation → rotation-merge → canonicalize → schedule
+    /// canonicalize → gate-cancellation → rotation-merge → single-qubit-fusion
+    ///   → canonicalize → schedule
     /// ```
     ///
     /// The ordering is deliberate, not incidental:
@@ -339,6 +369,10 @@ impl PassManager {
     ///   how to remove exactly. This is a fixed, finite order rather than a
     ///   fixed-point loop — §7 asks for meaningful ordering, not iteration to
     ///   convergence, and a finite pipeline cannot fail to terminate.
+    /// - `single-qubit-fusion` runs after the peephole passes, so it fuses
+    ///   what they could not remove rather than hiding a cancellable pair
+    ///   inside a `U` the cancellation pass cannot see into. With a target it
+    ///   fuses only when the target's rules make the result cheaper.
     /// - `schedule` is last and read-only: it measures the circuit that
     ///   actually comes out.
     #[must_use]
@@ -348,6 +382,7 @@ impl PassManager {
             .register(Box::new(Canonicalize))
             .register(Box::new(GateCancellation))
             .register(Box::new(RotationMerge))
+            .register(Box::new(SingleQubitFusion))
             .register(Box::new(Canonicalize))
             .register(Box::new(Schedule));
         manager
@@ -372,6 +407,27 @@ impl PassManager {
         circuit: &Circuit,
         selection: &PassSelection,
         context: &PassContext<'_>,
+    ) -> Result<PassPipelineResult, PassError> {
+        self.run_observed(circuit, selection, context, &mut |_| {})
+    }
+
+    /// As [`PassManager::run`], calling `observer` after every pass that ran
+    /// with the circuit before and after it.
+    ///
+    /// This is how in-compiler verification (`crate::verify`) sees each
+    /// transformation — extension passes included — without the pass manager
+    /// knowing anything about verification, and without cloning a circuit
+    /// when nobody is observing.
+    ///
+    /// # Errors
+    ///
+    /// As [`PassManager::run`].
+    pub fn run_observed(
+        &self,
+        circuit: &Circuit,
+        selection: &PassSelection,
+        context: &PassContext<'_>,
+        observer: &mut dyn FnMut(&PassObservation<'_>),
     ) -> Result<PassPipelineResult, PassError> {
         let mut current = circuit.clone();
         let mut records = Vec::with_capacity(self.passes.len());
@@ -398,6 +454,12 @@ impl PassManager {
             let output = pass.run(&current, context)?;
             let duration = started.elapsed();
 
+            observer(&PassObservation {
+                position: records.len(),
+                id,
+                before: &current,
+                after: &output.circuit,
+            });
             current = output.circuit;
             let after = analyze(&current).map_err(|e| PassError::from_ir(id, e))?;
 
@@ -607,6 +669,7 @@ mod tests {
                 "canonicalize",
                 "gate-cancellation",
                 "rotation-merge",
+                "single-qubit-fusion",
                 "canonicalize",
                 "schedule",
             ]
@@ -618,7 +681,7 @@ mod tests {
         let result = PassManager::default_pipeline()
             .run(
                 &cancellable(),
-                &PassSelection::all_except(["gate-cancellation"]),
+                &PassSelection::all_except(["gate-cancellation", "single-qubit-fusion"]),
                 &PassContext::none(),
             )
             .unwrap();
@@ -633,7 +696,7 @@ mod tests {
         assert_eq!(cancellation.before, cancellation.after);
         assert_eq!(cancellation.duration, Duration::ZERO);
 
-        // With cancellation disabled, the H;H pair survives.
+        // With cancellation and fusion disabled, the H;H pair survives.
         assert_eq!(result.circuit.len(), 2);
     }
 
@@ -647,7 +710,7 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(result.records.len(), 5, "every pass is still reported");
+        assert_eq!(result.records.len(), 6, "every pass is still reported");
         let enabled: Vec<&str> = result
             .records
             .iter()

@@ -1,0 +1,125 @@
+# A small CI profile: the same harness, the same code paths, a fraction of
+# the corpus (n <= 8, one timed repetition). Its numbers are never reported
+# as results — it exists to prove the pipeline works end to end on every
+# change. The locked protocol is stage_g.toml.
+
+[protocol]
+name = "smoke"
+version = "1.0"
+
+[seeds]
+master = 20261020
+
+[families.qft]
+sizes = [4, 6]
+
+[families.grover]
+sizes = [3]
+
+[families.vqe]
+sizes = [4]
+reps = [1]
+
+[families.random]
+sizes = [4, 8]
+instances = 2
+gates_per_qubit = 10
+two_qubit_fraction = 0.3
+
+[targets]
+kinds = ["all-to-all", "linear", "heron"]
+
+[targets.heron]
+fake_backend = "FakeFez"
+
+[[compilers]]
+id = "oqci-default"
+compiler = "oqci"
+layout = "dense"
+timed = true
+targets = ["all-to-all", "linear", "heron"]
+
+[[compilers]]
+id = "qiskit-o3"
+compiler = "qiskit"
+optimization_level = 3
+timed = true
+targets = ["all-to-all", "linear", "heron"]
+
+[[compilers]]
+id = "tket"
+compiler = "tket"
+timed = true
+targets = ["all-to-all", "linear"]
+
+[[compilers]]
+id = "oqci-no-passes"
+compiler = "oqci"
+layout = "dense"
+passes = []
+timed = false
+targets = ["linear"]
+
+[[compilers]]
+id = "oqci-no-single-qubit-fusion"
+compiler = "oqci"
+layout = "dense"
+disable = ["single-qubit-fusion"]
+timed = false
+targets = ["linear"]
+
+[timing]
+warmup = 0
+repetitions = 1
+statistic = "median"
+spread = "iqr"
+
+[correctness]
+operator_max_qubits = 10
+state_max_qubits = 20
+tolerance = 1e-6
+
+[determinism]
+compiler = "oqci-default"
+targets = ["linear"]
+repetitions = 3
+fresh_process = true
+
+[interop]
+consumers = ["pyqir-0.12.5", "llvm-as-18", "llvm-as-14"]
+
+[interop.agreement]
+consumers = ["aer", "cudaq"]
+max_qubits = 8
+shots = 2048
+alpha = 0.001
+min_expected = 5
+
+[statistics]
+bootstrap_resamples = 1000
+confidence = 0.95
+primary = "oqci-default"
+baselines = ["qiskit-o3", "tket"]
+
+[mutants]
+manifest = "mutants/mutants.toml"
+
+[hardware]
+shots = 1024
+compilers = ["oqci-default", "qiskit-o3"]
+selection = "least-busy-cz"
+metric = "hellinger-fidelity"
+noise_fake_backend = "FakeFez"
+
+[[hardware.circuits]]
+kind = "bell"
+id = "bell_2"
+
+[[hardware.circuits]]
+kind = "ghz"
+n = 3
+id = "ghz_3"
+
+[budget]
+local_hours = 0.1
+qpu_minutes = 0

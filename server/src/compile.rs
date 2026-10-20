@@ -70,6 +70,7 @@ fn build_report(
         target: None,
         lowering: None,
         executable: None,
+        ..PipelineReport::default()
     };
 
     report.stages.push(StageSnapshot {

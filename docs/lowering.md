@@ -547,6 +547,20 @@ computed something else, which is not a better position to be in.
 
 ## The rule table
 
+Since `0.6.0` there are 22 rules. Two complete rule sets are named in
+`target::builtin`:
+
+- **`CX_BASIS_RULES`** reaches `{rz, sx, x, cx}`. It is used by
+  `linear-nisq` and `ibm-illustrative`.
+- **`CZ_BASIS_RULES`** reaches `{rz, sx, x, cz}`. It is the same set with
+  `cz-to-cx` replaced by `cx-to-cz`, and is the basis of CZ-native IBM Heron
+  devices. `cy`, `swap` and `ccx` reach `cz` through `cx`.
+
+The two rules are never listed together: they form a cycle, which
+`RuleSet::new` rejects with `CyclicRuleSet`. `tests/lowering_equivalence.rs`
+draws its generated profiles from both bases, so both chains are proved
+through routing, orientation repair and layout.
+
 Every rule in `BUILTIN`, in the order it is declared. Operand indices are into
 the source's operand list; for one-qubit rules they are all `[0]` and are
 omitted below.
@@ -556,6 +570,7 @@ omitted below.
 | `id-to-nothing` | `id` | *(nothing)* | Exact | yes |
 | `swap-to-cx` | `swap` | `cx 0,1; cx 1,0; cx 0,1` | Exact | yes |
 | `cz-to-cx` | `cz` | `h 1; cx 0,1; h 1` | Exact | yes |
+| `cx-to-cz` | `cx` | `h 1; cz 0,1; h 1` | Exact | no — the CZ-native rule set |
 | `cy-to-cx` | `cy` | `sdg 1; cx 0,1; s 1` | Exact | yes |
 | `ccx-to-cx` | `ccx` | the standard six-CNOT Toffoli, 15 steps | Exact | yes |
 | `x-to-sx` | `x` | `sx; sx` | Exact | no — `x` is native there |

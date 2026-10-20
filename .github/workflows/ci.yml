@@ -174,3 +174,205 @@ jobs:
             llvm-as-14 "$module" -o /dev/null
             echo "ok  $module"
           done
+
+  # Dependency hygiene (final-deliverables-spec.md §29): known
+  # vulnerabilities, licences, bans and sources, per deny.toml.
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # --workspace: the root is also a package, and without it cargo-deny
+      # checks only that package — which is how a pyo3 advisory in the python/
+      # member reached CI through cargo-audit alone.
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories licenses bans sources
+          arguments: --workspace
+
+  audit:
+    name: cargo-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - name: Audit Cargo.lock
+        run: cargo audit
+
+  # Parser and pipeline fuzzing (§23.3). Each target runs for a bounded time
+  # from the committed seed corpus; any crash, and any miscompilation found
+  # by compile_verified, fails the job. Linux only: libFuzzer needs nightly
+  # and sanitizers.
+  fuzz:
+    name: fuzz (nightly, ${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [openqasm, cudaq, target_json, qiskit_handoff, compile_verified]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Nightly toolchain
+        run: rustup toolchain install nightly --profile minimal
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+      - name: Seed corpus regression (any toolchain)
+        working-directory: fuzz
+        run: cargo test --no-default-features
+      - name: Mutation smoke (stable, no libFuzzer)
+        working-directory: fuzz
+        env:
+          OQCI_MUTATION_ONLY: ${{ matrix.target }}
+        run: bash ../scripts/ci_annotate.sh "mutation smoke ${{ matrix.target }}" cargo test --no-default-features --release --test mutate -- --ignored --nocapture
+      - name: Fuzz for 60 seconds
+        # --target: the prebuilt cargo-fuzz is a static musl binary and
+        # defaults to its own triple, for which no std is installed and which
+        # AddressSanitizer cannot instrument.
+        run: |
+          mkdir -p fuzz/corpus/${{ matrix.target }}
+          bash scripts/ci_annotate.sh "cargo fuzz ${{ matrix.target }}" cargo +nightly fuzz run --fuzz-dir fuzz --target x86_64-unknown-linux-gnu ${{ matrix.target }} fuzz/corpus/${{ matrix.target }} -- -max_total_time=60
+      - name: Keep crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts
+
+  # The CUDA-Q execution adapter against a real, pinned CUDA-Q (CPU target):
+  # counts must agree with the exact distribution and with Aer.
+  cudaq:
+    name: cudaq (0.16.0.post1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install CUDA-Q and build OQCI
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          bash scripts/ci_annotate.sh "pip install cudaq" pip install -r python/requirements-dev.txt cudaq==0.16.0.post1
+          bash scripts/ci_annotate.sh "maturin develop" maturin develop --manifest-path python/Cargo.toml
+      - name: CUDA-Q imports and runs on the CPU target
+        run: |
+          source .venv/bin/activate
+          bash scripts/ci_annotate.sh "import cudaq" python -c "import cudaq; print(cudaq.__version__); print(cudaq.get_target())"
+      - name: Run the CUDA-Q adapter tests against CUDA-Q
+        env:
+          # A missing or broken CUDA-Q fails this job instead of skipping it.
+          OQCI_REQUIRE_CUDAQ: "1"
+          # Aer and CUDA-Q each bundle a libgomp; glibc's default 512-byte
+          # static TLS reserve fits only the first one loaded (docs/adapters.md).
+          GLIBC_TUNABLES: glibc.rtld.optional_static_tls=16384
+        run: |
+          source .venv/bin/activate
+          bash scripts/ci_annotate.sh "cudaq tests" pytest python/tests/test_backend_cudaq.py python/tests/test_backend_cudaq_live.py -v -rs
+
+  # The benchmark harness end to end on the smoke profile (never reported as
+  # results), plus its own tests.
+  benchmarks-smoke:
+    name: benchmarks (smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install LLVM 18
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-18
+      - name: Smoke run, report and harness tests
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r python/requirements-dev.txt -r benchmarks/requirements.txt
+          maturin develop --release --manifest-path python/Cargo.toml
+          cd benchmarks
+          pytest tests -q
+          python -m oqci_bench run --config configs/smoke.toml --out results/ci
+          python -m oqci_bench interop --config configs/smoke.toml --out results/ci
+          python -m oqci_bench coverage --config configs/smoke.toml --out results/ci
+          python -m oqci_bench report results/ci
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-smoke-report
+          path: benchmarks/results/ci/report
+
+  # The Stage G determinism protocol (§3.2): the full corpus, ten
+  # repetitions each in a fresh process, on every claimed platform.
+  determinism:
+    name: determinism (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ten fresh-process compilations of the Stage G corpus
+        shell: bash
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate 2>/dev/null || source .venv/Scripts/activate
+          pip install -r python/requirements-dev.txt -r benchmarks/requirements.txt
+          maturin develop --release --manifest-path python/Cargo.toml
+          cd benchmarks
+          python -m oqci_bench determinism --config configs/stage_g.toml --out results/determinism
+          python -c "import json,sys; d=json.load(open('results/determinism/determinism.json')); print(d['passed'],'/',d['items']); sys.exit(d['passed']!=d['items'])"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: determinism-${{ matrix.os }}
+          path: benchmarks/results/determinism/determinism.json
+
+  # Python wheels, as build artifacts only — nothing is published.
+  wheels:
+    name: wheel (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build
+        run: |
+          pip install "maturin>=1.7,<2.0"
+          maturin build --release --manifest-path python/Cargo.toml --out dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.os }}
+          path: dist/*.whl
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the reproducible environment
+        run: docker build -t oqci --build-arg OQCI_GIT_COMMIT=${{ github.sha }} .
+      - name: Smoke-test the image
+        run: |
+          docker run --rm oqci oqci compile examples/bell.qasm --emit qc-ir
+          docker run --rm oqci python -c "import oqci; print(oqci.__version__)"

@@ -125,6 +125,14 @@ impl QiskitInstruction {
 /// - [`FrontendError::Ir`] for anything QC-IR's own validation rejects, such
 ///   as an out-of-range bit index.
 pub fn translate(circuit: &QiskitCircuitIr) -> Result<Circuit, FrontendError> {
+    if circuit.num_qubits > crate::ir::MAX_REGISTER_WIDTH
+        || circuit.num_clbits > crate::ir::MAX_REGISTER_WIDTH
+    {
+        return Err(FrontendError::unsupported(format!(
+            "a circuit wider than {} qubits or classical bits",
+            crate::ir::MAX_REGISTER_WIDTH
+        )));
+    }
     let mut builder = CircuitBuilder::new(if circuit.name.is_empty() {
         "main"
     } else {

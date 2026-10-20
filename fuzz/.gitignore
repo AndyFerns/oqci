@@ -1,0 +1,7 @@
+target
+corpus/*/*
+!corpus/*/*.qasm
+artifacts
+coverage
+last-input
+crash-*

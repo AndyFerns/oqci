@@ -35,7 +35,18 @@ QC-IR, so no vendor type crosses into the compiler.
 | OpenQASM 3 | `src/frontend/openqasm/` | — (a language, not a runtime) |
 | CUDA-Q | `src/frontend/cudaq/` ([subset](cudaq_frontend.md)) | `python/oqci/backends/cudaq.py` ([below](#the-cuda-q-execution-adapter)) |
 | Qiskit | `src/frontend/qiskit/` + `python/src/lib.rs` ([adapter](qiskit_adapter.md)) | `python/oqci/backends/aer.py` (Qiskit Aer) |
-| Cirq | not started | not started |
+| IBM Quantum hardware | — (a runtime, not a language) | `python/oqci/backends/ibm.py` ([below](#the-ibm-execution-adapter), [`hardware.md`](hardware.md)) |
+| Cirq | out of scope | out of scope |
+
+Cirq is **out of scope** by the project owner's decision for `0.6.0`. The
+specification reserves a Cirq adapter "to the committed scope"
+(`final-deliverables-spec.md` §5.4, §15.2), and the committed scope is none.
+The checklist below records how one would be added, and nothing more.
+
+`python -m oqci run FILE --runtime aer|cudaq|ibm` compiles and executes in one
+command, through these adapters. `oqci.backends.to_execution_result` converts
+any adapter's result into OQCI's structured `ExecutionResult`
+(`final-deliverables-spec.md` §10).
 
 ### Rules every adapter follows
 
@@ -169,6 +180,22 @@ the generated kernel to a temporary `.py` file and imports it, exactly as a
 user's own kernel would be loaded. The prototype called `exec` on a string,
 which leaves the function with no source file to read.
 
+### Aer and CUDA-Q in one Linux process
+
+Aer and CUDA-Q each bundle their own copy of `libgomp`. Each copy needs a
+slot in glibc's small reserve of static thread-local storage, which by
+default is 512 bytes, and only the first copy loaded fits. The second import,
+in either order, then fails with `cannot allocate memory in static TLS
+block`. Starting Python with a larger reserve fixes this (glibc 2.35 or
+later):
+
+```bash
+GLIBC_TUNABLES=glibc.rtld.optional_static_tls=16384 python ...
+```
+
+The `cudaq` CI job sets this. A process that uses only one of the two
+runtimes, such as `python -m oqci run`, needs nothing.
+
 ### Verification status
 
 | Checked | How |
@@ -177,7 +204,43 @@ which leaves the function with no source file to read.
 | Every refusal | One parametrized test per refusal. |
 | The bit-order conversion | Aer's counts for an asymmetric, cross-wired executable are converted to CUDA-Q's documented order and back, and must come back unchanged. |
 | `run`'s plumbing (seed, target, shots, kernel loading) | A stand-in `cudaq` module in `python/tests/test_backend_cudaq.py`. |
-| **Real CUDA-Q returns what its docs say** | **Not yet.** No CUDA-Q installation was available (Windows). Before trusting its numbers, run the same executable through `aer.run` and `cudaq.run` on a machine with CUDA-Q and compare distributions, then pin that CUDA-Q version in `pyproject.toml`'s `cudaq` extra. |
+| **Real CUDA-Q returns what its docs say** | The `cudaq` CI job (Linux) installs CUDA-Q **0.16.0.post1**, pinned in the `cudaq` extra, and runs `python/tests/test_backend_cudaq_live.py`. That test runs OQCI executables on real CUDA-Q and requires the counts to agree with the exact source distribution and with Aer: chi-square, alpha 0.001, 8192 shots, three circuits on two backends. CUDA-Q has no Windows wheels, so this is checked only in CI. It counts as verified once that job has passed; until then, treat CUDA-Q numbers as unverified. |
+
+## The IBM execution adapter
+
+`oqci.backends.ibm` runs an executable on IBM Quantum hardware. It supports
+CZ-native, Heron-family devices. The user-facing guide is
+[`hardware.md`](hardware.md). It follows the layout above, with two extra
+steps that real hardware needs:
+
+- **`target_from_backend(backend)`** builds the OQCI profile from the
+  device's live `Target`, so lowering targets the device that runs it. It
+  refuses an ECR-native device by name.
+- **`check_isa(circuit, backend)`** checks every instruction and physical
+  qubit against the device's `Target`. It refuses, and never transpiles: the
+  circuit that runs is the one OQCI verified.
+
+The rest of the API:
+
+- **`submit`, `collect`, `retrieve` and `run`** use the client-side
+  `executor_sampler.Sampler` with gate twirling, measurement twirling and
+  dynamical decoupling off (`configured_sampler`). Queue time and execution
+  time come from the job's own timestamps.
+- **The pure translation** is `to_isa_circuit`: `aer.to_qiskit`, padded to
+  the device width.
+- **Hardware cannot be seeded.** `run(seed=...)` raises rather than recording
+  a reproducibility the run does not have.
+
+Verified against `qiskit-ibm-runtime` 0.50.0, pinned in the `ibm` extra.
+`python/tests/test_backend_ibm.py` tests the whole path offline, through
+IBM's local testing mode on the Heron snapshot `FakeFez`:
+
+- the device-target conversion;
+- ISA refusal;
+- agreement with the ideal distribution under the device's noise;
+- the bit order;
+- provenance;
+- the absence of any secret in a submission record.
 
 ## What became of `cudaq-adapter/`
 

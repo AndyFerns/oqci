@@ -62,3 +62,26 @@ pub fn parse_openqasm3_named(source: &str, name: &str) -> Result<Circuit, Fronte
     let program = parser::parse(source)?;
     translate::translate(&program, name)
 }
+
+/// As [`parse_openqasm3_named`], timing parsing and IR construction
+/// separately (`final-deliverables-spec.md` §24).
+///
+/// # Errors
+///
+/// As [`parse_openqasm3_named`].
+pub fn parse_openqasm3_timed(
+    source: &str,
+    name: &str,
+) -> Result<(Circuit, super::FrontendTiming), FrontendError> {
+    let started = std::time::Instant::now();
+    let program = parser::parse(source)?;
+    let parsed = std::time::Instant::now();
+    let circuit = translate::translate(&program, name)?;
+    Ok((
+        circuit,
+        super::FrontendTiming {
+            parse: parsed - started,
+            ir_construction: Some(parsed.elapsed()),
+        },
+    ))
+}

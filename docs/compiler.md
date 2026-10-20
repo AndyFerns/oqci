@@ -421,50 +421,51 @@ docstring says plainly that none of them executes in the compiler process.
 `oqci.qasm3_to_qir` and `oqci.qiskit_to_qir` remain available and both document
 QIR as a lowering artifact rather than an execution guarantee (Stage C §5).
 
+## Since 0.6.0
+
+`CompilerConfig` gained four fields. All default to the previous behaviour,
+so existing callers are unchanged.
+
+| Field | What it does |
+|---|---|
+| `extensions` | A `Registry` of extension frontends, passes, backends, lint rules and runtime target files ([`extensions.md`](extensions.md)). Backend lookup and the pass pipeline go through it. |
+| `lint` | Lint the source circuit, against the selected backend's profile when there is one ([`verification.md`](verification.md#lint-135)). |
+| `verify` | Check binding, every pass and lowering semantically. A `NotEquivalent` verdict stops compilation with `CompileError::SemanticMismatch` ([`verification.md`](verification.md)). |
+| `frontend` | Unchanged, but `compile_with_frontend` now reads with any registered frontend by id. |
+
+`CompilationArtifacts` gained five fields:
+
+- `frontend_id`;
+- `extensions`;
+- `lint`;
+- `verification`;
+- `timings`.
+
+`Timings` is the §24 breakdown: frontend, IR construction, binding,
+optimization, lowering, cost, QIR emission, preparation, lint, verification
+and total. A stage that did not run is `None`. Timings are measurements, never
+semantic outputs ([`determinism.md`](determinism.md)).
+
+`ExecutionResult::compilation_duration_ms` is filled from `timings.total`
+when an adapter's result is converted.
+
 ## What is absent
 
-Per `final-deliverables-spec.md`'s Critical Rule — a feature is not implemented
-merely because a module, type, parameter or document names it — the following
-are **absent**:
+Per `final-deliverables-spec.md`'s Critical Rule, the following are
+**absent**:
 
-- **A Cirq frontend** (§5.4). OpenQASM 3, CUDA-Q (a documented subset, see
-  [`cudaq_frontend.md`](cudaq_frontend.md)) and Qiskit all reach the whole
-  pipeline; Cirq does not exist in any form.
-- **Verified execution on CUDA-Q** (§15.2). `oqci.backends.cudaq` runs an
-  `Executable` on CUDA-Q alongside `oqci.backends.aer`, but it has not yet run
-  against a real CUDA-Q install; see
-  [`adapters.md`](adapters.md#verification-status).
+- **A Cirq frontend** (§5.4): out of scope by the project owner's decision.
 - **Circuit *construction* from Python.** §17 says "circuit
   construction/import". Import exists (OpenQASM 3 or CUDA-Q text, and a Qiskit
-  `QuantumCircuit`); there is no builder API. Nothing in the SDK creates a
-  circuit programmatically, though building one in Qiskit and passing it in now
-  reaches the full pipeline.
+  `QuantumCircuit`). There is no builder API of OQCI's own. Building a circuit
+  in Qiskit and passing it in reaches the full pipeline.
 - **One top-level schema for the SDK dict and the CLI's `--json`.** Every
   *section* the two share is built from the same view type, so the contents
-  cannot drift. The top-level *layout* still differs on purpose: the CLI's
-  `PipelineReport` is organised by pipeline stage for reading, the SDK dict by
-  what a program wants to use. `diff`, `target` and QIR text appear only in the
-  CLI report.
-- **Pass ordering as configuration.** `PassManager::default_pipeline()` is fixed.
-  `PassSelection` can disable a pass or restrict to a subset, but nothing
-  reorders the pipeline, inserts a pass, or registers one from outside the crate
-  (§18.2).
+  cannot drift. The top-level *layout* differs on purpose. The CLI's
+  `PipelineReport` is organised by pipeline stage, for reading; the SDK dict
+  by what a program wants to use.
 - **An execution step in the orchestrator.** `compile` stops at
-  `Stop::Prepared`. There is no `Stop::Executed` and no `ExecutionResult` on
-  `CompilationArtifacts`, because no backend executes — see
-  [`backend_contract.md`](backend_contract.md#the-execution-boundary). Adding
-  one would mean the orchestrator returning an artifact it cannot fill.
-- **Compilation timing.** `ExecutionResult::compilation_duration_ms` exists as a
-  field, and the orchestrator does not measure it: `compile_named` takes no
-  end-to-end timing, so the field stays `None` rather than acquiring a number
-  nobody measured. The pipeline does read a clock in one place:
-  `PassManager::run` times each pass it executes (`PassRecord::duration`,
-  `src/pass/mod.rs`), and that per-pass wall-clock time is reported as
-  `duration_us` in the CLI's `--json` output, the Python SDK's `passes` entries
-  and the visualization server's events. It is a measurement, so it differs
-  between runs of the same compilation.
-- **Incremental or cached compilation.** Every call runs the whole pipeline from
-  source text. There is no artifact cache, and `Lowered` is not serializable, so
-  a lowered circuit cannot be persisted and re-offered to a backend later —
-  which is the case `Backend::validate`'s "a `Lowered` that arrived from
-  somewhere else" doc comment anticipates but nothing yet produces.
+  `Stop::Prepared`. Execution is the adapters' job
+  ([`backend_contract.md`](backend_contract.md#the-execution-boundary)).
+  `python -m oqci run` composes the two.
+- **Incremental or cached compilation.** Every call runs the whole pipeline.

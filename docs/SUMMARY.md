@@ -14,7 +14,7 @@
   - [Stage D — Backend-Specific Basis Profiles](core_architecture/stage-d-backend-specific-basis-profiles.md)
   - [Stage E — Backend-Defined Cost Model](core_architecture/stage-e-backend-defined-cost-model.md)
   - [Stage F — Static Parameterized Circuits](core_architecture/stage-f-static-parameterized-circuit-scope.md)
-  - [Stage G — Benchmarking Protocol (pending)](core_architecture/stage-g-benchmarking-protocol.md)
+  - [Stage G — Benchmarking Protocol](core_architecture/stage-g-benchmarking-protocol.md)
   - [Final Deliverables Specification](core_architecture/final-deliverables-spec.md)
 
 # Reference
@@ -34,18 +34,26 @@
 # Optimization
 
 - [Pass Manager](pass_manager.md)
+- [Verification and Lint](verification.md)
 
 # Targets
 
 - [Target Model](target_model.md)
 - [Target Lowering](lowering.md)
 - [Backend Contract](backend_contract.md)
+- [IBM Quantum Hardware](hardware.md)
 
 # Tooling
 
 - [Compiler Orchestration](compiler.md)
 - [Command Line](cli.md)
 - [Live Visualization](visualization.md)
+- [Extensions](extensions.md)
+
+# Evaluation
+
+- [Benchmarks and Research Package](benchmarks.md)
+- [Determinism Contract](determinism.md)
 
 # Positioning
 

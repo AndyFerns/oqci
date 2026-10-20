@@ -12,6 +12,207 @@ and may change without a major bump (per SemVer §4).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-20
+
+Fixes for the CI failures on the 0.6.0 pull request, plus the defects that
+fuzzing the compiler turned up while diagnosing them.
+
+### Security
+
+- **pyo3 0.24 → 0.29** in `oqci-python` (RUSTSEC-2026-0176, RUSTSEC-2026-0177:
+  every earlier release is affected). `cargo-audit` caught it; `cargo-deny`
+  had not, because it checked only the root package. It now runs with
+  `--workspace`.
+
+### Fixed
+
+Each of these was found by fuzzing:
+
+- **A miscompilation in `rotation-merge`.** For huge angles the floating-point
+  sum is not the real sum: `rz(7.0e18); rz(0.4)` merged into a rotation that
+  had lost the `0.4`. A merge now happens only when its rounding error,
+  computed exactly with FMA and TwoSum, is within
+  `ir::ANGLE_ROUNDING_LIMIT` (1e-12 rad).
+- **The same flaw in lowering's affine angle steps** (`scale·θ + offset`).
+  An inexact step now refuses with the new `RuleError::InexactAngle` instead of
+  emitting a different gate.
+- **Platform-dependent trigonometry.** On the Windows GNU toolchain
+  `cos(5.5e19)` is wrong in the third decimal place, so a gate fused from such
+  an angle would differ by platform. Nothing evaluates trigonometry beyond
+  `ir::MAX_EVALUATED_ANGLE` (2²⁰ rad) any more:
+  - fusion leaves those gates alone;
+  - the verifier reports them `inconclusive` with the new reason
+    `angle_too_large`.
+- **Parser stack overflows.** Deeply nested parentheses, unary signs or
+  indexing crashed both frontends. Expressions are now limited to
+  `frontend::MAX_EXPRESSION_DEPTH` (32) levels and `MAX_EXPRESSION_NODES`
+  (256) terms, and larger ones are refused as unsupported.
+- **A CUDA-Q allocation abort.** A huge `cudaq.qvector`, or many of them, was
+  allocated in full (24 GiB) before any check, and the running total could
+  overflow. The cumulative width is now checked against
+  `ir::MAX_REGISTER_WIDTH` at each allocation.
+
+Limits are documented in `docs/verification.md` under "Numerical and
+structural limits", and covered by `tests/limits.rs`.
+
+### Added
+
+- **`fuzz/tests/mutate.rs`**, a mutation fuzzer that runs on stable Rust on
+  every platform. It mutates the corpus seeds for all five fuzz targets and
+  needs no libFuzzer. CI runs it before each `cargo fuzz` job, and 6.4 million
+  mutants at `OQCI_MUTATION_SCALE=10` ran without a panic.
+- **`scripts/ci_annotate.sh`.** It publishes the tail of a failing step's
+  output as a GitHub annotation. Annotations are public, unlike job logs.
+
+### Changed
+
+- **The `cudaq` CI job is strict.** It sets `OQCI_REQUIRE_CUDAQ=1`, so a
+  broken CUDA-Q install fails with its import error instead of skipping. It
+  is also split into install, import and test steps.
+
+## [0.6.0] - 2026-10-20
+
+Completion of the non-G deliverables (`final-deliverables-spec.md` §34) and of
+Stage G, which is now locked. This release adds:
+
+- an extension boundary, and a crate that demonstrates it;
+- semantic verification during compilation;
+- lint;
+- gate fusion;
+- runtime device targets and IBM hardware execution;
+- compile timing and result retrieval;
+- the benchmark and research harness;
+- fuzzing and CI hardening.
+
+### Added
+
+- **Extensions** (§18; Definition of Done item 9). `src/extension.rs` adds a
+  source-level `Registry` of frontends (`FrontendPlugin`), passes (with a
+  `PassPlacement`), backends and lint rules. Each registration is checked when
+  it is made: ids, cost model against profile, rule closure, placement
+  anchors. Supporting changes:
+  - `CompilerConfig::extensions` carries the registry;
+  - `compile_with_frontend` reads with any registered frontend;
+  - `cli::run_with` lets an extension crate ship its own CLI;
+  - every extension that took part is listed in provenance.
+
+  `examples/plugin-demo` adds one of each through the public API only, and is
+  tested end to end. See `docs/extensions.md`.
+- **Runtime targets** (§9.2). `backend::from_target_json` loads a serialized
+  profile as an `ibm` or `simulator` backend. It is reached through
+  `--target-file`, `--target-kind` and `--target-id`, through
+  `oqci.compile(target=...)`, and through `oqci.load_target`.
+- **`cx-to-cz`**, with `target::builtin::CX_BASIS_RULES` and
+  `CZ_BASIS_RULES`: the complete rule sets for CX- and CZ-native bases (22
+  rules in all). The two rules form a cycle and are refused together.
+  `lowering_equivalence` proves both bases.
+- **Single-qubit gate fusion** (§8.3), `single-qubit-fusion`, in the default
+  pipeline after rotation merging. It fuses runs into one `U` or `rz` by exact
+  ZYZ synthesis. With a target, it fuses only when the result expands to
+  strictly fewer native operations. The policy is documented in
+  `docs/pass_manager.md`.
+- **Semantic verification in the compiler** (Stage G §3.1), `src/verify`,
+  `--verify`.
+  - Binding is checked by exact substitution.
+  - Every pass that ran, including extension passes, is checked through the
+    new `PassManager::run_observed`.
+  - Lowering is checked modulo layout, against an independent state-vector
+    kernel, with an operator / initial-state / distribution ladder and typed
+    inconclusive reasons.
+  - A mismatch stops compilation with `CompileError::SemanticMismatch`.
+
+  See `docs/verification.md`.
+- **Lint** (§13.5): `src/analysis/lint.rs`, five rules behind `LintRule`,
+  `oqci lint [--deny]`, `oqci lint-rules`, `--lint`, `oqci.lint`.
+- **Compile timing** (§24): `Timings` on `CompilationArtifacts`, with parsing
+  and IR construction split for both built-in frontends, and `--timings`.
+  `snapshot::strip_measurements` is the single definition of what a
+  determinism comparison removes.
+- **Result retrieval** (§10). `ExecutionResult::from_adapter` builds a result
+  from an execution adapter's output, keeping queue time and execution time
+  apart. `oqci.backends.to_execution_result` uses it, after checking the
+  run's provenance against the compilation whose time it attaches.
+- **The IBM execution adapter**, `oqci.backends.ibm`, for CZ-native (Heron)
+  devices.
+  - `target_from_backend` builds the profile from the device's live target.
+  - `check_isa` refuses rather than transpiles.
+  - Submission uses the client-side executor `Sampler`, with twirling and
+    dynamical decoupling off.
+  - `submit`, `collect`, `retrieve` and `run`.
+  - It is verified against `qiskit-ibm-runtime` 0.50.0, pinned in a new `ibm`
+    extra, and tested offline through IBM's local testing mode on `FakeFez`.
+
+  See `docs/hardware.md`.
+- **`python -m oqci run`** (§19): compile and execute on Aer, CUDA-Q or IBM
+  hardware in one command.
+- **The benchmark and research harness** (§20–§22, §24, §30), `benchmarks/`,
+  under the locked Stage G. It includes:
+  - a 64-circuit corpus on three targets;
+  - OQCI against Qiskit O3/O0 and t|ket⟩, and an ablation;
+  - an exhaustive correctness check of every compiled output;
+  - determinism across fresh processes;
+  - QIR acceptance and execution agreement;
+  - mutation evidence (10 mutants × 6 checkers);
+  - a validated checker coverage matrix;
+  - the hardware workflow;
+  - a report of tables and figures built only from serialized data.
+
+  A reference run is committed. See `docs/benchmarks.md`.
+- **Fuzzing** (§23.3): `fuzz/`, five cargo-fuzz targets. One of them,
+  `compile_verified`, hunts for miscompilations under `--verify`. Their seed
+  corpus also runs on any toolchain.
+- **CI:**
+  - `cargo-deny` (`deny.toml`) and `cargo-audit`;
+  - fuzzing;
+  - CUDA-Q against a real, pinned CUDA-Q (`cudaq` extra pinned to
+    0.16.0.post1);
+  - the benchmark smoke run;
+  - Stage G determinism on ubuntu and windows;
+  - wheel builds;
+  - a Docker build.
+
+  A `Dockerfile` provides the reproducible environment. `build.rs` honours
+  `OQCI_GIT_COMMIT_OVERRIDE`.
+- **Documentation:**
+  - `docs/extensions.md`, `docs/verification.md`, `docs/hardware.md`,
+    `docs/benchmarks.md` and `docs/determinism.md`;
+  - Stage G's locked values;
+  - the §31 checklist, ticked with evidence.
+
+### Changed
+
+- **Stage G is locked** (2026-10-20, by the project owner).
+- **Cirq is out of scope** for this release, by the owner's decision. The
+  committed scope for the Cirq adapter is none.
+- **Dense layout** builds its distances once per placement instead of per
+  candidate. On the 156-qubit Heron map a six-qubit circuit lowers in 16 ms
+  rather than 1.4 s, and layouts are byte-identical to before.
+- **`SimulatorBackend::try_from_profile`** now checks rule closure, as
+  `IbmBackend` does.
+- **`PassError::from_ir`** is public, for extension passes.
+
+### Fixed
+
+- **Untrusted register widths** are refused before allocation
+  (`ir::MAX_REGISTER_WIDTH`, 65,536). Found by the fuzz corpus: before this
+  fix, `qubit[4294967295]` hung the OpenQASM frontend, and a target profile
+  declaring that many qubits aborted the process. The limit is enforced by:
+  - the OpenQASM 3 and CUDA-Q frontends;
+  - the Qiskit handoff;
+  - profile validation (`TargetError::TooManyQubits`).
+
+- The QIR profile serialized as `"base"` in JSON output (CLI `--json`, the
+  Python dict, the visualization server) while the module attribute and the
+  docs say `"base_profile"`. It now serializes as `"base_profile"`, pinned by a
+  CLI test.
+
+### Documentation
+
+- External QIR validation is recorded as observed: PyQIR 0.12.5, `llvm-as` 18
+  (opaque and typed pointers) and `llvm-as` 14 (typed) passed in CI run
+  39384077389 on `d70c44a`. Documents that still described the 0.5.0 QIR
+  boundary or the CUDA-Q work as planned or unreleased are corrected.
+
 ## [0.5.0] - 2026-09-30
 
 QIR becomes an honest, externally validated interoperability artifact
@@ -128,8 +329,8 @@ and execution adapter listed below, which were on `master` but unreleased.
 
 ## [0.4.1] - 2026-09-28
 
-A single lowering fix. Everything under `[Unreleased]` above is recorded
-there rather than here.
+A single lowering fix. The CUDA-Q work that was unreleased at this point is
+recorded under `[0.5.0]`.
 
 ### Fixed
 
@@ -711,7 +912,9 @@ the first usable milestone; Phase 1 will bump the minor.
 - Backend execution (simulators, hardware) — beyond the QIR emission boundary.
 - Python bindings — only empty PyO3 placeholders exist under `python/`.
 
-[Unreleased]: https://github.com/AndyFerns/oqci/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/AndyFerns/oqci/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/AndyFerns/oqci/compare/v0.6.0...v0.7.1
+[0.6.0]: https://github.com/AndyFerns/oqci/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/AndyFerns/oqci/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/AndyFerns/oqci/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/AndyFerns/oqci/compare/v0.3.0...v0.4.0

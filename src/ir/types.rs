@@ -154,6 +154,19 @@ pub enum GateKind {
     /// Phase / `R1` gate `P(λ) = diag(1, e^{iλ})`.
     P(Param),
     /// General single-qubit unitary `U(θ, φ, λ)` (Euler / OpenQASM `U`).
+    ///
+    /// The convention is OpenQASM 3's (and Qiskit's `UGate`), exactly:
+    ///
+    /// ```text
+    /// U(θ, φ, λ) = [ cos(θ/2)          -e^{iλ} sin(θ/2)      ]
+    ///              [ e^{iφ} sin(θ/2)    e^{i(φ+λ)} cos(θ/2)  ]
+    /// ```
+    ///
+    /// so `U(π/2, 0, π)` is `H` with no global phase, and
+    /// `U(θ, φ, λ) = e^{i(φ+λ)/2} Rz(φ) Ry(θ) Rz(λ)`. OpenQASM 2's `U` differs
+    /// by that global phase; anything that synthesizes a `U` (gate fusion, a
+    /// decomposition rule) must produce this matrix, or say it is exact only
+    /// up to global phase.
     U {
         /// Polar angle θ.
         theta: Param,

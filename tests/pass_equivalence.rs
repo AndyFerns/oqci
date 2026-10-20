@@ -22,6 +22,7 @@ use proptest::prelude::*;
 use oqci::ir::{Circuit, CircuitBuilder, GateKind, Param, QubitId};
 use oqci::pass::{
     Canonicalize, GateCancellation, Pass, PassContext, PassManager, PassSelection, RotationMerge,
+    SingleQubitFusion,
 };
 use support::statevector::{same_state_up_to_global_phase, simulate};
 
@@ -174,6 +175,11 @@ proptest! {
     #[test]
     fn rotation_merge_preserves_semantics(circuit in circuit_strategy()) {
         assert_preserves_semantics(&RotationMerge, &circuit);
+    }
+
+    #[test]
+    fn single_qubit_fusion_preserves_semantics(circuit in circuit_strategy()) {
+        assert_preserves_semantics(&SingleQubitFusion, &circuit);
     }
 
     #[test]

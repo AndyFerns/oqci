@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AndyFerns/oqci/benchmarks/schema/result.schema.json",
+  "title": "OQCI benchmark record",
+  "description": "One compiled output: final-deliverables-spec.md §20.3's fields plus correctness, the timing breakdown, seeds and the target digest. One JSON object per line of records.jsonl.",
+  "type": "object",
+  "required": [
+    "schema_version", "benchmark_id", "record_id", "circuit_id", "circuit_family",
+    "circuit_size", "circuit_width", "item_seed", "source_format", "compiler",
+    "compiler_version", "config_id", "git_commit", "frontend", "pass_pipeline", "backend",
+    "target_kind", "target_profile", "cost_model", "compilation_time", "metrics",
+    "correctness", "execution_metadata", "result_artifact_paths"
+  ],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "benchmark_id": {"type": "string"},
+    "record_id": {"type": "string"},
+    "circuit_id": {"type": "string"},
+    "circuit_family": {"type": "string"},
+    "circuit_size": {"type": "integer"},
+    "circuit_width": {"type": "integer"},
+    "circuit_reps": {"type": "integer"},
+    "circuit_instance": {"type": "integer"},
+    "item_seed": {"type": "string", "description": "64-bit seed as decimal text (exceeds JSON's safe integers)"},
+    "source_format": {"type": "string"},
+    "compiler": {"type": "string", "enum": ["oqci", "qiskit", "tket"]},
+    "compiler_version": {"type": ["string", "null"]},
+    "config_id": {"type": "string"},
+    "config": {"type": "object"},
+    "git_commit": {"type": "string"},
+    "frontend": {"type": ["string", "null"]},
+    "pass_pipeline": {"type": ["array", "null"]},
+    "backend": {"type": "string"},
+    "target_kind": {"type": "string", "enum": ["all-to-all", "linear", "heron"]},
+    "target_profile": {
+      "type": "object",
+      "required": ["id", "digest", "source", "basis", "num_qubits"]
+    },
+    "cost_model": {"type": ["object", "null"]},
+    "compilation_time": {
+      "type": "object",
+      "required": ["median_ms", "iqr_ms", "samples_ms", "warmup", "timed", "clock"]
+    },
+    "oqci_timings": {"type": ["object", "null"]},
+    "oqci_passes": {"type": ["array", "null"]},
+    "compiler_notes": {"type": "array", "description": "Deviations from the compiler's fixed recipe on this item (the t|ket> permutation fallback); empty when none"},
+    "metrics": {
+      "type": "object",
+      "required": ["total_gates", "one_qubit_gates", "two_qubit_gates", "depth", "native_gates",
+                   "non_native_gates", "gate_counts"]
+    },
+    "swaps_inserted": {"type": ["integer", "null"]},
+    "layout": {"type": "object", "required": ["initial", "final"]},
+    "correctness": {
+      "type": "object",
+      "required": ["status", "method", "residual", "detail"]
+    },
+    "execution_metadata": {"type": ["object", "null"]},
+    "result_artifact_paths": {"type": "object", "required": ["compiled_qasm"]}
+  }
+}

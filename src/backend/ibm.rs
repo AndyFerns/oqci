@@ -4,35 +4,40 @@
 //! special case inside generic code, and Stage C §4 gives it a dedicated
 //! target-lowering stage. This is that module.
 //!
-//! # What this does, and what it deliberately does not
+//! # What this does, and where the rest happens
 //!
 //! Implemented, in pure Rust and fully tested: backend configuration, target
 //! profile construction from supplied data, connectivity, target legality
 //! checking, target lowering, and execution preparation with structured
 //! result metadata.
 //!
-//! **Not implemented: execution submission and result retrieval.**
-//! [`Backend::execute`] returns
-//! [`BackendError::ExecutionNotAvailableInProcess`]. Three reasons, and none
-//! of them is that it was forgotten:
+//! **Execution submission and result retrieval happen outside this crate**,
+//! in the Python execution adapter `oqci.backends.ibm`, like every other
+//! runtime (`docs/adapters.md`). [`Backend::execute`] therefore returns
+//! [`BackendError::ExecutionNotAvailableInProcess`] and names that adapter.
+//! The adapter:
 //!
-//! - `qiskit-ibm-runtime` is not a dependency of this project and is not
-//!   installed in its environment, so the SDK cannot be checked. §33.4
-//!   forbids implementing a vendor-specific API from memory when the current
-//!   SDK documentation could be consulted instead.
-//! - There are no credentials here, so submission code could not be run even
-//!   once. Untested code on the path between a verified circuit and real
-//!   hardware is worse than an explicit boundary.
-//! - §33.12 forbids claiming hardware executability without target-specific
-//!   lowering and validation. This module provides both; it does not thereby
-//!   acquire the right to claim the rest.
+//! - builds the profile from the device's live `Target`
+//!   (`target_from_backend`), which [`crate::backend::from_target_json`]
+//!   loads through [`IbmBackend::from_profile`], so lowering targets the real
+//!   coupling map and basis;
+//! - submits the prepared executable *verbatim* through `qiskit-ibm-runtime`,
+//!   after checking every instruction against the device's instruction set
+//!   and refusing on any mismatch — it never transpiles;
+//! - retrieves counts, queue time and execution time separately, and the
+//!   result converts back into [`ExecutionResult`] via
+//!   [`ExecutionResult::from_adapter`].
 //!
-//! **No claim is made that an [`Executable`] produced here will run on any
-//! IBM device.** What is claimed is narrower and checkable: it has been
-//! lowered to, and validated against, the target description it was given.
-//! If that description is wrong, so is the conclusion — which is why
-//! [`IbmBackend::from_target_json`] exists and why
-//! [`IbmBackend::illustrative`] says in its own name that it is not real.
+//! Only CZ-native devices (IBM's Heron family) are supported: their basis is
+//! `{rz, sx, x, cz}`, reached through the `cx-to-cz` rule. ECR is not in the
+//! gate set.
+//!
+//! **What is claimed is narrow and checkable:** an [`Executable`] produced
+//! here has been lowered to, and validated against, the target description it
+//! was given. If that description is wrong, so is the conclusion — which is
+//! why the real description is retrieved from the device rather than written
+//! down, and why [`IbmBackend::illustrative`] says in its own name that it is
+//! not real.
 //!
 //! # Target data comes from outside
 //!
@@ -163,25 +168,7 @@ impl IbmBackend {
                 mid_circuit_measurement: false,
                 reset: false,
             })
-            .decomposition_rules([
-                "id-to-nothing",
-                "y-to-rz-x",
-                "z-to-rz",
-                "h-to-rz-sx",
-                "s-to-rz",
-                "sdg-to-rz",
-                "t-to-rz",
-                "tdg-to-rz",
-                "sxdg-to-sx",
-                "rx-to-rz-sx",
-                "ry-to-rz-sx",
-                "p-to-rz",
-                "u-to-rz-sx",
-                "cy-to-cx",
-                "cz-to-cx",
-                "swap-to-cx",
-                "ccx-to-cx",
-            ])
+            .decomposition_rules(crate::target::builtin::CX_BASIS_RULES.iter().copied())
             .capability("directed-coupling")
             .capability("synthetic-not-a-real-device")
             .cost_model("nisq-weighted")
@@ -229,10 +216,11 @@ impl Backend for IbmBackend {
     fn execute(&self, _executable: &Executable) -> Result<ExecutionResult, BackendError> {
         Err(BackendError::ExecutionNotAvailableInProcess {
             backend: self.id.clone(),
-            reason: "IBM submission requires `qiskit-ibm-runtime` and account credentials, \
-                     neither of which this build has. The executable is prepared and validated \
-                     against the supplied target description; no claim is made that it will run \
-                     on any real device"
+            reason: "IBM submission runs in the Python adapter `oqci.backends.ibm` \
+                     (qiskit-ibm-runtime, with the caller's own saved account). The executable \
+                     is prepared and validated against the supplied target description; no \
+                     claim is made that it will run on any device other than the one that \
+                     description came from"
                 .to_string(),
         })
     }
@@ -395,7 +383,7 @@ mod tests {
         );
         assert!(
             err.to_string().contains("no claim is made"),
-            "the boundary must not imply hardware readiness: {err}"
+            "the boundary must not overclaim: {err}"
         );
     }
 }

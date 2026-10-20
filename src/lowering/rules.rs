@@ -140,7 +140,15 @@ impl ParamTransform {
                     available: source.len(),
                 })?;
                 match param {
-                    Param::Concrete(angle) => Ok(Param::concrete(scale * angle.radians() + offset)),
+                    Param::Concrete(angle) => {
+                        crate::ir::exact_affine(*scale, angle.radians(), *offset)
+                            .map(Param::concrete)
+                            .ok_or_else(|| RuleError::InexactAngle {
+                                rule: rule.to_string(),
+                                step,
+                                angle: angle.radians(),
+                            })
+                    }
                     Param::Symbol(symbol) if self.is_transparent() => {
                         Ok(Param::symbol(symbol.clone()))
                     }
@@ -340,6 +348,22 @@ pub enum RuleError {
         step: usize,
         /// The unbound symbol.
         symbol: String,
+    },
+    /// Transforming a concrete angle would round it by more than
+    /// [`crate::ir::ANGLE_ROUNDING_LIMIT`]: the emitted rotation would not be
+    /// the one the rule means. Only happens for huge angles.
+    #[error(
+        "rule `{rule}` step {step} cannot transform angle {angle} exactly in floating point \
+         (the rounding would exceed {limit:e} rad); reduce the angle modulo its period first",
+        limit = crate::ir::ANGLE_ROUNDING_LIMIT
+    )]
+    InexactAngle {
+        /// The rule that refused.
+        rule: String,
+        /// Which emitted step needed the transformation.
+        step: usize,
+        /// The source angle, in radians.
+        angle: f64,
     },
     /// The operation had the wrong number of qubits for this rule.
     #[error("rule `{rule}` expects {expected} qubit(s), got {found}")]
@@ -844,6 +868,15 @@ static BUILTIN: &[DecompositionRule] = &[
         steps: &[step("h", &[1]), step("cx", &[0, 1]), step("h", &[1])],
         exactness: Exactness::Exact,
         note: "conjugating the target by H turns CX into CZ",
+    },
+    DecompositionRule {
+        id: "cx-to-cz",
+        source: "cx",
+        source_arity: 2,
+        source_params: 0,
+        steps: &[step("h", &[1]), step("cz", &[0, 1]), step("h", &[1])],
+        exactness: Exactness::Exact,
+        note: "conjugating the target by H turns CZ into CX; a profile lists this or                cz-to-cx, never both, since together they form a cycle",
     },
     DecompositionRule {
         id: "cy-to-cx",

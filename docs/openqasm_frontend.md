@@ -105,6 +105,13 @@ binary `+ - * /` with standard precedence and parentheses. These are
 **constant-folded at parse time** to a concrete angle, so `rz(pi/2)` emits bit
 for bit what `rz(1.5707963267948966)` emits.
 
+An expression may nest at most `frontend::MAX_EXPRESSION_DEPTH` (32) levels
+deep and contain at most `MAX_EXPRESSION_NODES` (256) terms. Anything larger
+is refused as unsupported, so a hostile input cannot overflow the parser's
+stack. Registers may total at most `ir::MAX_REGISTER_WIDTH` (65,536) qubits,
+checked at each declaration before anything is allocated. See
+[`verification.md`](verification.md#numerical-and-structural-limits).
+
 ### Comments
 
 Line (`//`) and block (`/* … */`).

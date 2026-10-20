@@ -353,6 +353,17 @@ impl LayoutStrategy for DenseLayout {
         let mut placed: BTreeMap<u32, PhysicalQubit> = BTreeMap::new();
         let mut taken = vec![false; topology.qubit_count() as usize];
 
+        // Computed once rather than per candidate: the neighbours and degree
+        // of every physical qubit, and hop distances from each *placed* qubit
+        // (one breadth-first search per placement). The values are exactly
+        // `Topology::adjacent` and `Topology::distance` under the undirected
+        // view, so the layout is unchanged; only the cost is — it no longer
+        // grows with the device size squared per candidate.
+        let neighbours: Vec<Vec<PhysicalQubit>> = (0..topology.qubit_count())
+            .map(|q| topology.adjacent(PhysicalQubit(q), CouplingMode::Undirected))
+            .collect();
+        let mut distances_from: BTreeMap<PhysicalQubit, Vec<Option<usize>>> = BTreeMap::new();
+
         for logical in order {
             let Some(best) = (0..topology.qubit_count())
                 .map(PhysicalQubit)
@@ -370,17 +381,14 @@ impl LayoutStrategy for DenseLayout {
                             if count == 0 {
                                 return 0;
                             }
-                            let hops = topology
-                                .distance(*candidate, *other_physical, CouplingMode::Undirected)
+                            let hops = distances_from[other_physical][candidate.index() as usize]
                                 .unwrap_or(UNREACHABLE_PENALTY);
                             count.saturating_mul(hops)
                         })
                         .sum();
                     // On an empty board this is what decides: prefer the
                     // best-connected qubit.
-                    let degree = topology
-                        .adjacent(*candidate, CouplingMode::Undirected)
-                        .len();
+                    let degree = neighbours[candidate.index() as usize].len();
                     (cost, std::cmp::Reverse(degree), candidate.index())
                 })
             else {
@@ -393,6 +401,7 @@ impl LayoutStrategy for DenseLayout {
             };
             taken[best.index() as usize] = true;
             placed.insert(logical, best);
+            distances_from.insert(best, hop_distances(&neighbours, best));
         }
 
         Layout::from_pairs(
@@ -400,6 +409,27 @@ impl LayoutStrategy for DenseLayout {
             topology.qubit_count(),
         )
     }
+}
+
+/// Hop distances from `from` to every physical qubit, by breadth-first search
+/// over a precomputed neighbour list; `None` where unreachable. Equal to
+/// `Topology::distance` from `from` under the same coupling mode.
+fn hop_distances(neighbours: &[Vec<PhysicalQubit>], from: PhysicalQubit) -> Vec<Option<usize>> {
+    let mut distance = vec![None; neighbours.len()];
+    let mut frontier = std::collections::VecDeque::new();
+    distance[from.index() as usize] = Some(0);
+    frontier.push_back(from);
+    while let Some(current) = frontier.pop_front() {
+        let next_distance = distance[current.index() as usize].map(|d| d + 1);
+        for next in &neighbours[current.index() as usize] {
+            let slot = &mut distance[next.index() as usize];
+            if slot.is_none() {
+                *slot = next_distance;
+                frontier.push_back(*next);
+            }
+        }
+    }
+    distance
 }
 
 /// Distance stand-in for a partner in another connected component.
@@ -579,6 +609,34 @@ mod tests {
             "the busiest pair should be adjacent, got {layout}"
         );
         assert!(layout.is_injective());
+    }
+
+    #[test]
+    fn precomputed_hop_distances_equal_topology_distance() {
+        // The dense layout's fast path must see exactly the distances the
+        // topology defines, or it would choose a different layout.
+        let mut topology = Topology::disconnected(7);
+        for (a, b) in [(0, 1), (1, 2), (2, 3), (3, 0), (4, 5)] {
+            topology.add_undirected(PhysicalQubit(a), PhysicalQubit(b));
+        }
+        topology.add_directed(PhysicalQubit(5), PhysicalQubit(6));
+        let neighbours: Vec<Vec<PhysicalQubit>> = (0..7)
+            .map(|q| topology.adjacent(PhysicalQubit(q), CouplingMode::Undirected))
+            .collect();
+        for from in 0..7 {
+            let fast = hop_distances(&neighbours, PhysicalQubit(from));
+            for to in 0..7 {
+                assert_eq!(
+                    fast[to as usize],
+                    topology.distance(
+                        PhysicalQubit(from),
+                        PhysicalQubit(to),
+                        CouplingMode::Undirected
+                    ),
+                    "{from} -> {to}"
+                );
+            }
+        }
     }
 
     #[test]
