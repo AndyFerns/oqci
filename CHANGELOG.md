@@ -12,6 +12,64 @@ and may change without a major bump (per SemVer §4).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-20
+
+Fixes for the CI failures on the 0.6.0 pull request, plus the defects that
+fuzzing the compiler turned up while diagnosing them.
+
+### Security
+
+- **pyo3 0.24 → 0.29** in `oqci-python` (RUSTSEC-2026-0176, RUSTSEC-2026-0177:
+  every earlier release is affected). `cargo-audit` caught it; `cargo-deny`
+  had not, because it checked only the root package. It now runs with
+  `--workspace`.
+
+### Fixed
+
+Each of these was found by fuzzing:
+
+- **A miscompilation in `rotation-merge`.** For huge angles the floating-point
+  sum is not the real sum: `rz(7.0e18); rz(0.4)` merged into a rotation that
+  had lost the `0.4`. A merge now happens only when its rounding error,
+  computed exactly with FMA and TwoSum, is within
+  `ir::ANGLE_ROUNDING_LIMIT` (1e-12 rad).
+- **The same flaw in lowering's affine angle steps** (`scale·θ + offset`).
+  An inexact step now refuses with the new `RuleError::InexactAngle` instead of
+  emitting a different gate.
+- **Platform-dependent trigonometry.** On the Windows GNU toolchain
+  `cos(5.5e19)` is wrong in the third decimal place, so a gate fused from such
+  an angle would differ by platform. Nothing evaluates trigonometry beyond
+  `ir::MAX_EVALUATED_ANGLE` (2²⁰ rad) any more:
+  - fusion leaves those gates alone;
+  - the verifier reports them `inconclusive` with the new reason
+    `angle_too_large`.
+- **Parser stack overflows.** Deeply nested parentheses, unary signs or
+  indexing crashed both frontends. Expressions are now limited to
+  `frontend::MAX_EXPRESSION_DEPTH` (32) levels and `MAX_EXPRESSION_NODES`
+  (256) terms, and larger ones are refused as unsupported.
+- **A CUDA-Q allocation abort.** A huge `cudaq.qvector`, or many of them, was
+  allocated in full (24 GiB) before any check, and the running total could
+  overflow. The cumulative width is now checked against
+  `ir::MAX_REGISTER_WIDTH` at each allocation.
+
+Limits are documented in `docs/verification.md` under "Numerical and
+structural limits", and covered by `tests/limits.rs`.
+
+### Added
+
+- **`fuzz/tests/mutate.rs`**, a mutation fuzzer that runs on stable Rust on
+  every platform. It mutates the corpus seeds for all five fuzz targets and
+  needs no libFuzzer. CI runs it before each `cargo fuzz` job, and 6.4 million
+  mutants at `OQCI_MUTATION_SCALE=10` ran without a panic.
+- **`scripts/ci_annotate.sh`.** It publishes the tail of a failing step's
+  output as a GitHub annotation. Annotations are public, unlike job logs.
+
+### Changed
+
+- **The `cudaq` CI job is strict.** It sets `OQCI_REQUIRE_CUDAQ=1`, so a
+  broken CUDA-Q install fails with its import error instead of skipping. It
+  is also split into install, import and test steps.
+
 ## [0.6.0] - 2026-10-20
 
 Completion of the non-G deliverables (`final-deliverables-spec.md` §34) and of
@@ -854,7 +912,8 @@ the first usable milestone; Phase 1 will bump the minor.
 - Backend execution (simulators, hardware) — beyond the QIR emission boundary.
 - Python bindings — only empty PyO3 placeholders exist under `python/`.
 
-[Unreleased]: https://github.com/AndyFerns/oqci/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/AndyFerns/oqci/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/AndyFerns/oqci/compare/v0.6.0...v0.7.1
 [0.6.0]: https://github.com/AndyFerns/oqci/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/AndyFerns/oqci/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/AndyFerns/oqci/compare/v0.4.0...v0.4.1
